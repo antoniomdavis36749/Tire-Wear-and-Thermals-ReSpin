@@ -8,7 +8,7 @@
 --   auto   — slow sensor-aided learn lap (≤10 mph) → repair → 10 aggressive AI laps
 --   manual — teleport once, arm tyre CSV telemetry, AI disabled (user drives)
 --
--- Triggers (under mods/unpacked/tyre-thermals-and-wear/tools/):
+-- Triggers (under mods/unpacked/Tire-Wear-and-Thermals-ReSpin-main/tools/):
 --   RUN_WC_MANUAL_TEL          → manual telemetry-only
 --   RUN_WC_GT4_TEST            → auto AI test (default)
 --   RUN_WC_GT4_TEST contents containing "manual" → manual telemetry-only
@@ -43,7 +43,7 @@ local MPH_PER_MPS = 2.2369362920544
 
 local function getToolsDir()
   -- Relative to BeamNG user folder (io.open works here; absolute Windows paths often fail in GELUA)
-  return 'mods/unpacked/tyre-thermals-and-wear/tools'
+  return 'mods/unpacked/Tire-Wear-and-Thermals-ReSpin-main/tools'
 end
 
 local function getOutDir()

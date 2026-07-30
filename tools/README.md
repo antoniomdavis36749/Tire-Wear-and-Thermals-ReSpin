@@ -10,12 +10,12 @@ Helpers for soft-sims, West Coast lap telemetry, and profile transforms.
 
 ## West Coast lap / telemetry
 
-Triggers live in `tools/` (VFS: `mods/unpacked/tyre-thermals-and-wear/tools`):
+Triggers live in `tools/` (VFS: `mods/unpacked/Tire-Wear-and-Thermals-ReSpin-main/tools`):
 
-- `RUN_WC_MANUAL_TEL` — manual drive + CSV telemetry
-- `RUN_WC_GT4_TEST` — auto AI Belasco test
-- `STOP_WC_TEST` — abort
-- `TELEMETRY_CSV_ARMED` — written by the vehicle extension when CSV is armed
+- `RUN_WC_MANUAL_TEL` ï¿½ manual drive + CSV telemetry
+- `RUN_WC_GT4_TEST` ï¿½ auto AI Belasco test
+- `STOP_WC_TEST` ï¿½ abort
+- `TELEMETRY_CSV_ARMED` ï¿½ written by the vehicle extension when CSV is armed
 
 Outputs go to `tools/output/` (`wc-*-lap-*.csv/json/txt`).
 
