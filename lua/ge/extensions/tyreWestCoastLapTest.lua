@@ -8,10 +8,11 @@
 --   auto   — slow sensor-aided learn lap (≤10 mph) → repair → 10 aggressive AI laps
 --   manual — teleport once, arm tyre CSV telemetry, AI disabled (user drives)
 --
--- Triggers (under mods/unpacked/tyre-thermals-and-wear/.vscode/):
+-- Triggers (under mods/unpacked/tyre-thermals-and-wear/tools/):
 --   RUN_WC_MANUAL_TEL          → manual telemetry-only
 --   RUN_WC_GT4_TEST            → auto AI test (default)
 --   RUN_WC_GT4_TEST contents containing "manual" → manual telemetry-only
+-- Outputs (CSV / status / result) go under tools/output/.
 local M = {}
 
 local logTag = 'tyreWestCoastLapTest'
@@ -40,9 +41,13 @@ local ARM_MIN_NODES = 8               -- must hit this many checkpoints before f
 local NODE_HIT_RADIUS_EXTRA = 28      -- m beyond waypoint radius to register a hit
 local MPH_PER_MPS = 2.2369362920544
 
-local function getOutDir()
+local function getToolsDir()
   -- Relative to BeamNG user folder (io.open works here; absolute Windows paths often fail in GELUA)
-  return 'mods/unpacked/tyre-thermals-and-wear/.vscode'
+  return 'mods/unpacked/tyre-thermals-and-wear/tools'
+end
+
+local function getOutDir()
+  return getToolsDir() .. '/output'
 end
 
 local function pathJoin(dir, name)
@@ -758,9 +763,9 @@ local function disableAi(veh)
 end
 
 local function clearTriggers()
-  pcall(function() os.remove(pathJoin(getOutDir(), 'RUN_WC_GT4_TEST')) end)
-  pcall(function() os.remove(pathJoin(getOutDir(), 'RUN_WC_MANUAL_TEL')) end)
-  pcall(function() os.remove(pathJoin(getOutDir(), 'STOP_WC_TEST')) end)
+  pcall(function() os.remove(pathJoin(getToolsDir(), 'RUN_WC_GT4_TEST')) end)
+  pcall(function() os.remove(pathJoin(getToolsDir(), 'RUN_WC_MANUAL_TEL')) end)
+  pcall(function() os.remove(pathJoin(getToolsDir(), 'STOP_WC_TEST')) end)
 end
 
 -- User/harness abort: kill AI, disarm CSV, mark stopped (does not quit BeamNG).
@@ -794,7 +799,7 @@ local function abortUserStop(reason)
 end
 
 local function pollStopTrigger()
-  local stopPath = pathJoin(getOutDir(), 'STOP_WC_TEST')
+  local stopPath = pathJoin(getToolsDir(), 'STOP_WC_TEST')
   local sf = io.open(stopPath, 'r')
   if not sf then return false end
   local body = sf:read('*a') or ''
@@ -807,7 +812,7 @@ end
 -- Returns runKind ('auto'|'manual') and trigger name, or nil,nil if none.
 -- Also applies vehicle/CSV profile from trigger body (key=value / profile=kingsnake).
 local function readTriggerMode()
-  local manPath = pathJoin(getOutDir(), 'RUN_WC_MANUAL_TEL')
+  local manPath = pathJoin(getToolsDir(), 'RUN_WC_MANUAL_TEL')
   local mf = io.open(manPath, 'r')
   if mf then
     local body = mf:read('*a') or ''
@@ -815,7 +820,7 @@ local function readTriggerMode()
     applyRunProfileFromTrigger(body)
     return 'manual', 'RUN_WC_MANUAL_TEL'
   end
-  local autoPath = pathJoin(getOutDir(), 'RUN_WC_GT4_TEST')
+  local autoPath = pathJoin(getToolsDir(), 'RUN_WC_GT4_TEST')
   local af = io.open(autoPath, 'r')
   if af then
     local contents = af:read('*a') or ''

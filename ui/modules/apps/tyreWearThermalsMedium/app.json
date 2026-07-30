@@ -1,6 +1,6 @@
 {
   "name": "Tyre Wear & Thermals Medium",
-  "author": "ZestyMaple98",
+  "author": "lucky4luuk, Zesty_Maple98",
   "version": "0.19",
   "directive": "tyreWearThermalsMedium",
   "domElement": "<tyre-wear-thermals-medium></tyre-wear-thermals-medium>",

@@ -1,6 +1,6 @@
 {
   "name": "Tyre Wear & Thermals",
-  "author": "ZestyMaple98",
+  "author": "lucky4luuk, Zesty_Maple98",
   "version": "0.18",
   "directive": "tyreWearThermals",
   "domElement": "<tyre-wear-thermals></tyre-wear-thermals>",

@@ -1,7 +1,7 @@
 # Aero edge-case soft-sim v4 - proven inline pattern
 # Per-wheel aero loads 0..5kN (20kN total), 4 scenarios, 3 tire types.
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $PSScriptRoot 'aero-edge-softsim.txt'
+$out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'aero-edge-softsim.txt'
 
 # ── constants ────────────────────────────────────────────────────────────────
 [double]$ENV_C=26.0; [double]$TRACK_C=40.0; [double]$TYRE_W=0.95

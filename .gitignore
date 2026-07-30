@@ -7,23 +7,20 @@ __pycache__/
 .venv/
 venv/
 
-# Telemetry arm marker + live CSV dumps
-.vscode/TELEMETRY_CSV_ARMED
-.vscode/*.csv
+# Dev triggers / arm markers (local only)
+tools/TELEMETRY_CSV_ARMED
+tools/RUN_WC_MANUAL_TEL
+tools/RUN_WC_GT4_TEST
+tools/STOP_WC_TEST
+tools/ENABLE_WC_LAP_TEST
 
-# Soft-sim / lap run artifacts (keep scripts + settings)
-.vscode/*-result.txt
-.vscode/*-status.json
-.vscode/*softsim*.txt
-.vscode/*-test.txt
-.vscode/aero-edge-softsim.txt
-.vscode/burnout-heat-softsim.txt
-.vscode/setup-geometry-matrix.txt
+# Generated soft-sim / lap artifacts (keep tools/output/.gitkeep)
+tools/output/*
+!tools/output/.gitkeep
 
-# One-shot helper scratch (safe to regenerate)
-.vscode/pack_locals.py
-.vscode/count_main_locals.py
+# One-shot helper scratch under tools/scripts
+tools/scripts/pack_locals.py
+tools/scripts/count_main_locals.py
 
 # Editor junk
 **/New Text Document.txt
-

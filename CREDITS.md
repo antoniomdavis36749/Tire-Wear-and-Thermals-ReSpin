@@ -1,0 +1,16 @@
+# Credits
+
+Tire-Wear-and-Thermals-ReSpin is derived from open-source BeamNG.drive tyre thermal/wear work.
+
+## Authors to credit
+
+- **lucky4luuk** — original mod author  
+  Resource: https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/
+
+- **Zesty_Maple98** — expanded and reworked the original into Tyre Wear and Thermals Redux  
+  Resource: https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/  
+  Upstream source: https://github.com/ample-samples/tyre-thermals-and-wear
+
+Please preserve these credits when redistributing or forking this ReSpin.
+
+License: GNU Affero General Public License v3 (`license`).

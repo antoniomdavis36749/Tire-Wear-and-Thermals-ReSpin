@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
-$vs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\tyre-thermals-and-wear\.vscode'
+$vs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\tyre-thermals-and-wear\tools'
 
-$b = Get-Content (Join-Path $vs 'belasco1-from-game.race.json') -Raw | ConvertFrom-Json
+$b = Get-Content (Join-Path (Join-Path $vs 'fixtures') 'belasco1-from-game.race.json') -Raw | ConvertFrom-Json
 Write-Host ("pathnodes=" + $b.pathnodes.Count)
 $sumx=0; $sumy=0; $sumz=0
 foreach ($n in $b.pathnodes) {
@@ -20,7 +20,7 @@ $sr = New-Object IO.StreamReader($e.Open())
 $t = $sr.ReadToEnd()
 $sr.Close()
 $z.Dispose()
-$prefabOut = Join-Path $vs 'race_track.prefab.txt'
+$prefabOut = Join-Path (Join-Path $vs 'fixtures') 'race_track.prefab.txt'
 [IO.File]::WriteAllText($prefabOut, $t)
 Write-Host ("prefabLen=" + $t.Length)
 

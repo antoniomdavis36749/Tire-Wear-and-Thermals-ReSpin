@@ -1,4 +1,4 @@
-$tel = Join-Path $PSScriptRoot 'wc-gt4-lap-telemetry.csv'
+$tel = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'wc-gt4-lap-telemetry.csv'
 $lines = Get-Content $tel
 Write-Output "lines=$($lines.Count)"
 $raw = $lines | Where-Object { $_ -and ($_ -notmatch '^#') -and ($_ -notmatch '^wall,') }

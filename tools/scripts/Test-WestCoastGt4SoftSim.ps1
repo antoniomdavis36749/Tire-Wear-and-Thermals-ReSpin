@@ -3,7 +3,7 @@
 # sport / sport_plus PROFILE_POINTS untouched.
 # Live ref: skin better @0.55; second carcass layer still overheating on driven rears.
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $PSScriptRoot 'wc-gt4-softsim-10laps.txt'
+$out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'wc-gt4-softsim-10laps.txt'
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {

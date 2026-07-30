@@ -71,7 +71,7 @@ foreach ($p in $profiles) {
     $std = (EffGrip $profiles[0] 35 1.0).grip
     $out.Add(('{0}: grip={1:n3} ({2:n0}% of standard)' -f $p.name, $e.grip, (100.0 * $e.grip / $std))
 }
-$path = Join-Path $PSScriptRoot 'vintage-grip-results.csv'
+$path = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'vintage-grip-results.csv'
 $out | Set-Content -LiteralPath $path -Encoding UTF8
 Write-Output "Wrote $path"
 $out | Select-Object -Last 20

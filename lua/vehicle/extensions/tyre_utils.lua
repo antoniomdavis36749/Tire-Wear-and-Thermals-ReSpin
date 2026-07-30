@@ -1,3 +1,4 @@
+-- Credits: lucky4luuk (original), Zesty_Maple98 (Redux expansion). See CREDITS.md.
 local M = {}
 
 local vehicleMassCache = nil -- Local variable to store the calculated mass

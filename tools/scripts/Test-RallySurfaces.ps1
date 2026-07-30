@@ -2,7 +2,7 @@
 # Live: names matching rally/tarmac/asphalt → STANDALONE_MODIFIERS.rally (profile1/2 = "rally")
 # Surface scale still follows treadCoef; profile bias uses has("rally") on profile tags.
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $PSScriptRoot 'rally-surface-test.txt'
+$out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'rally-surface-test.txt'
 
 function Lerp([double]$a,[double]$b,[double]$t){ return $a+($b-$a)*$t }
 function Clamp([double]$v,[double]$lo,[double]$hi){ if($v -lt $lo){return $lo}; if($v -gt $hi){return $hi}; return $v }

@@ -1,4 +1,6 @@
 -- lua/vehicle/extensions/auto/luukstyrethermalsandwear.lua
+-- Credits: lucky4luuk (original open-source mod), Zesty_Maple98 (Redux expansion).
+-- This ReSpin builds on their AGPL-licensed work — see CREDITS.md / README.md.
 local M = {}
 
 -- Toggle real-time log prints to the BeamNG game console (open with ~ key)
@@ -759,7 +761,7 @@ local waterFilmDepth = 0 -- 0..1 global film from rain (no native BeamNG film AP
 local telem = {
     csvEnabled = false,    -- Optional CSV dump (user can enable)
     interval = 1.0,        -- Seconds between samples when enabled
-    armMarker = "mods/unpacked/tyre-thermals-and-wear/.vscode/TELEMETRY_CSV_ARMED",
+    armMarker = "mods/unpacked/tyre-thermals-and-wear/tools/TELEMETRY_CSV_ARMED",
     timer = 0,
     path = nil,
     csvBuffer = {},

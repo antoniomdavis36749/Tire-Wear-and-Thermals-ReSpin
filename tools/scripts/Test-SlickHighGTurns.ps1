@@ -1,7 +1,7 @@
 # Slick compounds under long high-G turns (soft-sim mirrors live heat + blister path)
 #Requires -Version 5.1
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $PSScriptRoot 'slick-highg-turns-test.txt'
+$out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'slick-highg-turns-test.txt'
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {

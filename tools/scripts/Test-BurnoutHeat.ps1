@@ -2,7 +2,7 @@
 # Source: luukstyrethermalsandwear.lua (THERMAL_TOPOLOGY + sport_plus PROFILE_POINTS)
 # Fix A: gated high-|lastSlip| longComp boost (slipVelBoost*) so burnout can smoke.
 $ErrorActionPreference = 'Stop'
-$out = Join-Path $PSScriptRoot 'burnout-heat-softsim.txt'
+$out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'burnout-heat-softsim.txt'
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {

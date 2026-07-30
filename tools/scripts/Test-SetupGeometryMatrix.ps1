@@ -7,7 +7,7 @@
   Compares effect magnitudes to real-world order-of-magnitude expectations.
 #>
 $ErrorActionPreference = 'Stop'
-$outPath = Join-Path $PSScriptRoot 'setup-geometry-matrix.txt'
+$outPath = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'setup-geometry-matrix.txt'
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {
