@@ -1,7 +1,7 @@
 {
   "name": "Tyre Wear & Thermals",
-  "author": "lucky4luuk, Zesty_Maple98",
-  "version": "0.18",
+  "author": "lucky4luuk, Zesty_Maple98 (ReSpin)",
+  "version": "0.1.0",
   "directive": "tyreWearThermals",
   "domElement": "<tyre-wear-thermals></tyre-wear-thermals>",
   "types": [
@@ -10,7 +10,7 @@
     "ui.apps.categories.info",
     "ui.apps.categories.racing"
   ],
-  "description": "Displays real-time tyre temperatures (inner, middle, outer), core temperatures, camber angles, and tread wear condition.",
+  "description": "ReSpin: real-time tyre temperatures (inner, middle, outer), core temperatures, camber angles, and tread wear condition.",
   "css": {
     "left": "0px",
     "top": "0px",
