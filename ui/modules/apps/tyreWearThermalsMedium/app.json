@@ -1,7 +1,7 @@
 {
   "name": "Tyre Wear & Thermals Medium",
-  "author": "lucky4luuk, Zesty_Maple98",
-  "version": "0.19",
+  "author": "lucky4luuk, Zesty_Maple98 (ReSpin)",
+  "version": "0.1.0",
   "directive": "tyreWearThermalsMedium",
   "domElement": "<tyre-wear-thermals-medium></tyre-wear-thermals-medium>",
   "types": [
@@ -10,7 +10,7 @@
     "ui.apps.categories.info",
     "ui.apps.categories.racing"
   ],
-  "description": "Heavy-style card telemetry without test channels: skin/carcass maps, grip, pressure, surface damage modes.",
+  "description": "ReSpin: skin/carcass maps, grip, pressure, and surface damage modes.",
   "css": {
     "left": "0px",
     "top": "0px",

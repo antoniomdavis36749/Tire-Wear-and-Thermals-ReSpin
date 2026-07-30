@@ -35,3 +35,14 @@ BeamNG requires the runtime folders below; do not rename them.
 | `.vscode/settings.json` | Editor Lua language-server config only |
 
 See `tools/README.md` for soft-sim / telemetry workflow.
+
+## Publishing
+
+BeamNG Repo prep lives on branch `beamng-repo-publish`. See **`PUBLISH_CHECKLIST.md`**.
+
+Build a correctly nested release zip (excludes `tools/` and the WC lap harness):
+
+```powershell
+.\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'
+```
+

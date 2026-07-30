@@ -10,6 +10,6 @@ setExtensionUnloadMode("luukstyrethermalsandwear", "manual")
 load("createbrakeductsliders")
 setExtensionUnloadMode("createbrakeductsliders", "manual")
 
-load("tyreWestCoastLapTest")
-setExtensionUnloadMode("tyreWestCoastLapTest", "manual")
-log("I", "luukstyrethermalsandwear", "tyreWestCoastLapTest loaded (RUN_WC_MANUAL_TEL=manual; profile=kingsnake|GT-IV via trigger body)")
+-- Dev-only West Coast lap / telemetry harness is NOT loaded in player builds.
+-- Keep lua/ge/extensions/tyreWestCoastLapTest.lua in the git tree for tools/, but
+-- omit it from Pack-Release.ps1 so Repo installs stay clean.
