@@ -1,0 +1,21 @@
+{
+  "name": "Tyre Wear & Thermals Heavy",
+  "description": "Full diagnostics for testing: 8-node temps, surface μ/depth, suspension, slip, brakes, wear modes.",
+  "author": "Luuk",
+  "version": "1.1",
+  "directive": "tyreWearThermalsHeavy",
+  "domElement": "<tyre-wear-thermals-heavy></tyre-wear-thermals-heavy>",
+  "types": [
+    "ui.apps.categories.debug",
+    "ui.apps.categories.vehicle_info",
+    "ui.apps.categories.racing"
+  ],
+  "css": {
+    "left": "0px",
+    "top": "0px",
+    "width": "420px",
+    "height": "560px",
+    "min-width": "320px",
+    "min-height": "280px"
+  }
+}
