@@ -107,11 +107,15 @@ local function onUpdate(dt)
     local cloudCover = 0.2
 
     if core_environment then
-        -- Retrieve temperature safely
+        -- Retrieve temperature safely (GE may return Kelvin or Celsius)
         if type(core_environment.getTemperature) == "function" then
             envTemp = core_environment.getTemperature() or 21
         elseif core_environment.temperature ~= nil then
             envTemp = core_environment.temperature
+        end
+        -- Normalize to Celsius before mailbox (vehicle also sanitizes, but keep units consistent)
+        if type(envTemp) == "number" and envTemp > 180 then
+            envTemp = envTemp - 273.15
         end
 
         -- Retrieve time of day safely

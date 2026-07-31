@@ -7,46 +7,51 @@ angular.module("beamng.apps")
                         .ttm-panel-container {
                             width: 100%;
                             height: 100%;
+                            max-height: 100%;
+                            min-height: 0;
                             background: rgba(18, 22, 28, 0.90);
                             border: 1px solid rgba(255, 255, 255, 0.08);
                             border-radius: 6px;
                             box-sizing: border-box;
                             font-family: "Lucida Console", Monaco, monospace;
                             color: #f1f5f9;
-                            overflow: auto;
-                            padding: 12px;
+                            overflow-x: hidden;
+                            overflow-y: auto;
+                            -webkit-overflow-scrolling: touch;
+                            padding: 8px;
+                            pointer-events: auto;
                         }
                         .ttm-header {
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
                             border-bottom: 2px solid rgba(255, 255, 255, 0.08);
-                            padding-bottom: 8px;
-                            margin-bottom: 12px;
-                            gap: 8px;
+                            padding-bottom: 5px;
+                            margin-bottom: 8px;
+                            gap: 6px;
                             flex-wrap: wrap;
                         }
                         .ttm-title {
-                            font-size: 13px;
+                            font-size: 12px;
                             font-weight: bold;
-                            letter-spacing: 1.5px;
+                            letter-spacing: 1.2px;
                             color: #38bdf8;
                         }
                         .ttm-header-meta {
-                            font-size: 10px;
+                            font-size: 9px;
                             color: #94a3b8;
-                            letter-spacing: 0.5px;
+                            letter-spacing: 0.4px;
                         }
                         .ttm-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-                            gap: 12px;
+                            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                            gap: 8px;
                         }
                         .ttm-card {
                             background: rgba(30, 41, 59, 0.6);
                             border: 1px solid rgba(255, 255, 255, 0.04);
-                            border-radius: 6px;
-                            padding: 12px;
+                            border-radius: 5px;
+                            padding: 8px;
                             box-sizing: border-box;
                         }
                         .ttm-card-header {
@@ -54,49 +59,49 @@ angular.module("beamng.apps")
                             justify-content: space-between;
                             align-items: center;
                             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-                            padding-bottom: 6px;
-                            margin-bottom: 10px;
+                            padding-bottom: 4px;
+                            margin-bottom: 6px;
                         }
                         .ttm-wheel-name {
-                            font-size: 14px;
+                            font-size: 12px;
                             font-weight: bold;
                             color: #38bdf8;
                         }
                         .ttm-compound-tag {
-                            font-size: 10px;
+                            font-size: 9px;
                             background: rgba(56, 189, 248, 0.12);
                             border: 1px solid rgba(56, 189, 248, 0.2);
-                            padding: 2px 6px;
-                            border-radius: 4px;
+                            padding: 1px 5px;
+                            border-radius: 3px;
                             text-transform: uppercase;
-                            letter-spacing: 0.5px;
+                            letter-spacing: 0.4px;
                         }
                         .ttm-stat-row {
                             display: flex;
                             justify-content: space-between;
-                            margin-bottom: 6px;
-                            font-size: 11px;
+                            margin-bottom: 3px;
+                            font-size: 10px;
                         }
                         .ttm-label { color: #94a3b8; }
                         .ttm-value { font-weight: bold; }
                         .ttm-section-label {
-                            font-size: 10px;
+                            font-size: 9px;
                             color: #94a3b8;
-                            margin-top: 8px;
-                            margin-bottom: 2px;
+                            margin-top: 5px;
+                            margin-bottom: 1px;
                         }
                         .ttm-thermal-strip {
                             display: grid;
                             grid-template-columns: repeat(3, 1fr);
-                            gap: 4px;
-                            margin: 6px 0 8px;
-                            height: 24px;
+                            gap: 3px;
+                            margin: 3px 0 5px;
+                            height: 20px;
                         }
                         .ttm-thermal-segment {
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            font-size: 11px;
+                            font-size: 10px;
                             font-weight: bold;
                             border-radius: 3px;
                             text-shadow: 1px 1px 1px rgba(0,0,0,0.85);
@@ -105,9 +110,9 @@ angular.module("beamng.apps")
                             width: 100%;
                             background: rgba(255, 255, 255, 0.05);
                             border-radius: 3px;
-                            height: 6px;
+                            height: 5px;
                             overflow: hidden;
-                            margin-top: 3px;
+                            margin-top: 2px;
                         }
                         .ttm-bar-fill {
                             height: 100%;
@@ -116,24 +121,24 @@ angular.module("beamng.apps")
                         .ttm-diagnostics-grid {
                             display: grid;
                             grid-template-columns: 1fr 1fr;
-                            gap: 10px;
+                            gap: 6px;
                             border-top: 1px dashed rgba(255, 255, 255, 0.08);
-                            margin-top: 10px;
-                            padding-top: 10px;
+                            margin-top: 6px;
+                            padding-top: 6px;
                         }
-                        .ttm-diagnostic-item { font-size: 10px; }
+                        .ttm-diagnostic-item { font-size: 9px; }
                         .ttm-diag-label {
                             color: #64748b;
                             display: block;
-                            margin-bottom: 3px;
-                            font-size: 9px;
-                            letter-spacing: 0.5px;
+                            margin-bottom: 2px;
+                            font-size: 8px;
+                            letter-spacing: 0.4px;
                         }
                         .ttm-footer {
-                            font-size: 9px;
+                            font-size: 8px;
                             color: #64748b;
                             text-align: right;
-                            margin-top: 8px;
+                            margin-top: 5px;
                         }
                     </style>
 
@@ -162,7 +167,7 @@ angular.module("beamng.apps")
                                     {{ w.condition !== undefined ? w.condition.toFixed(1) : '0.0' }}%
                                 </span>
                             </div>
-                            <div class="ttm-bar-container" style="margin-bottom: 8px;">
+                            <div class="ttm-bar-container" style="margin-bottom: 5px;">
                                 <div class="ttm-bar-fill" ng-style="{'width': (w.condition || 0) + '%', 'background-color': getConditionColor(w.condition)}"></div>
                             </div>
 

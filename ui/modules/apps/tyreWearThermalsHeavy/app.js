@@ -7,14 +7,19 @@ angular.module("beamng.apps")
                         .tth-panel-container {
                             width: 100%;
                             height: 100%;
+                            max-height: 100%;
+                            min-height: 0;
                             background: rgba(18, 22, 28, 0.90);
                             border: 1px solid rgba(255, 255, 255, 0.08);
                             border-radius: 6px;
                             box-sizing: border-box;
                             font-family: "Lucida Console", Monaco, monospace;
                             color: #f1f5f9;
-                            overflow: auto;
+                            overflow-x: hidden;
+                            overflow-y: auto;
+                            -webkit-overflow-scrolling: touch;
                             padding: 12px;
+                            pointer-events: auto;
                         }
                         .tth-header {
                             display: flex;
@@ -127,7 +132,7 @@ angular.module("beamng.apps")
                         }
                     </style>
 
-                    <div class="tth-header">
+                    <div class="tth-header" style="flex-wrap: wrap; gap: 8px;">
                         <span class="tth-title">TYRE TELEMETRY (HEAVY / TEST)</span>
                         <span style="font-size: 10px; color: #94a3b8; letter-spacing: 0.5px;">
                             Env {{ envTemp }}°C · Track {{ trackTemp }}°C · Rain {{ rainState }}% · Film {{ waterFilm }}%
@@ -137,6 +142,10 @@ angular.module("beamng.apps")
                             <span style="color: #f59e0b; font-weight: bold;">{{ totalDownforceKN }} kN</span>
                             <span style="color: #64748b; font-size: 9px;">({{ aeroFracPct }}% of load)</span>
                         </span>
+                        <span style="font-size: 9px; color: #64748b; letter-spacing: 0.4px; width: 100%;">
+                            Elev {{ elevationM }}m · ToD {{ timeOfDay }} · Cloud {{ cloudCover }}% · Wake {{ packWake }}% · Δair {{ packAirDelta }}°
+                            · Stream {{ streamHz }} Hz · EnvΔ {{ envTempRange }}°
+                        </span>
                     </div>
 
                     <div class="tth-grid">
@@ -144,7 +153,13 @@ angular.module("beamng.apps")
                             <!-- Wheel Header -->
                             <div class="tth-card-header">
                                 <span class="tth-wheel-name">{{ w.name }}</span>
-                                <span class="tth-compound-tag">{{ formatProfile(w.profile) }}</span>
+                                <span class="tth-compound-tag">{{ formatProfile(w.compoundClass || w.profile) }}</span>
+                            </div>
+                            <div class="tth-stat-row" ng-if="w.profile1 || w.profile2" style="font-size: 9px; margin-top: -4px;">
+                                <span class="tth-label">Profiles</span>
+                                <span class="tth-value" style="font-size: 9px; color: #94a3b8;">
+                                    {{ formatProfile(w.profile1) }} → {{ formatProfile(w.profile2) }}
+                                </span>
                             </div>
 
                             <!-- Structural Condition -->
@@ -173,8 +188,13 @@ angular.module("beamng.apps")
                                     <span ng-style="{'color': getInflationColor(w.pressure, w.targetHotPressure || w.optimalPressure)}">
                                         {{ w.pressure !== undefined ? w.pressure.toFixed(1) : '0.0' }} PSI 
                                     </span>
+                                    <span class="tth-compound-tag" style="margin-left: 4px;"
+                                          ng-style="{'color': getInflationColor(w.pressure, w.targetHotPressure || w.optimalPressure)}">
+                                        {{ pressureBandLabel(w) }}
+                                    </span>
                                     <span style="font-size: 9px; color: #64748b;">
-                                        (Cold: {{ w.coldPressure || w.initialPressure || 0 }} / Hot tgt: {{ w.targetHotPressure || w.optimalPressure || 0 }})
+                                        (Cold: {{ w.coldPressure || w.initialPressure || 0 }} / Hot tgt: {{ w.targetHotPressure || w.optimalPressure || 0 }}
+                                        · r{{ (w.pressureRatio || 0).toFixed(2) }})
                                     </span>
                                 </span>
                             </div>
@@ -269,8 +289,22 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Skin−carcass gap:</span>
+                                <span class="tth-value" ng-style="{'color': isLargeSkinGap(w.skinCarcassGap) ? '#f59e0b' : '#f1f5f9'}">
+                                    {{ (w.skinCarcassGap !== undefined ? w.skinCarcassGap : 0).toFixed(1) }} °C
+                                </span>
+                            </div>
+
                             <!-- TEST / PHYSICS CHANNELS -->
                             <div style="font-size: 10px; color: #f59e0b; margin-top: 10px; letter-spacing: 0.5px;">TEST CHANNELS</div>
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Drive heat gate S/C:</span>
+                                <span class="tth-value">
+                                    {{ ((w.driveHeatGate||0)*100).toFixed(0) }}% /
+                                    {{ ((w.driveHeatGateCarcass||0)*100).toFixed(0) }}%
+                                </span>
+                            </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Load / Peak F:</span>
                                 <span class="tth-value">{{ w.loadN || 0 }} N / {{ w.peakForce || 0 }} N</span>
@@ -381,10 +415,35 @@ angular.module("beamng.apps")
                 scope.waterFilm = 0;
                 scope.totalDownforceKN = "0.00";
                 scope.aeroFracPct = 0;
+                scope.elevationM = 0;
+                scope.timeOfDay = "0.00";
+                scope.cloudCover = 0;
+                scope.packWake = 0;
+                scope.packAirDelta = 0;
+                scope.streamHz = 15;
+                scope.envTempRange = 0;
 
                 scope.formatProfile = function (profile) {
                     if (!profile) return '';
-                    return profile.replace(/_/g, ' ');
+                    return String(profile).replace(/_/g, ' ');
+                };
+
+                scope.isLargeSkinGap = function (gap) {
+                    return Math.abs(gap || 0) > 15;
+                };
+
+                scope.pressureBandLabel = function (w) {
+                    var opt = (w && (w.targetHotPressure || w.optimalPressure)) || 25;
+                    if (opt <= 0) opt = 25;
+                    var pressure = (w && w.pressure) || 0;
+                    var ratio = pressure / opt;
+                    if (pressure < 5) return "FLAT";
+                    if (ratio < 0.70) return "LOW";
+                    if (ratio < 0.86) return "UNDER";
+                    if (ratio <= 1.04) return "OPT";
+                    if (ratio <= 1.32) return "WARM+";
+                    if (ratio <= 1.55) return "OVER";
+                    return "HIGH";
                 };
 
                 scope.tempCategoryColor = function (cat) {
@@ -433,11 +492,13 @@ angular.module("beamng.apps")
                     var opt = optimalPressure || 25;
                     if (opt <= 0) opt = 25; 
                     var ratio = pressure / opt;
+                    // Bands mirror CalcPressureGripScales (perfect ±4%, normal under -14%, over +32%)
                     if (pressure < 5) return "#ef4444"; 
-                    if (ratio < 0.75) return "#38bdf8";  
-                    if (ratio < 0.90) return "#a3e635";  
-                    if (ratio <= 1.25) return "#10b981"; 
-                    if (ratio <= 1.40) return "#f59e0b"; 
+                    if (ratio < 0.70) return "#38bdf8";  
+                    if (ratio < 0.86) return "#a3e635";  
+                    if (ratio <= 1.04) return "#10b981"; 
+                    if (ratio <= 1.32) return "#34d399"; 
+                    if (ratio <= 1.55) return "#f59e0b"; 
                     return "#ef4444";                    
                 };
 
@@ -445,8 +506,8 @@ angular.module("beamng.apps")
                     var initialPres = initialPressure || 25;
                     var optPres = optimalPressure || 25;
                     
-                    var underLimit = Math.min(optPres * 0.75, optPres - 5);
-                    var overLimit = Math.max(optPres * 1.35, optPres + 6);
+                    var underLimit = Math.min(optPres * 0.86, optPres - 4);
+                    var overLimit = Math.max(optPres * 1.32, optPres + 8);
                     
                     if (initialPres < underLimit) {
                         return "UNDERINFLATED";
@@ -499,6 +560,14 @@ angular.module("beamng.apps")
                             ? (dataStream.totalDownforceN / 1000).toFixed(2)
                             : scope.totalDownforceKN;
                         scope.aeroFracPct = dataStream.aeroFracPct !== undefined ? dataStream.aeroFracPct : scope.aeroFracPct;
+                        scope.elevationM = dataStream.elevationM !== undefined ? dataStream.elevationM : scope.elevationM;
+                        scope.timeOfDay = dataStream.timeOfDay !== undefined
+                            ? Number(dataStream.timeOfDay).toFixed(3) : scope.timeOfDay;
+                        scope.cloudCover = dataStream.cloudCover !== undefined ? dataStream.cloudCover : scope.cloudCover;
+                        scope.packWake = dataStream.packWake !== undefined ? dataStream.packWake : scope.packWake;
+                        scope.packAirDelta = dataStream.packAirDelta !== undefined ? dataStream.packAirDelta : scope.packAirDelta;
+                        scope.streamHz = dataStream.streamHz !== undefined ? dataStream.streamHz : scope.streamHz;
+                        scope.envTempRange = dataStream.envTempRange !== undefined ? dataStream.envTempRange : scope.envTempRange;
                     });
                 }
 

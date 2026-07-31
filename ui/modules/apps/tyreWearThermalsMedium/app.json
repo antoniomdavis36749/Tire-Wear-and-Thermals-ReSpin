@@ -1,7 +1,7 @@
 {
   "name": "Tyre Wear & Thermals Medium",
   "author": "lucky4luuk, Zesty_Maple98 (ReSpin)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "directive": "tyreWearThermalsMedium",
   "domElement": "<tyre-wear-thermals-medium></tyre-wear-thermals-medium>",
   "types": [
@@ -11,6 +11,9 @@
     "ui.apps.categories.racing"
   ],
   "description": "ReSpin: skin/carcass maps, grip, pressure, and surface damage modes.",
+  "category": "Telemetry",
+  "isAuxiliary": false,
+  "interactive": "yes",
   "css": {
     "left": "0px",
     "top": "0px",

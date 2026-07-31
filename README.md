@@ -8,8 +8,8 @@ This project builds on the work of:
 
 | Author | Role |
 | --- | --- |
-| **[lucky4luuk](https://www.beamng.com/members/lucky4luuk.53119/)** | Original mod author — [Luuk's Tyre Thermals and Wear](https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/) |
-| **[Zesty_Maple98](https://www.beamng.com/members/zesty-maple98.393895/)** | Expanded / reworked the original — [Tyre Wear and Thermals Redux](https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/) |
+| **[lucky4luuk](https://www.beamng.com/members/lucky4luuk.53119/)** | Original mod author (open source; cite authorship) — [Luuk's Tyre Thermals and Wear](https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/) |
+| **[Zesty_Maple98](https://www.beamng.com/members/zesty-maple98.393895/)** | Expanded / reworked the original — [Tyre Wear and Thermals Redux](https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/) (permission received for ReSpin) |
 
 Source lineage remains AGPL-3.0 (see `license`). Thank you to both authors for releasing their work as open source.
 
@@ -45,4 +45,6 @@ Build a correctly nested release zip (excludes `tools/` and the WC lap harness):
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'
 ```
+
+Repo listing copy-paste text: **`LISTING.md`**.
 

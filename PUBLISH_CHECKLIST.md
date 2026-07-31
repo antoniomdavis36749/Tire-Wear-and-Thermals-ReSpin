@@ -14,10 +14,11 @@ Guidelines: https://www.beamng.com/game/support/policies/modding-guidelines/
 ## A. Legal & credits (required)
 
 - [x] Keep AGPL-3.0 (`license`)
-- [x] Credit **lucky4luuk** (original) and **Zesty_Maple98** (Redux) — `CREDITS.md`, `NOTICE`, README, app authors, listing text
-- [ ] Confirm you have permission / AGPL compliance to redistribute derivative (source link on listing)
-- [ ] Decide listing author name (your BeamNG forum username) — fill into `mod_info` / repo form
-- [ ] Link **your** GitHub source on the resource page (not only upstream Redux)
+- [x] Credit **lucky4luuk** (original, open source — cite authorship) and **Zesty_Maple98** (Redux) — `CREDITS.md`, `NOTICE`, README, app authors, listing text
+- [x] Luuk: open-source release; authorship citation required (stated in listing)
+- [x] Zesty_Maple98 official permission received (stated in listing)
+- [x] Confirm BeamNG forum username: `antoniomdavis36749`
+- [x] Link **your** GitHub source on the listing (`LISTING.md` / `info.json`)
 
 ## B. What ships vs what stays private
 
@@ -28,7 +29,7 @@ Player zip should contain only runtime content. Dev tooling must not ship.
 | `lua/` (except lap harness if removed below) | `tools/` |
 | `ui/` | `.vscode/` |
 | `scripts/luukstyrethermalsandwear/` | `.git/` |
-| `license`, `CREDITS.md`, `NOTICE`, `README.md` | `tools/output/`, soft-sim dumps |
+| `license`, `CREDITS.md`, `NOTICE`, `README.md`, `LISTING.md` | `tools/output/`, soft-sim dumps |
 | `mod_info/` (cleaned for **new** resource) | Old Redux `resource_id` / foreign `username` leftovers |
 
 - [x] Document exclude list (this file + packer)
@@ -41,14 +42,13 @@ Player zip should contain only runtime content. Dev tooling must not ship.
 Do **not** reuse Redux’s resource identity. This is a new listing derived from open source.
 
 - [x] New title: `Tire Wear and Thermals ReSpin`
-- [x] Short tagline with credits
-- [x] Full description draft in `mod_info/TWTRS_RESPIN/info.json`
+- [x] Polished tagline + BBCode description (`LISTING.md`, `mod_info/TWTRS_RESPIN/info.json`)
 - [x] Version string `0.1.0` (no version in zip filename)
 - [x] Zip name draft: `TireWearThermalsReSpin.zip` (add `_YourBeamNGUser` before upload if needed)
 - [x] Removed Redux `resource_id` / `MXFQY32S5` / foreign owner fields / stale hashes
 - [x] Local placeholder tagid `TWTRS_RESPIN` (Repo will assign official tag on upload)
-- [ ] Confirm BeamNG forum username (currently set to GitHub-style `antoniomdavis36749` — change if different)
-- [ ] Icon / preview images (≥2 screenshots for listing)
+- [x] BeamNG forum username confirmed: `antoniomdavis36749`
+- [ ] Icon / preview images (≥2 screenshots — see `LISTING.md` shot plan)
 - [ ] Category confirmed on upload form
 - [ ] Prefix: Alpha until balance is ready
 

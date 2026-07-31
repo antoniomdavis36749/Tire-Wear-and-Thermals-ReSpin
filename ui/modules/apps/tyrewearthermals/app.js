@@ -1,7 +1,7 @@
 angular.module("beamng.apps")
     .directive("tyreWearThermals", ["$injector", function ($injector) {
         return {
-            template: '<canvas width="220" height="220"></canvas>',
+            template: '<canvas class="twt-simple-canvas" width="220" height="220" style="width:100%;height:100%;display:block;box-sizing:border-box;"></canvas>',
             replace: true,
             restrict: "EA",
             link: function (scope, element, attrs) {
@@ -21,9 +21,17 @@ angular.module("beamng.apps")
                 var c = element[0];
                 var ctx = c.getContext("2d");
 
+                function fitCanvas(width, height) {
+                    var w = Math.max(1, Math.floor(width || c.clientWidth || 220));
+                    var h = Math.max(1, Math.floor(height || c.clientHeight || 220));
+                    if (c.width !== w || c.height !== h) {
+                        c.width = w;
+                        c.height = h;
+                    }
+                }
+
                 scope.$on('app:resized', function (event, data) {
-                    c.width = data.width || 220;
-                    c.height = data.height || 220;
+                    fitCanvas(data && data.width, data && data.height);
                 });
 
                 // Standard border-radius drawing utility

@@ -24,3 +24,7 @@ tools/scripts/count_main_locals.py
 
 # Editor junk
 **/New Text Document.txt
+
+# Local reference only (not for Repo)
+mod_info/**/icon-redux-reference.jpg
+

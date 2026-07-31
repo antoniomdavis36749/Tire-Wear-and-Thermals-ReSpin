@@ -48,18 +48,46 @@ function Get-CombinedBias([double]$camberDeg, [double]$gLat, [double]$wheelDir =
   return (-$camberDeg * 0.12 * $wheelDir) + $gLatBias
 }
 
-# Live pressure grip scales (CalculateTyreGrip, dry paved)
+# Live pressure grip scales (CalcPressureGripScales, dry paved)
 function Get-PressureScales([double]$currentPsi, [double]$optP, [double]$sensitivity) {
   $pOffset = ($currentPsi / [math]::Max(1.0, $optP)) - 1.0
-  if ($pOffset -lt 0) {
-    $defSq = $pOffset * $pOffset
-    $lat = [math]::Max(0.15, 1.0 - ($sensitivity * 0.75) * $defSq)
-    $long = [math]::Max(0.30, 1.0 - ($sensitivity * 0.35) * $defSq)
-  } else {
-    $pen = [math]::Max(0.35, 1.0 / (1.0 + ($sensitivity * 0.80) * ($pOffset * $pOffset)))
-    $lat = $pen; $long = $pen
+  $sens = [math]::Max(0.05, $sensitivity)
+  $ph = 0.04; $nu = 0.14; $no = 0.32
+  $bonus = 0.020
+  $mildMax = 0.028 + 0.022 * $sens
+  $ao = [math]::Abs($pOffset)
+  if ($ao -le $ph) {
+    $t = 1.0 - $ao / $ph
+    $s = 1.0 + $bonus * $t * $t
+    return @{ Lat = $s; Long = $s; POffset = $pOffset; Band = 'perfect' }
   }
-  return @{ Lat = $lat; Long = $long; POffset = $pOffset }
+  if ($pOffset -lt 0) {
+    if ($pOffset -ge -$nu) {
+      $t = (-$pOffset - $ph) / ($nu - $ph)
+      $lat = 1.0 - $mildMax * $t * 1.15
+      $long = 1.0 - $mildMax * $t * 0.55
+      return @{ Lat = $lat; Long = $long; POffset = $pOffset; Band = 'normal_under' }
+    }
+    $excess = -$pOffset - $nu
+    $edgeLat = 1.0 - $mildMax * 1.15
+    $edgeLong = 1.0 - $mildMax * 0.55
+    $den = 1.0 + $sens * 1.5 * ($excess * $excess + 1.8 * $excess * $excess * $excess)
+    return @{
+      Lat = [math]::Max(0.15, $edgeLat / $den)
+      Long = [math]::Max(0.30, $edgeLong / $den)
+      POffset = $pOffset; Band = 'outer_under'
+    }
+  }
+  if ($pOffset -le $no) {
+    $t = ($pOffset - $ph) / ($no - $ph)
+    $pen = 1.0 - $mildMax * [math]::Pow($t, 1.15)
+    return @{ Lat = $pen; Long = $pen; POffset = $pOffset; Band = 'normal_over' }
+  }
+  $excess = $pOffset - $no
+  $edge = 1.0 - $mildMax
+  $den = 1.0 + $sens * 1.5 * ($excess * $excess + 2.4 * $excess * $excess * $excess)
+  $pen = [math]::Max(0.35, $edge / $den)
+  return @{ Lat = $pen; Long = $pen; POffset = $pOffset; Band = 'outer_over' }
 }
 
 # Live camber grip penalty + thrust
@@ -216,11 +244,11 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('')
 
 # --- Instantaneous geometry tables (no time integration) ---
-[void]$sb.AppendLine('--- Instant: pressure grip vs optimal (optP=31, sens=0.75) ---')
-foreach ($psi in @(27.0, 31.0, 35.0, 26.35, 35.65)) {
+[void]$sb.AppendLine('--- Instant: pressure grip vs optimal (optP=31, sens=0.75; three-band) ---')
+foreach ($psi in @(27.0, 31.0, 35.0, 26.35, 35.65, 40.0, 45.0)) {
   $s = Get-PressureScales $psi 31.0 0.75
   $dPct = (($psi / 31.0) - 1.0) * 100.0
-  $line = '  PSI={0:N1}  dOpt={1:N1}%  latScale={2:N3}  longScale={3:N3}' -f $psi, $dPct, $s.Lat, $s.Long
+  $line = '  PSI={0:N1}  dOpt={1:N1}%  latScale={2:N3}  longScale={3:N3}  band={4}' -f $psi, $dPct, $s.Lat, $s.Long, $s.Band
   [void]$sb.AppendLine($line)
 }
 
@@ -422,12 +450,12 @@ $line = '  Rake F load +12% vs -12%: avgSkin {0:N1}->{1:N1}  wear/min {2:N3}->{3
 
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine('=== RANKED RECOMMENDATIONS ===')
-[void]$sb.AppendLine('1. KEEP PSI + camber + toe paths (magnitudes not gamified; sport/sport_plus feel locks safe).')
+[void]$sb.AppendLine('1. KEEP PSI path (three-band perfect/normal/outer; stock fills land mild). Camber + toe OK.')
 [void]$sb.AppendLine('2. LEAVE CASTER alone (correct: trail/KPI is chassis steering feel, not tyre mu).')
 [void]$sb.AppendLine('3. DONE: signed g_lat*wheelDir*0.28 into combinedBias -- outer shoulder per wheel under lateral load.')
 [void]$sb.AppendLine('4. DONE: toe soft-sat v/(1+v/Vref) Vref=70 m/s -- scrub persists more realistically at mid-high speed.')
 [void]$sb.AppendLine('5. OPTIONAL later: explicit rake unused; F/R load from BeamNG already covers pitch transfer.')
-[void]$sb.AppendLine('6. NO surgical grip retune from this matrix -- no clear overshoot vs +/-1deg/+/-4psi expectations.')
+[void]$sb.AppendLine('6. Pressure window retuned for stock fills -- see Test-PressureWindow.ps1.')
 
 # Machine-readable deltas block for canvas/report
 [void]$sb.AppendLine('')

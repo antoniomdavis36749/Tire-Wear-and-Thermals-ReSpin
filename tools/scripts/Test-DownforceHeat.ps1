@@ -58,10 +58,6 @@ foreach ($kmh in @(0, 50, 80, 100, 130, 160, 200, 250, 300)) {
 
 # ============================================================
 # SOFT-SIM: before/after delta for Scintilla GT at 200 km/h
-#   Assumptions:
-#     - Static corner load:  ~3100 N  (1250 kg car / 4 wheels * 9.81)
-#     - Aero rear corner:    ~520 N   (est. ~2000 N total rear aero @ 200 km/h)
-#     - Total rear loadRaw:  ~3620 N
 # ============================================================
 Write-Host ""
 Write-Host "=== SOFT-SIM: Scintilla GT rear corner at 200 km/h ===" -ForegroundColor Cyan
@@ -77,9 +73,9 @@ $load_kg_full = Get-LoadKg $totalLoad
 $thermalFrac  = Get-ThermalLoadFrac $speedMs
 $load_kg_thermal = $load_kg_full * $thermalFrac
 
-Write-Host ("  Static load:           {0,6} N  → load_kg = {1:F1}" -f $staticLoad, $load_kg_base)
-Write-Host ("  Static+aero load:      {0,6} N  → load_kg = {1:F1}" -f $totalLoad,  $load_kg_full)
-Write-Host ("  Thermal load (scaled): {0,6} N  → load_kg_thermal = {1:F1}  (×{2:F3})" -f $totalLoad, $load_kg_thermal, $thermalFrac)
+Write-Host ("  Static load:           {0,6} N  -> load_kg = {1:F1}" -f $staticLoad, $load_kg_base)
+Write-Host ("  Static+aero load:      {0,6} N  -> load_kg = {1:F1}" -f $totalLoad,  $load_kg_full)
+Write-Host ("  Thermal load (scaled): {0,6} N  -> load_kg_thermal = {1:F1}  (x{2:F3})" -f $totalLoad, $load_kg_thermal, $thermalFrac)
 Write-Host ""
 
 $rawRatio      = $load_kg_full / $load_kg_base
@@ -98,13 +94,12 @@ Write-Host ("  Reduction in aero thermal impact: {0:F1} percentage points" -f ($
 Write-Host ""
 Write-Host "=== VERDICT ===" -ForegroundColor Cyan
 $verdict = if ($rawDeltaPct -gt 12) { "Too aggressive (pre-fix)" } else { "OK" }
-Write-Host ("  Pre-fix aero heat delta: {0:F1}%  → {1}" -f $rawDeltaPct, $verdict) -ForegroundColor ($rawDeltaPct -gt 12 ? "Red" : "Green")
+$verdictColor = if ($rawDeltaPct -gt 12) { "Red" } else { "Green" }
+Write-Host ("  Pre-fix aero heat delta: {0:F1}%  -> {1}" -f $rawDeltaPct, $verdict) -ForegroundColor $verdictColor
 $verdict2 = if ($thermalDeltaPct -ge 3 -and $thermalDeltaPct -le 10) { "GOOD (still meaningful)" } else { "CHECK" }
-Write-Host ("  Post-fix aero heat delta: {0:F1}%  → {1}" -f $thermalDeltaPct, $verdict2) -ForegroundColor ($verdict2 -eq "GOOD (still meaningful)" ? "Green" : "Yellow")
+$verdict2Color = if ($verdict2 -eq "GOOD (still meaningful)") { "Green" } else { "Yellow" }
+Write-Host ("  Post-fix aero heat delta: {0:F1}%  -> {1}" -f $thermalDeltaPct, $verdict2) -ForegroundColor $verdict2Color
 
-# ============================================================
-# PARAMETERS CHANGED
-# ============================================================
 Write-Host ""
 Write-Host "=== CHANGES TO luukstyrethermalsandwear.lua ===" -ForegroundColor Cyan
 Write-Host "  THERMAL_TOPOLOGY additions:"
@@ -119,8 +114,8 @@ Write-Host "    Replaces load_kg in: loadCoeff (skin), loadRrHeat, flexWarmHeat,
 Write-Host "    Does NOT change: loadRaw/loadN (grip), flexWarmLoad gate (onset behavior)"
 Write-Host ""
 Write-Host "  GUI stream additions:"
-Write-Host "    guiStream.totalDownforceN  – estimated total aero downforce (N) all wheels"
-Write-Host "    guiStream.aeroFracPct      – speed-based aero fraction %"
-Write-Host "    entry.aeroLoadN            – per-wheel estimated aero load (N)"
+Write-Host "    guiStream.totalDownforceN  - estimated total aero downforce (N) all wheels"
+Write-Host "    guiStream.aeroFracPct      - speed-based aero fraction %"
+Write-Host "    entry.aeroLoadN            - per-wheel estimated aero load (N)"
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green

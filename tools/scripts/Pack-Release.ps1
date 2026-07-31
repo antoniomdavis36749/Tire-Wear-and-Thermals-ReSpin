@@ -45,7 +45,7 @@ try {
         Copy-Item -Recurse -Force $src (Join-Path $stage $d)
     }
 
-    foreach ($f in @('license', 'CREDITS.md', 'NOTICE', 'README.md')) {
+    foreach ($f in @('license', 'CREDITS.md', 'NOTICE', 'README.md', 'LISTING.md')) {
         $src = Join-Path $ModRoot $f
         if (Test-Path $src) {
             Copy-Item -Force $src (Join-Path $stage $f)
@@ -56,6 +56,7 @@ try {
     $mi = Join-Path $ModRoot 'mod_info'
     if (Test-Path $mi) {
         Copy-Item -Recurse -Force $mi (Join-Path $stage 'mod_info')
+        Get-ChildItem (Join-Path $stage 'mod_info') -Recurse -Filter 'icon-redux-reference.jpg' -ErrorAction SilentlyContinue | Remove-Item -Force
     }
 
     # Strip West Coast lap harness from player package
