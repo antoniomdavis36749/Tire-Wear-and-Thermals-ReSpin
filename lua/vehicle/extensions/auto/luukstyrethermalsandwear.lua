@@ -109,6 +109,19 @@ local THERMAL_TOPOLOGY = {
     drivePropStreetSpeed0 = 78.0,         -- m/s (~175 mph): street carcass damp begins
     drivePropStreetSpeed1 = 112.0,        -- m/s (~250 mph): full street carcass damp
     drivePropStreetCarcassScale = 0.28,   -- carcass excess/RR mult at Speed1 (≈ slick carcass)
+    -- Street driven-wheel residual slip soft-cap (FWD hard-accel cook):
+    -- FWD street cars dump torque → sustained long slip under power; slipEnergy opens
+    -- driveHeatGate + Fix A boost like a burnout. Soft-cap slip→skin (+ mild prop skin)
+    -- only when: non-slick / non-sport_plus, driven (|prop|), rolling (not stationary
+    -- burnout), and low lateral g (not drift/corner). Slick + sport_plus + burnout stay hot.
+    driveStreetSlipSpeed0 = 3.5,          -- m/s freestream: below → full heat (burnout/launch)
+    driveStreetSlipSpeed1 = 14.0,         -- m/s: full soft-cap eligibility (~30 mph)
+    driveStreetSlipCapStart = 0.16,       -- slipEnergy where soft-cap begins
+    driveStreetSlipCapFull = 0.52,        -- slipEnergy at full soft-cap
+    driveStreetSlipHeatMin = 0.40,        -- floor mult on slip skin heat at full cap
+    driveStreetSlipPropMin = 0.62,        -- milder floor on prop netTorque skin path
+    driveStreetSlipG0 = 0.32,             -- g_mag: soft-cap starts fading (corner/drift)
+    driveStreetSlipG1 = 0.58,             -- g_mag: soft-cap fully off
     -- P1-1: skin L↔C↔R conductance (mirrors carcass); soft equalizer mostly retired
     skinLateralConductance = 0.042,
     skinEqualizerRetain = 0.05, -- leftover avg soft mix (was 0.20)
@@ -172,10 +185,10 @@ local LOCKUP_HEAT_FLOOR = 0.22         -- Keep some flat-spot heat; not full L/C
 local LOCKUP_RECOVERY_LONG_GRIP = 0.62 -- Min longGrip when brake released & wheel still sliding near lock
 local LOCKUP_RECOVERY_OMEGA = 8.0      -- Blend recovery floor out by this ω (rad/s)
 
--- UI streaming throttling (15 Hz): 20 Hz was chatty; 10 Hz felt choppy on canvas Simple/Heavy.
--- Single vehicle stream rate for all apps — 15 Hz is the usable compromise.
+-- UI streaming throttling (30 Hz): queueStream-only + cached hasQueueStream keeps flush cheap.
+-- Single vehicle stream rate for all apps — 15 Hz felt laggy; 30 Hz restores snappy HUD feel.
 local sendTimer = 0
-local SEND_INTERVAL = 1.0 / 15.0 -- ~0.0667 s = 15 Hz
+local SEND_INTERVAL = 1.0 / 30.0 -- ~0.0333 s = 30 Hz
 -- Cached once in onInit: prefer queueStream alone (0.39+); else trigger. Avoid per-flush type() checks.
 local hasQueueStream = false
 local hasGuiTrigger = false
@@ -258,6 +271,9 @@ local scratchCarcassWeights = { 0, 0, 0 }
                           (hyst/flex excess + prop-linked RR; default 0.30).
     drivePropStreetSpeed0/1 / StreetCarcassScale
                           Non-slick high-V carcass excess/RR damp (prop-hold cruise).
+    driveStreetSlipSpeed0/1 / CapStart/Full / HeatMin / PropMin / G0/G1
+                          Street driven residual long-slip soft-cap (FWD accel cook;
+                          burnout / slick / sport_plus / high-g untouched).
     skinLateralConductance  Skin L↔C↔R conductance.
     gripBlendWarm/Cold    Dynamic EffectiveTyreTemp carcass share.
     slipVelBoostStart/Full/Max  Gated |lastSlip| longComp boost (burnout/lock).
@@ -2243,7 +2259,34 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     driveHeatGate = driveHeatGateSkin -- skin path + legacy readers
     data.lastDriveHeatGate = driveHeatGateSkin
     data.lastDriveHeatGateCarcass = driveHeatGateCarcass
-    local netTorque = vehNotParked * abs(propulsionTorque * topo.drivePropSkinCoef * driveHeatGateSkin - brakeTorque * 0.025) * 0.075 * rollingResistance * flexModifier
+    -- Street driven residual long-slip soft-cap (FWD accel cook vs burnout/drift/slick).
+    -- Uses freestream safeAirspeed (not ω-mixed) so spinning-in-place still cooks.
+    local streetSlipHeatScale = 1.0
+    local streetSlipPropScale = 1.0
+    if slickDriveScale >= 0.999 and abs(brakeTorque) < 40
+        and propAbs > (topo.drivePropCruiseNm * 0.5)
+        and not (string.find(p1Lower, "sport_plus", 1, true) or string.find(p2Lower, "sport_plus", 1, true)) then
+        local v0 = topo.driveStreetSlipSpeed0 or 3.5
+        local v1 = topo.driveStreetSlipSpeed1 or 14.0
+        local speedRamp = max(0, min(1.0, (safeAirspeed - v0) / max(1.0, v1 - v0)))
+        speedRamp = speedRamp * speedRamp * (3.0 - 2.0 * speedRamp)
+        local g0 = topo.driveStreetSlipG0 or 0.32
+        local g1 = topo.driveStreetSlipG1 or 0.58
+        local gGate = 1.0 - max(0, min(1.0, (g_mag - g0) / max(1e-3, g1 - g0)))
+        local s0 = topo.driveStreetSlipCapStart or 0.16
+        local s1 = topo.driveStreetSlipCapFull or 0.52
+        local slipRamp = max(0, min(1.0, (slipEnergy - s0) / max(1e-3, s1 - s0)))
+        slipRamp = slipRamp * slipRamp * (3.0 - 2.0 * slipRamp)
+        local blend = speedRamp * gGate * slipRamp
+        if blend > 1e-4 then
+            local heatMin = topo.driveStreetSlipHeatMin or 0.40
+            local propMin = topo.driveStreetSlipPropMin or 0.62
+            streetSlipHeatScale = 1.0 + (heatMin - 1.0) * blend
+            streetSlipPropScale = 1.0 + (propMin - 1.0) * blend
+        end
+    end
+    data.lastStreetSlipHeatScale = streetSlipHeatScale
+    local netTorque = vehNotParked * abs(propulsionTorque * topo.drivePropSkinCoef * driveHeatGateSkin * streetSlipPropScale - brakeTorque * 0.025) * 0.075 * rollingResistance * flexModifier
     -- Pass 3+: boost slip/work skin heat with excess prop (driven tires only — undriven gate≈0)
     local tempDistWeighted = avgWeightedTemp / (data.working_temp > 0 and data.working_temp or 1)
 
@@ -2329,8 +2372,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         -- Cornering work only — straight-line bump noise must not inflate skin heat
         local relative_work = max(0, g_mag - 0.22) * loadCoeff / 1000
         
-        -- High-speed soft-saturation slide heat
-        local slipEnergyHeat = slipEnergy / (1.0 + slipEnergy * 0.12)
+        -- High-speed soft-saturation slide heat (street driven residual slip soft-cap applied here)
+        local slipEnergyHeat = (slipEnergy / (1.0 + slipEnergy * 0.12)) * streetSlipHeatScale
 
         -- Rebalanced skin ring heating rates to prevent rapid thermal saturation
         local rawFrictionalGain = (slipEnergyHeat * 0.05 + netTorque * 0.002) * 3 * weight
@@ -2340,9 +2383,12 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
         -- West Coast hot-lap balance: ~+20% slip/work heat so ~4 laps approach opt without
         -- undoing highway RR soft-caps (those stay on carcass ω saturation below).
+        -- relative_work uses unscaled slipEnergy in the denominator soft-sat so corner work
+        -- is not double-damped by the street drive-slip soft-cap.
+        local slipEnergyHeatWork = slipEnergy / (1.0 + slipEnergy * 0.12)
         rawFrictionalGain = rawFrictionalGain * (max(surfaceMu - 0.5, 0.1) * 2)
             + (((0.0078 * (slipEnergyHeat * slipEnergyHeat) * loadCoeff) * slipHeatRate * slideMuScale
-                + 0.145 * relative_work * workHeatRate * peakWorkFactor / (1 + (slipEnergyHeat * slipEnergyHeat))) * surfaceMu / tyreWidthCoeff)
+                + 0.145 * relative_work * workHeatRate * peakWorkFactor / (1 + (slipEnergyHeatWork * slipEnergyHeatWork))) * surfaceMu / tyreWidthCoeff)
                 
         rawFrictionalGain = rawFrictionalGain + ((verticalCarcassHeat * 0.005 * workHeatRate) / heatMassScale) * weight
 
@@ -2356,7 +2402,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
             frictionalGain = frictionalGain * lerp(LOCKUP_HEAT_FLOOR, 1.0, max(0, min(1, angularVel / LOCKUP_OMEGA_THRESH)))
         end
         -- P0-1: deposit slip/work/torque heat on patch-resident fraction (integrates with lockup floor)
-        frictionalGain = frictionalGain * patchHeatScale * (1.0 + ((topo.drivePropSlipWorkMult or 1.0) - 1.0) * excessPropGateEff)
+        -- Street residual slip soft-cap also trims excess-prop slip/work boost (driven FWD cook).
+        frictionalGain = frictionalGain * patchHeatScale * (1.0 + ((topo.drivePropSlipWorkMult or 1.0) - 1.0) * excessPropGateEff * streetSlipHeatScale)
 
         local tempDelta = ((skinSnap[i] or localEnvTemp) - localEnvTemp)
         
@@ -3298,6 +3345,7 @@ initGuiStream = function()
             tyreGrip = 1, longGrip = 1, latGrip = 1, camber = 0, toe = 0, pressure = 25,
             initialPressure = 25, optimalPressure = 25, coldPressure = 25, targetHotPressure = 25,
             pressureRatio = 1, skinCarcassGap = 0, driveHeatGate = 0, driveHeatGateCarcass = 0,
+            streetSlipScale = 1,
             clog = 0, cycles = 0, graining = 0, blistering = 0, marbles = 0, flatspot = 0,
             surfaceDamage = 0, stintFade = 0, leak = 0, waterFilm = 0, ductPercent = 1,
             carcassAvg = ENV_TEMP, rimTemp = ENV_TEMP, airTemp = ENV_TEMP,
@@ -3571,6 +3619,7 @@ flushGuiStream = function(localizedEnvTemp)
                 entry.ductPercent = data.ductPercent or getBrakeDuctPercent(data.isFront)
                 entry.driveHeatGate = math.floor((data.lastDriveHeatGate or 0) * 1000) / 1000
                 entry.driveHeatGateCarcass = math.floor((data.lastDriveHeatGateCarcass or 0) * 1000) / 1000
+                entry.streetSlipScale = math.floor((data.lastStreetSlipHeatScale or 1) * 1000) / 1000
 
                 entry.clog = (w.isBroken) and 0 or math.floor((data.currentClog or data.clog or 0) * 100)
                 entry.graining = (w.isBroken) and 0 or math.floor((data.currentGraining or data.graining or 0) * 100)

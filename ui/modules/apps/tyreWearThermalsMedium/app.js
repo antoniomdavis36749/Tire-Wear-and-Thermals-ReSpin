@@ -116,7 +116,6 @@ angular.module("beamng.apps")
                         }
                         .ttm-bar-fill {
                             height: 100%;
-                            transition: width 0.1s ease-out;
                         }
                         .ttm-diagnostics-grid {
                             display: grid;
@@ -145,12 +144,12 @@ angular.module("beamng.apps")
                     <div class="ttm-header">
                         <span class="ttm-title">TYRE TELEMETRY (MEDIUM)</span>
                         <span class="ttm-header-meta">
-                            Env {{ envTemp }}°C · Track {{ trackTemp }}°C · Rain {{ rainState }}%
+                            Env {{ (envTemp||0).toFixed(2) }}°C · Track {{ (trackTemp||0).toFixed(2) }}°C · Rain {{ (rainState||0).toFixed(2) }}%
                         </span>
                         <span class="ttm-header-meta">
                             <span style="color: #64748b;">Aero ↓</span>
                             <span style="color: #f59e0b; font-weight: bold;"> {{ totalDownforceKN }} kN</span>
-                            <span style="color: #475569; font-size: 9px;"> ({{ aeroFracPct }}%)</span>
+                            <span style="color: #475569; font-size: 9px;"> ({{ (aeroFracPct||0).toFixed(2) }}%)</span>
                         </span>
                     </div>
 
@@ -164,7 +163,7 @@ angular.module("beamng.apps")
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Tread Condition:</span>
                                 <span class="ttm-value" ng-style="{'color': getConditionColor(w.condition)}">
-                                    {{ w.condition !== undefined ? w.condition.toFixed(1) : '0.0' }}%
+                                    {{ (w.condition !== undefined ? w.condition : 0).toFixed(2) }}%
                                 </span>
                             </div>
                             <div class="ttm-bar-container" style="margin-bottom: 5px;">
@@ -174,7 +173,7 @@ angular.module("beamng.apps")
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Dynamic Grip:</span>
                                 <span class="ttm-value" ng-style="{'color': getGripColor(w.tyreGrip)}">
-                                    {{ ((w.tyreGrip || 0) * 100).toFixed(0) }}%
+                                    {{ ((w.tyreGrip || 0) * 100).toFixed(2) }}%
                                 </span>
                             </div>
 
@@ -182,10 +181,10 @@ angular.module("beamng.apps")
                                 <span class="ttm-label">Tire Pressure:</span>
                                 <span class="ttm-value">
                                     <span ng-style="{'color': getInflationColor(w.pressure, w.targetHotPressure || w.optimalPressure)}">
-                                        {{ w.pressure !== undefined ? w.pressure.toFixed(1) : '0.0' }} PSI
+                                        {{ (w.pressure !== undefined ? w.pressure : 0).toFixed(2) }} PSI
                                     </span>
                                     <span style="font-size: 9px; color: #64748b;">
-                                        (Cold {{ w.coldPressure || w.initialPressure || 0 }} / Hot {{ w.targetHotPressure || w.optimalPressure || 0 }})
+                                        (Cold {{ (w.coldPressure || w.initialPressure || 0).toFixed(2) }} / Hot {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(2) }})
                                     </span>
                                 </span>
                             </div>
@@ -202,8 +201,8 @@ angular.module("beamng.apps")
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Camber / Toe:</span>
                                 <span class="ttm-value" ng-style="{'color': isExcessiveCamber(w.camber) ? '#ffaa44' : '#f1f5f9'}">
-                                    {{ w.camber !== undefined ? w.camber.toFixed(2) : '0.00' }}° /
-                                    {{ w.toe !== undefined ? w.toe.toFixed(2) : '0.00' }}°
+                                    {{ (w.camber !== undefined ? w.camber : 0).toFixed(2) }}° /
+                                    {{ (w.toe !== undefined ? w.toe : 0).toFixed(2) }}°
                                 </span>
                             </div>
 
@@ -211,7 +210,7 @@ angular.module("beamng.apps")
                                 <span class="ttm-label">Temp State / Opt:</span>
                                 <span class="ttm-value">
                                     <span ng-style="{'color': tempCategoryColor(w.tempCategory)}">{{ w.tempCategory || 'Normal' }}</span>
-                                    <span style="color:#64748b;"> · avg {{ (w.avgTemp||0).toFixed(0) }}° / opt {{ (w.working_temp||0).toFixed(0) }}°</span>
+                                    <span style="color:#64748b;"> · avg {{ (w.avgTemp||0).toFixed(2) }}° / opt {{ (w.working_temp||0).toFixed(2) }}°</span>
                                 </span>
                             </div>
 
@@ -225,7 +224,7 @@ angular.module("beamng.apps")
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Aero Load:</span>
                                 <span class="ttm-value" style="color: #f59e0b;">
-                                    {{ (w.aeroLoadN || 0) >= 1000 ? ((w.aeroLoadN || 0) / 1000).toFixed(2) + ' kN' : (w.aeroLoadN || 0) + ' N' }}
+                                    {{ (w.aeroLoadN || 0) >= 1000 ? ((w.aeroLoadN || 0) / 1000).toFixed(2) + ' kN' : (w.aeroLoadN || 0).toFixed(2) + ' N' }}
                                 </span>
                             </div>
 
@@ -234,7 +233,7 @@ angular.module("beamng.apps")
                                 <div class="ttm-thermal-segment"
                                      ng-repeat="tempVal in w.surfaceTemps track by $index"
                                      ng-style="{'background-color': getTempColor(tempVal, w.working_temp), 'color': '#ffffff'}">
-                                    {{ tempVal !== undefined ? tempVal.toFixed(0) : '0' }}°
+                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(2) }}°
                                 </div>
                             </div>
 
@@ -243,65 +242,65 @@ angular.module("beamng.apps")
                                 <div class="ttm-thermal-segment"
                                      ng-repeat="tempVal in w.carcassTemps track by $index"
                                      ng-style="{'background-color': getTempColor(tempVal, w.working_temp), 'color': '#ffffff'}">
-                                    {{ tempVal !== undefined ? tempVal.toFixed(0) : '0' }}°
+                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(2) }}°
                                 </div>
                             </div>
 
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Rim / Air:</span>
                                 <span class="ttm-value">
-                                    <span ng-style="{'color': getTempColor(w.rimTemp, w.working_temp)}">{{ (w.rimTemp || 0).toFixed(0) }}°</span>
+                                    <span ng-style="{'color': getTempColor(w.rimTemp, w.working_temp)}">{{ (w.rimTemp || 0).toFixed(2) }}°</span>
                                     /
-                                    <span ng-style="{'color': getTempColor(w.airTemp, w.working_temp)}">{{ (w.airTemp || 0).toFixed(0) }}°</span>
+                                    <span ng-style="{'color': getTempColor(w.airTemp, w.working_temp)}">{{ (w.airTemp || 0).toFixed(2) }}°</span>
                                 </span>
                             </div>
 
                             <div class="ttm-diagnostics-grid">
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">CLOG</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.clog)}">{{ w.clog || 0 }}%</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.clog)}">{{ (w.clog || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
                                         <div class="ttm-bar-fill" ng-style="{'width': (w.clog || 0) + '%', 'background-color': getDiagnosticColor(w.clog)}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">GRAINING</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.graining)}">{{ w.graining || 0 }}%</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.graining)}">{{ (w.graining || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
                                         <div class="ttm-bar-fill" ng-style="{'width': (w.graining || 0) + '%', 'background-color': getDiagnosticColor(w.graining)}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">BLISTER</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.blistering)}">{{ w.blistering || 0 }}%</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.blistering)}">{{ (w.blistering || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
                                         <div class="ttm-bar-fill" ng-style="{'width': (w.blistering || 0) + '%', 'background-color': '#f43f5e'}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">MARBLES</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.marbles)}">{{ w.marbles || 0 }}%</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.marbles)}">{{ (w.marbles || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
                                         <div class="ttm-bar-fill" ng-style="{'width': (w.marbles || 0) + '%', 'background-color': getDiagnosticColor(w.marbles)}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">FLATSPOT</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ w.flatspot || 0 }}%</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ (w.flatspot || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
                                         <div class="ttm-bar-fill" ng-style="{'width': (w.flatspot || 0) + '%', 'background-color': '#f43f5e'}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">LEAK / FILM</span>
-                                    <span class="ttm-value">{{ w.leak || 0 }}% / {{ w.waterFilm || 0 }}%</span>
+                                    <span class="ttm-value">{{ (w.leak || 0).toFixed(0) }}% / {{ (w.waterFilm || 0).toFixed(0) }}%</span>
                                 </div>
                             </div>
 
                             <div class="ttm-footer">
-                                Cycles: <span style="color: #f1f5f9; font-weight: bold;">{{ w.cycles || 0 }}</span>
-                                &nbsp;|&nbsp; Stint: <span style="color: #f1f5f9; font-weight: bold;">{{ w.stintFade || 0 }}%</span>
-                                &nbsp;|&nbsp; Duct: <span style="color: #f1f5f9; font-weight: bold;">{{ w.ductPercent || 1 }}%</span>
+                                Cycles: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.cycles || 0).toFixed(0) }}</span>
+                                &nbsp;|&nbsp; Stint: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.stintFade || 0).toFixed(0) }}%</span>
+                                &nbsp;|&nbsp; Duct: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.ductPercent || 1).toFixed(0) }}%</span>
                             </div>
                         </div>
                     </div>
@@ -317,11 +316,29 @@ angular.module("beamng.apps")
                     StreamsManager.add(streamsList);
                 }
 
-                scope.$on("$destroy", function () {
-                    if (StreamsManager) {
-                        StreamsManager.remove(streamsList);
-                    }
-                });
+                // Client-side smooth motion: Lua ~30 Hz; RAF lerps display toward targets.
+                // Digest is throttled (~20 Hz): full $digest every RAF stalls CEF under Heavy/Medium binding load.
+                var LERP_K = 12;
+                var LERP_EPS = 0.05;
+                var DIGEST_INTERVAL_MS = 50; // ~20 Hz Angular updates; RAF still lerps at display rate
+                var rafId = null;
+                var lastRafTs = 0;
+                var lastDigestTs = 0;
+                var rafRunning = false;
+                var targetWheels = [];
+                var targetMeta = {
+                    envTemp: 21,
+                    trackTemp: 21,
+                    rainState: 0,
+                    totalDownforceN: 0,
+                    aeroFracPct: 0
+                };
+                var WHEEL_LERP_KEYS = [
+                    "condition", "tyreGrip", "pressure", "camber", "toe", "avgTemp",
+                    "working_temp", "rimTemp", "airTemp", "aeroLoadN",
+                    "clog", "graining", "blistering", "marbles", "flatspot", "leak", "waterFilm",
+                    "stintFade", "ductPercent"
+                ];
 
                 scope.wheels = [];
                 scope.envTemp = 21;
@@ -399,36 +416,258 @@ angular.module("beamng.apps")
                     return "hsla(" + Math.round(hue) + ", 80%, 45%, 1)";
                 };
 
-                function processData(dataStream) {
-                    if (!dataStream || !dataStream.data) return;
-
-                    angular.forEach(dataStream.data, function (w) {
-                        var t = w.temp || [];
-                        w.surfaceTemps = [t[0] || 0, t[1] || 0, t[2] || 0];
-                        w.carcassTemps = [t[3] || 0, t[4] || 0, t[5] || 0];
-                        if (w.rimTemp === undefined) w.rimTemp = t[6] || 0;
-                        if (w.airTemp === undefined) w.airTemp = t[7] || 0;
-                    });
-
-                    scope.$evalAsync(function () {
-                        scope.wheels = dataStream.data;
-                        scope.envTemp = dataStream.envTemp !== undefined ? dataStream.envTemp : scope.envTemp;
-                        scope.trackTemp = dataStream.trackTemp !== undefined ? dataStream.trackTemp : scope.trackTemp;
-                        scope.rainState = dataStream.rainState !== undefined ? dataStream.rainState : scope.rainState;
-                        scope.totalDownforceKN = dataStream.totalDownforceN !== undefined
-                            ? (dataStream.totalDownforceN / 1000).toFixed(2)
-                            : scope.totalDownforceKN;
-                        scope.aeroFracPct = dataStream.aeroFracPct !== undefined ? dataStream.aeroFracPct : scope.aeroFracPct;
-                    });
+                function lerpNum(cur, tgt, alpha) {
+                    if (tgt === undefined || tgt === null) return cur;
+                    if (cur === undefined || cur === null) return tgt;
+                    var next = cur + (tgt - cur) * alpha;
+                    return Math.abs(tgt - next) < LERP_EPS ? tgt : next;
                 }
 
+                function ensureArr3(dst, a, b, c) {
+                    if (!dst || dst.length !== 3) return [a || 0, b || 0, c || 0];
+                    dst[0] = a || 0;
+                    dst[1] = b || 0;
+                    dst[2] = c || 0;
+                    return dst;
+                }
+
+                function prepareWheelTemps(w) {
+                    var t = w.temp || [];
+                    w.surfaceTemps = ensureArr3(w.surfaceTemps, t[0], t[1], t[2]);
+                    w.carcassTemps = ensureArr3(w.carcassTemps, t[3], t[4], t[5]);
+                    if (w.rimTemp === undefined) w.rimTemp = t[6] || 0;
+                    if (w.airTemp === undefined) w.airTemp = t[7] || 0;
+                    if (!w.zoneCondition || w.zoneCondition.length !== 3) {
+                        w.zoneCondition = [
+                            (w.zoneCondition && w.zoneCondition[0]) || w.condition || 100,
+                            (w.zoneCondition && w.zoneCondition[1]) || w.condition || 100,
+                            (w.zoneCondition && w.zoneCondition[2]) || w.condition || 100
+                        ];
+                    }
+                }
+
+                function copyStaticWheel(dst, src) {
+                    dst.name = src.name;
+                    dst.profile = src.profile;
+                    dst.tempCategory = src.tempCategory;
+                    dst.surfaceName = src.surfaceName;
+                    dst.surfaceType = src.surfaceType;
+                    dst.coldPressure = src.coldPressure;
+                    dst.initialPressure = src.initialPressure;
+                    dst.targetHotPressure = src.targetHotPressure;
+                    dst.optimalPressure = src.optimalPressure;
+                    dst.cycles = src.cycles;
+                }
+
+                function snapLerpArrays(dst, src) {
+                    var st = src.surfaceTemps || [0, 0, 0];
+                    var ct = src.carcassTemps || [0, 0, 0];
+                    var zc = src.zoneCondition || [100, 100, 100];
+                    dst.surfaceTemps = [st[0] || 0, st[1] || 0, st[2] || 0];
+                    dst.carcassTemps = [ct[0] || 0, ct[1] || 0, ct[2] || 0];
+                    dst.zoneCondition = [zc[0] || 0, zc[1] || 0, zc[2] || 0];
+                }
+
+                function snapLerpScalars(dst, src) {
+                    for (var i = 0; i < WHEEL_LERP_KEYS.length; i++) {
+                        var k = WHEEL_LERP_KEYS[i];
+                        dst[k] = src[k] !== undefined && src[k] !== null ? src[k] : 0;
+                    }
+                }
+
+                function makeDisplayWheel(src) {
+                    var dst = {};
+                    copyStaticWheel(dst, src);
+                    snapLerpScalars(dst, src);
+                    snapLerpArrays(dst, src);
+                    return dst;
+                }
+
+                function setTargetWheel(dst, src) {
+                    copyStaticWheel(dst, src);
+                    snapLerpScalars(dst, src);
+                    snapLerpArrays(dst, src);
+                }
+
+                function isAppVisible() {
+                    if (document.hidden) return false;
+                    var el = element[0];
+                    if (!el) return false;
+                    // Detached / display:none apps have no layout box — skip RAF work.
+                    return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+                }
+
+                function stopRaf() {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    rafRunning = false;
+                    lastRafTs = 0;
+                }
+
+                function startRaf() {
+                    if (rafRunning || !isAppVisible()) return;
+                    rafRunning = true;
+                    lastRafTs = 0;
+                    lastDigestTs = 0;
+                    rafId = requestAnimationFrame(rafTick);
+                }
+
+                function applyDisplayMeta() {
+                    scope.totalDownforceKN = ((scope._dfN || 0) / 1000).toFixed(2);
+                }
+
+                function lerpDisplay(alpha) {
+                    var moved = false;
+                    var i, j, k, prev, d, t;
+
+                    prev = scope.envTemp;
+                    scope.envTemp = lerpNum(scope.envTemp, targetMeta.envTemp, alpha);
+                    if (scope.envTemp !== prev) moved = true;
+
+                    prev = scope.trackTemp;
+                    scope.trackTemp = lerpNum(scope.trackTemp, targetMeta.trackTemp, alpha);
+                    if (scope.trackTemp !== prev) moved = true;
+
+                    prev = scope.rainState;
+                    scope.rainState = lerpNum(scope.rainState, targetMeta.rainState, alpha);
+                    if (scope.rainState !== prev) moved = true;
+
+                    prev = scope._dfN;
+                    scope._dfN = lerpNum(scope._dfN || 0, targetMeta.totalDownforceN, alpha);
+                    if (scope._dfN !== prev) moved = true;
+
+                    prev = scope.aeroFracPct;
+                    scope.aeroFracPct = lerpNum(scope.aeroFracPct, targetMeta.aeroFracPct, alpha);
+                    if (scope.aeroFracPct !== prev) moved = true;
+
+                    var n = Math.min(scope.wheels.length, targetWheels.length);
+                    for (i = 0; i < n; i++) {
+                        d = scope.wheels[i];
+                        t = targetWheels[i];
+                        copyStaticWheel(d, t);
+                        for (j = 0; j < WHEEL_LERP_KEYS.length; j++) {
+                            k = WHEEL_LERP_KEYS[j];
+                            prev = d[k];
+                            d[k] = lerpNum(d[k], t[k], alpha);
+                            if (d[k] !== prev) moved = true;
+                        }
+                        for (j = 0; j < 3; j++) {
+                            prev = d.surfaceTemps[j];
+                            d.surfaceTemps[j] = lerpNum(d.surfaceTemps[j], t.surfaceTemps[j], alpha);
+                            if (d.surfaceTemps[j] !== prev) moved = true;
+
+                            prev = d.carcassTemps[j];
+                            d.carcassTemps[j] = lerpNum(d.carcassTemps[j], t.carcassTemps[j], alpha);
+                            if (d.carcassTemps[j] !== prev) moved = true;
+
+                            prev = d.zoneCondition[j];
+                            d.zoneCondition[j] = lerpNum(d.zoneCondition[j], t.zoneCondition[j], alpha);
+                            if (d.zoneCondition[j] !== prev) moved = true;
+                        }
+                    }
+                    applyDisplayMeta();
+                    return moved;
+                }
+
+                function digestDisplay() {
+                    if (scope.$$phase) return;
+                    scope.$digest();
+                }
+
+                function rafTick(ts) {
+                    if (!rafRunning) return;
+                    if (!isAppVisible()) {
+                        stopRaf();
+                        return;
+                    }
+                    var dt = lastRafTs ? Math.min(0.05, (ts - lastRafTs) / 1000) : (1 / 60);
+                    lastRafTs = ts;
+                    var alpha = Math.min(1, LERP_K * dt);
+                    var moved = lerpDisplay(alpha);
+                    // Throttle digests: RAF keeps lerping the model; Angular rebinds at ~20 Hz.
+                    if (!moved || !lastDigestTs || (ts - lastDigestTs) >= DIGEST_INTERVAL_MS) {
+                        lastDigestTs = ts;
+                        digestDisplay();
+                    }
+                    if (moved) {
+                        rafId = requestAnimationFrame(rafTick);
+                    } else {
+                        stopRaf();
+                    }
+                }
+
+                function onVisibilityChange() {
+                    if (!isAppVisible()) {
+                        stopRaf();
+                    } else if (targetWheels.length) {
+                        startRaf();
+                    }
+                }
+                document.addEventListener("visibilitychange", onVisibilityChange);
+
+                function ingestStream(dataStream) {
+                    if (!dataStream || !dataStream.data) return;
+
+                    var src = dataStream.data;
+                    var count = src.length;
+                    var structural = (scope.wheels.length !== count);
+                    var i, w;
+
+                    for (i = 0; i < count; i++) {
+                        prepareWheelTemps(src[i]);
+                    }
+
+                    targetMeta.envTemp = dataStream.envTemp !== undefined ? dataStream.envTemp : targetMeta.envTemp;
+                    targetMeta.trackTemp = dataStream.trackTemp !== undefined ? dataStream.trackTemp : targetMeta.trackTemp;
+                    targetMeta.rainState = dataStream.rainState !== undefined ? dataStream.rainState : targetMeta.rainState;
+                    targetMeta.totalDownforceN = dataStream.totalDownforceN !== undefined ? dataStream.totalDownforceN : targetMeta.totalDownforceN;
+                    targetMeta.aeroFracPct = dataStream.aeroFracPct !== undefined ? dataStream.aeroFracPct : targetMeta.aeroFracPct;
+
+                    if (structural) {
+                        targetWheels = [];
+                        var wheels = [];
+                        for (i = 0; i < count; i++) {
+                            w = src[i] || {};
+                            var tgt = {};
+                            setTargetWheel(tgt, w);
+                            targetWheels.push(tgt);
+                            wheels.push(makeDisplayWheel(w));
+                        }
+                        scope.wheels = wheels;
+                        scope.envTemp = targetMeta.envTemp;
+                        scope.trackTemp = targetMeta.trackTemp;
+                        scope.rainState = targetMeta.rainState;
+                        scope._dfN = targetMeta.totalDownforceN;
+                        scope.aeroFracPct = targetMeta.aeroFracPct;
+                        applyDisplayMeta();
+                        if (!scope.$$phase) {
+                            scope.$evalAsync(angular.noop);
+                        }
+                    } else {
+                        for (i = 0; i < count; i++) {
+                            setTargetWheel(targetWheels[i], src[i] || {});
+                        }
+                    }
+                    startRaf();
+                }
+
+                scope.$on("$destroy", function () {
+                    stopRaf();
+                    document.removeEventListener("visibilitychange", onVisibilityChange);
+                    if (StreamsManager) {
+                        StreamsManager.remove(streamsList);
+                    }
+                });
+
                 scope.$on("TyreWearThermals", function (event, dataStream) {
-                    processData(dataStream);
+                    ingestStream(dataStream);
                 });
 
                 scope.$on("streamsUpdate", function (event, streams) {
                     if (streams && streams.TyreWearThermals) {
-                        processData(streams.TyreWearThermals);
+                        ingestStream(streams.TyreWearThermals);
                     }
                 });
             }
