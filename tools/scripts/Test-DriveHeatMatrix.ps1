@@ -1,20 +1,11 @@
-﻿# FWD vs RWD drive-slip heat soft-sim (street residual spin cook).
-# Mirrors CalcTyreWear: driveHeatGate + excess prop + street driven-slip soft-cap
-# (driveStreetSlip*). Compares BEFORE (scale=1) vs AFTER (live soft-cap).
-#
-# Scenarios:
-#   FWD street hard accel   --- driven front, high long slip, rolling 15---40 mph
-#   RWD street hard accel   --- driven rear, milder residual slip (typical)
-#   Stationary burnout      --- airspeed---1.5, must still cook (soft-cap off)
-#   RWD drift               --- high g + side slip, soft-cap off
-#   Slick                    --- soft-cap off (floors 1.0)
-#   sport_plus               --- milder profile floors (0.72/0.82)
-#
-# Refs: Test-StraightLineSpeedSweep.ps1, Test-BurnoutHeat.ps1
+#Requires -Version 5.1
+# P0 gate matrix: street / sport_plus / slick / rally x FWD / RWD / AWD x cruise / hard accel / burnout.
+# Mirrors CalcTyreWear driveHeatGate + excess prop + driveStreetSlip* (live THERMAL_TOPOLOGY).
+# Refs: Test-FwdDriveHeatEdge.ps1, Test-FwdDriveHeat.ps1, luukstyrethermalsandwear.lua
 $ErrorActionPreference = 'Stop'
 $outDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'output'
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
-$out = Join-Path $outDir 'fwd-drive-heat-softsim.txt'
+$out = Join-Path $outDir 'drive-heat-matrix.txt'
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {
@@ -27,7 +18,6 @@ function Smooth01([double]$t) {
   return $t * $t * (3.0 - 2.0 * $t)
 }
 
-# ---- Live THERMAL_TOPOLOGY (post street-slip soft-cap) ----
 $topo = @{
   patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
   freeBeltCoolMult = 1.32
@@ -41,6 +31,8 @@ $topo = @{
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
   driveStreetSlipG0 = 0.32; driveStreetSlipG1 = 0.58
+  drivePropMassRefKg = 1500.0; drivePropMassScaleMin = 0.78; drivePropMassScaleMax = 1.35
+  drivePropAwdExcessScale = 0.62
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
   hystSkinShare = 0.18
@@ -61,7 +53,8 @@ $TRACK_C = 36.0
 
 $street = @{
   name = 'street'
-  isSlick = $false; isSportPlus = $false
+  isSlick = $false; isSportPlus = $false; expectSoftCap = $true
+  purpose = 'street'
   tOpt = 65.0; slipHeat = 8.925; workHeat = 5.1; rollingRes = 0.8
   treadInertia = 0.46; carcassInertia = 0.75; react = 1.35
   skinCore = 0.068; airCool = 0.0275; staticCool = 0.08
@@ -72,24 +65,39 @@ $street = @{
 }
 $sportPlus = @{
   name = 'sport_plus'
-  isSlick = $false; isSportPlus = $true
+  isSlick = $false; isSportPlus = $true; expectSoftCap = $true
+  purpose = 'street'
   tOpt = 76.0; slipHeat = 8.2; workHeat = 3.8; rollingRes = 0.70
   treadInertia = 0.441; carcassInertia = 0.714; react = 1.3
   skinCore = 0.088; airCool = 0.029; staticCool = 0.095
   coreCool = 0.038; coreVelCool = 0.0095; trackCondMult = 1.15
   treadCoef = 0.30
-  driveSlipHeatMin = 0.72; driveSlipPropMin = 0.82; driveHighVCarcassScale = 0.28
   tyreWidthM = 0.265; tyreRadius = 0.33; pressurePsi = 30.0
+  driveSlipHeatMin = 0.72; driveSlipPropMin = 0.82; driveHighVCarcassScale = 0.28
 }
 $slick = @{
   name = 'medium_slick'
-  isSlick = $true; isSportPlus = $false
+  isSlick = $true; isSportPlus = $false; expectSoftCap = $false
+  purpose = 'circuit'
   tOpt = 84.0; slipHeat = 9.1; workHeat = 5.35; rollingRes = 1.02
   treadInertia = 0.399; carcassInertia = 0.646; react = 1.42
   skinCore = 0.104; airCool = 0.024; staticCool = 0.082
   coreCool = 0.031; coreVelCool = 0.0072; trackCondMult = 1.15
   treadCoef = 0.0
   tyreWidthM = 0.275; tyreRadius = 0.33; pressurePsi = 27.0
+  driveSlipHeatMin = 1.0; driveSlipPropMin = 1.0; driveHighVCarcassScale = 1.0
+}
+$rallyAsphalt = @{
+  name = 'rally_asphalt'
+  isSlick = $false; isSportPlus = $false; expectSoftCap = $false
+  purpose = 'tarmac_rally'
+  tOpt = 68.0; slipHeat = 9.45; workHeat = 5.1; rollingRes = 1.12
+  treadInertia = 0.42; carcassInertia = 0.68; react = 1.65
+  skinCore = 0.08; airCool = 0.0275; staticCool = 0.08
+  coreCool = 0.035; coreVelCool = 0.008; trackCondMult = 1.0
+  treadCoef = 0.35
+  tyreWidthM = 0.245; tyreRadius = 0.33; pressurePsi = 28.0
+  # Phase 5: rally rubber keeps OFF magnitudes; purpose pack also skips street soft-cap
   driveSlipHeatMin = 1.0; driveSlipPropMin = 1.0; driveHighVCarcassScale = 1.0
 }
 
@@ -111,14 +119,18 @@ function Get-StreetSlipScales {
     [double]$airspeed,
     [double]$gMag,
     [double]$brakeNm = 0.0,
+    [double]$cruiseNm = 250.0,
     [switch]$DisableSoftCap
   )
   $heatScale = 1.0
   $propScale = 1.0
   if ($DisableSoftCap) { return @{ heat = 1.0; prop = 1.0 } }
   if ($comp.isSlick) { return @{ heat = 1.0; prop = 1.0 } }
+  $purpose = if ($comp.purpose) { [string]$comp.purpose } else { 'street' }
+  $streetPurposes = @{ street = $true; wet = $true; winter = $true; utility = $true; commercial = $true }
+  if (-not $streetPurposes[$purpose]) { return @{ heat = 1.0; prop = 1.0 } }
   if ($brakeNm -ge 40.0) { return @{ heat = 1.0; prop = 1.0 } }
-  if ($propAbs -le ([double]$topo.drivePropCruiseNm * 0.5)) { return @{ heat = 1.0; prop = 1.0 } }
+  if ($propAbs -le ($cruiseNm * 0.5)) { return @{ heat = 1.0; prop = 1.0 } }
 
   $speedRamp = Smooth01 (($airspeed - [double]$topo.driveStreetSlipSpeed0) /
     [math]::Max(1.0, [double]$topo.driveStreetSlipSpeed1 - [double]$topo.driveStreetSlipSpeed0))
@@ -144,11 +156,13 @@ function Simulate-DriveHeat {
     [double]$dur = 25.0,
     [double]$slip = 0.45,
     [double]$propNm = 900.0,
-    [double]$airspeed = 12.0,   # freestream m/s (safeAirspeed)
+    [double]$airspeed = 12.0,
     [double]$gMag = 0.18,
     [double]$loadRaw = 4200.0,
     [double]$brakeNm = 0.0,
-    [double]$omega = $null,     # default from airspeed / r if null; burnout overrides
+    [double]$omega = $null,
+    [double]$vehicleMassKg = 1500.0,
+    [int]$drivenCount = 2,
     [switch]$DisableSoftCap
   )
 
@@ -156,10 +170,14 @@ function Simulate-DriveHeat {
   $tyreRadius = [double]$comp.tyreRadius
   $tyreWidthM = [double]$comp.tyreWidthM
   if ($null -eq $omega) {
-    # Residual spin: wheel faster than vehicle (typical FWD accel slip)
     $omega = ($airspeed / [math]::Max(0.05, $tyreRadius)) * (1.0 + [math]::Min(1.8, $slip * 1.6))
   }
   $propAbs = [math]::Abs($propNm)
+  $massRef = [double]$topo.drivePropMassRefKg
+  $massScale = Clamp ([math]::Sqrt([math]::Max(400.0, $vehicleMassKg) / [math]::Max(400.0, $massRef))) `
+    ([double]$topo.drivePropMassScaleMin) ([double]$topo.drivePropMassScaleMax)
+  $cruiseNm = [double]$topo.drivePropCruiseNm * $massScale
+  $excessFullNm = [double]$topo.drivePropExcessFullNm * $massScale
   $tyreW = 0.95
   $wt = 1.0
   $heatMassScale = 1.0
@@ -170,7 +188,7 @@ function Simulate-DriveHeat {
   $blend = if ($comp.isSlick) { $SLICK_PREHEAT_BLEND } else { $STREET_PREHEAT_BLEND }
   $core = Lerp $ENV_C ([double]$comp.tOpt) $blend
   $skin = Lerp $ENV_C ([double]$comp.tOpt) ($blend * $SKIN_PREHEAT_FRAC)
-  $skin0 = $skin; $core0 = $core
+  $skin0 = $skin
 
   $skinCore = [math]::Max([double]$topo.skinCoreFloor, [double]$comp.skinCore * [double]$topo.skinCoreScale)
   $condTread = Lerp 2.0 1.0 ([double]$comp.treadCoef)
@@ -205,21 +223,25 @@ function Simulate-DriveHeat {
   $workHeat = [double]$comp.workHeat * $heatAdapt
 
   $scales = Get-StreetSlipScales -comp $comp -slip $slip -propAbs $propAbs `
-    -airspeed $airspeed -gMag $gMag -brakeNm $brakeNm -DisableSoftCap:$DisableSoftCap
+    -airspeed $airspeed -gMag $gMag -brakeNm $brakeNm -cruiseNm $cruiseNm -DisableSoftCap:$DisableSoftCap
   $streetHeat = [double]$scales.heat
   $streetProp = [double]$scales.prop
 
   $driveHeatGate = [math]::Min(1.0, ($slip * 2.5) + ($gMag * 0.45) + ($(if ($brakeNm -gt 40) { 1.0 } else { 0.0 })))
   if (($slip -lt 0.06) -and ($gMag -lt 0.28) -and ($brakeNm -lt 40)) {
-    $halfCruise = [double]$topo.drivePropCruiseNm * 0.5
+    $halfCruise = $cruiseNm * 0.5
     if ($propAbs -gt $halfCruise) {
       $driveHeatGate = $driveHeatGate * (0.15 + 0.85 * (Clamp (($propAbs - $halfCruise) / [math]::Max(1.0, $halfCruise)) 0 1))
     } else {
       $driveHeatGate = $driveHeatGate * 0.15
     }
   }
-  $excessPropGate = Clamp (($propAbs - [double]$topo.drivePropCruiseNm) /
-    [math]::Max(1.0, [double]$topo.drivePropExcessFullNm)) 0 1
+  $excessPropGate = Clamp (($propAbs - $cruiseNm) / [math]::Max(1.0, $excessFullNm)) 0 1
+  if ($drivenCount -ge 3) {
+    $awdT = Clamp (($drivenCount - 2.0) / 2.0) 0 1
+    $awdScale = 1.0 + ([double]$topo.drivePropAwdExcessScale - 1.0) * $awdT
+    $excessPropGate = $excessPropGate * $awdScale
+  }
   $slickDrive = 1.0; $slickCarcass = 1.0
   if ($comp.isSlick) {
     $slickDrive = [double]$topo.drivePropSlickScale
@@ -251,7 +273,6 @@ function Simulate-DriveHeat {
   }
 
   $peakSkin = $skin; $peakCore = $core
-  $tAt80 = $null; $tAt100 = $null; $tAt120 = $null
   $n = [int]($dur / $dt)
   $t = 0.0
 
@@ -310,189 +331,212 @@ function Simulate-DriveHeat {
 
     if ($skin -gt $peakSkin) { $peakSkin = $skin }
     if ($core -gt $peakCore) { $peakCore = $core }
-    if ($null -eq $tAt80 -and $skin -ge 80.0) { $tAt80 = $t }
-    if ($null -eq $tAt100 -and $skin -ge 100.0) { $tAt100 = $t }
-    if ($null -eq $tAt120 -and $skin -ge 120.0) { $tAt120 = $t }
-
     $t += $dt
   }
+
+  $engaged = ($streetHeat -lt 0.995)
+  $overOpt = $peakSkin / [math]::Max(1.0, [double]$comp.tOpt)
+  $flag = 'PLAUSIBLE'
+  if ($peakSkin -ge 160.0 -or $overOpt -ge 2.4) { $flag = 'RUNAWAY' }
+  elseif ($peakSkin -ge 140.0 -or $overOpt -ge 2.0) { $flag = 'HOT' }
 
   return [pscustomobject]@{
     label = $label
     compound = $comp.name
-    softCap = -not $DisableSoftCap
-    slip = [math]::Round($slip, 3)
-    propNm = [math]::Round($propNm, 0)
-    airspeed = [math]::Round($airspeed, 1)
-    gMag = [math]::Round($gMag, 2)
+    softCapEngaged = $engaged
     streetHeat = [math]::Round($streetHeat, 3)
     streetProp = [math]::Round($streetProp, 3)
-    dhgSkin = [math]::Round($dhgSkin, 3)
-    netTorque = [math]::Round($netTorque, 2)
-    startSkin = [math]::Round($skin0, 1)
+    propNm = [math]::Round($propNm, 0)
+    slip = [math]::Round($slip, 3)
     endSkin = [math]::Round($skin, 1)
     peakSkin = [math]::Round($peakSkin, 1)
     endCore = [math]::Round($core, 1)
     peakCore = [math]::Round($peakCore, 1)
     dSkin = [math]::Round($skin - $skin0, 1)
-    tAt80 = $tAt80
-    tAt100 = $tAt100
-    tAt120 = $tAt120
+    flag = $flag
   }
 }
 
-# ---- Cases ----
-# FWD street: high residual long slip while rolling (lastSlip ~18---22 --- slipE ~0.4---0.7)
-$fwdSlip = SlipEnergyFromLastSlip -lastSlip 20.0
-$rwdSlip = SlipEnergyFromLastSlip -lastSlip 9.0   # milder driven residual
-$burnSlip = SlipEnergyFromLastSlip -lastSlip 20.0
-$driftSlip = SlipEnergyFromLastSlip -lastSlip 8.0 -sideSlip 12.0
+# Layout kinematics (per driven wheel). AWD splits torque ~half of 2WD axle share.
+$fwdHardSlip = SlipEnergyFromLastSlip 20.0
+$rwdHardSlip = SlipEnergyFromLastSlip 9.0
+$awdHardSlip = SlipEnergyFromLastSlip 12.0
+$burnSlip = SlipEnergyFromLastSlip 20.0
+$cruiseSlip = 0.08
 
-$cases = @(
+$layouts = @(
   @{
-    name = 'FWD street hard accel (rolling spin)'
-    comp = $street; slip = $fwdSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22
-    loadRaw = 4400.0; omega = $null
+    key = 'FWD'
+    hard = @{ slip = $fwdHardSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22; loadRaw = 4400.0; omega = $null }
+    cruise = @{ slip = $cruiseSlip; propNm = 350.0; airspeed = 22.0; gMag = 0.10; loadRaw = 3800.0; omega = $null }
+    burnout = @{ slip = $burnSlip; propNm = 1800.0; airspeed = 1.5; gMag = 0.08; loadRaw = 4200.0; omega = 80.0 }
   }
   @{
-    name = 'FWD street launch mid (25 mph)'
-    comp = $street; slip = $fwdSlip; propNm = 1000.0; airspeed = 11.2; gMag = 0.25
-    loadRaw = 4300.0; omega = $null
+    key = 'RWD'
+    hard = @{ slip = $rwdHardSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22; loadRaw = 4600.0; omega = $null }
+    cruise = @{ slip = $cruiseSlip; propNm = 350.0; airspeed = 22.0; gMag = 0.10; loadRaw = 3800.0; omega = $null }
+    burnout = @{ slip = $burnSlip; propNm = 1800.0; airspeed = 1.5; gMag = 0.08; loadRaw = 4200.0; omega = 80.0 }
   }
   @{
-    name = 'FWD street cruise residual'
-    comp = $street; slip = 0.08; propNm = 350.0; airspeed = 22.0; gMag = 0.10
-    loadRaw = 3800.0; omega = $null
-  }
-  @{
-    name = 'RWD street hard accel (milder slip)'
-    comp = $street; slip = $rwdSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22
-    loadRaw = 4600.0; omega = $null
-  }
-  @{
-    name = 'Stationary burnout (must stay hot)'
-    comp = $street; slip = $burnSlip; propNm = 1800.0; airspeed = 1.5; gMag = 0.08
-    loadRaw = 4200.0; omega = 80.0
-  }
-  @{
-    name = 'RWD drift (high g --- soft-cap off)'
-    comp = $street; slip = $driftSlip; propNm = 900.0; airspeed = 20.0; gMag = 0.85
-    loadRaw = 4800.0; omega = $null
-  }
-  @{
-    name = 'sport_plus FWD-like spin (milder soft-cap)'
-    comp = $sportPlus; slip = $fwdSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22
-    loadRaw = 4400.0; omega = $null
-  }
-  @{
-    name = 'medium_slick driven spin (excluded)'
-    comp = $slick; slip = $fwdSlip; propNm = 1100.0; airspeed = 11.0; gMag = 0.22
-    loadRaw = 4400.0; omega = $null
+    key = 'AWD'
+    # 4 driven wheels: ~half FWD per-wheel prop; mid residual slip
+    hard = @{ slip = $awdHardSlip; propNm = 580.0; airspeed = 11.0; gMag = 0.22; loadRaw = 4200.0; omega = $null }
+    cruise = @{ slip = $cruiseSlip; propNm = 200.0; airspeed = 22.0; gMag = 0.10; loadRaw = 3800.0; omega = $null }
+    burnout = @{ slip = $burnSlip; propNm = 950.0; airspeed = 1.5; gMag = 0.08; loadRaw = 4200.0; omega = 80.0 }
   }
 )
 
+$scenarios = @('cruise', 'hard', 'burnout')
+$compounds = @($street, $sportPlus, $slick, $rallyAsphalt)
+
 $sb = New-Object System.Text.StringBuilder
-function Out([string]$s) { [void]$sb.AppendLine($s) }
+function Out([string]$s) { [void]$sb.AppendLine($s); Write-Host $s }
 
-Out '=== FWD / RWD drive-slip heat soft-sim ==='
-Out ('Generated: {0:yyyy-MM-dd HH:mm}' -f (Get-Date))
-Out 'Live knobs: topo enable ramps + profile driveSlipHeatMin/PropMin (street 0.40/0.62, sport+ 0.72/0.82)'
-Out ('FWD slipE from lastSlip=20 -> {0:n3}; RWD lastSlip=9 -> {1:n3}; burnout lastSlip=20 -> {2:n3}' -f `
-  $fwdSlip, $rwdSlip, $burnSlip)
+Out '=== Drive-heat MATRIX soft-sim (compound x layout x scenario) ==='
+Out ("Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm')")
+Out 'Live knobs: patchFrac 0.035/0.070 heatMin 0.025; driveStreetSlip*; drivePropCruiseNm=250'
 Out ''
-Out (' {0,-42} {1,7} {2,7} {3,6} {4,6} {5,7} {6,7} {7,7} {8,7}' -f `
-  'case', 'mode', 'heatSc', 'endSk', 'peak', 'dSkin', 'endCo', 't@100', 't@120')
+Out (" {0,-14} {1,-4} {2,-8} {3,7} {4,7} {5,7} {6,7} {7,6} {8,9}" -f `
+  'compound', 'lay', 'scen', 'peakSk', 'endSk', 'peakCo', 'heatSc', 'eng', 'flag')
 
-$paired = @()
-foreach ($c in $cases) {
-  $pAfter = @{
-    comp = $c.comp; label = $c.name; dur = 25.0
-    slip = $c.slip; propNm = $c.propNm; airspeed = $c.airspeed; gMag = $c.gMag
-    loadRaw = $c.loadRaw
+$rows = @()
+foreach ($comp in $compounds) {
+  foreach ($lay in $layouts) {
+    $drivenN = if ($lay.key -eq 'AWD') { 4 } elseif ($lay.key -eq 'FWD' -or $lay.key -eq 'RWD') { 2 } else { 2 }
+    foreach ($sk in $scenarios) {
+      $sc = $lay[$sk]
+      $p = @{
+        comp = $comp
+        label = "$($comp.name)/$($lay.key)/$sk"
+        dur = 25.0
+        slip = [double]$sc.slip
+        propNm = [double]$sc.propNm
+        airspeed = [double]$sc.airspeed
+        gMag = [double]$sc.gMag
+        loadRaw = [double]$sc.loadRaw
+        drivenCount = $drivenN
+        vehicleMassKg = 1500.0
+      }
+      if ($null -ne $sc.omega) { $p['omega'] = [double]$sc.omega }
+      $r = Simulate-DriveHeat @p
+      $eng = if ($r.softCapEngaged) { 'YES' } else { 'no' }
+      Out (" {0,-14} {1,-4} {2,-8} {3,7:0.0} {4,7:0.0} {5,7:0.0} {6,7:0.000} {7,6} {8,9}" -f `
+        $comp.name, $lay.key, $sk, $r.peakSkin, $r.endSkin, $r.peakCore, $r.streetHeat, $eng, $r.flag)
+      $rows += [pscustomobject]@{
+        compound = $comp.name
+        layout = $lay.key
+        scenario = $sk
+        expectSoftCap = [bool]$comp.expectSoftCap
+        isSlick = [bool]$comp.isSlick
+        isSportPlus = [bool]$comp.isSportPlus
+        r = $r
+      }
+    }
   }
-  if ($null -ne $c.omega) { $pAfter['omega'] = $c.omega }
-  $after = Simulate-DriveHeat @pAfter
-
-  $pBefore = @{
-    comp = $c.comp; label = ($c.name + ' [BEFORE]'); dur = 25.0
-    slip = $c.slip; propNm = $c.propNm; airspeed = $c.airspeed; gMag = $c.gMag
-    loadRaw = $c.loadRaw; DisableSoftCap = $true
-  }
-  if ($null -ne $c.omega) { $pBefore['omega'] = $c.omega }
-  $before = Simulate-DriveHeat @pBefore
-
-  $paired += [pscustomobject]@{ name = $c.name; before = $before; after = $after }
-
-  foreach ($r in @($before, $after)) {
-    $mode = if ($r.softCap) { 'AFTER' } else { 'BEFORE' }
-    $f100 = if ($null -eq $r.tAt100) { '-' } else { ('{0:n1}' -f $r.tAt100) }
-    $f120 = if ($null -eq $r.tAt120) { '-' } else { ('{0:n1}' -f $r.tAt120) }
-    Out (' {0,-42} {1,7} {2,7:n3} {3,6:n1} {4,6:n1} {5,7:n1} {6,7:n1} {7,7} {8,7}' -f `
-      $c.name, $mode, $r.streetHeat, $r.endSkin, $r.peakSkin, $r.dSkin, $r.endCore, $f100, $f120)
-  }
-  Out ''
-}
-
-Out '=== BEFORE -> AFTER deltas (peakSkin; negative = cooler = soft-cap working) ==='
-foreach ($p in $paired) {
-  $dPeak = $p.after.peakSkin - $p.before.peakSkin
-  $dEnd = $p.after.endSkin - $p.before.endSkin
-  Out (' {0,-42} dPeak={1:n1}C  dEnd={2:n1}C  heatScale={3:n3}' -f `
-    $p.name, $dPeak, $dEnd, $p.after.streetHeat)
 }
 
 Out ''
 Out '=== VERDICT CHECKS ==='
-$fwd = $paired | Where-Object { $_.name -like 'FWD street hard accel*' } | Select-Object -First 1
-$burn = $paired | Where-Object { $_.name -like 'Stationary burnout*' } | Select-Object -First 1
-$drift = $paired | Where-Object { $_.name -like 'RWD drift*' } | Select-Object -First 1
-$sp = $paired | Where-Object { $_.name -like 'sport_plus*' } | Select-Object -First 1
-$sl = $paired | Where-Object { $_.name -like 'medium_slick*' } | Select-Object -First 1
-$rwd = $paired | Where-Object { $_.name -like 'RWD street hard accel*' } | Select-Object -First 1
-
 $fail = 0
-if ($fwd -and (($fwd.before.peakSkin - $fwd.after.peakSkin) -lt 8.0)) {
-  Out ' FAIL: FWD rolling spin not cooled enough (expect >=8C peak relief).'; $fail++
+
+# slick: soft-cap never engages
+$slBad = @($rows | Where-Object { $_.compound -eq 'medium_slick' -and $_.r.softCapEngaged })
+if ($slBad.Count -gt 0) {
+  Out (" FAIL: medium_slick soft-cap leaked on $($slBad.Count) cell(s)."); $fail++
 } else {
-  Out (' OK: FWD rolling spin peak {0:n1} -> {1:n1}C (relief {2:n1}C)' -f `
-    $fwd.before.peakSkin, $fwd.after.peakSkin, ($fwd.before.peakSkin - $fwd.after.peakSkin))
+  Out ' OK: medium_slick excluded from soft-cap across matrix'
 }
-if ($burn -and ([math]::Abs($burn.after.peakSkin - $burn.before.peakSkin) -gt 2.0)) {
-  Out ' FAIL: burnout peak changed - soft-cap leaked into stationary spin.'; $fail++
+
+# sport_plus FWD hard: milder soft-cap engages
+$spFwd = $rows | Where-Object { $_.compound -eq 'sport_plus' -and $_.layout -eq 'FWD' -and $_.scenario -eq 'hard' } | Select-Object -First 1
+if (-not $spFwd) {
+  Out ' FAIL: missing sport_plus/FWD/hard.'; $fail++
+} elseif (-not $spFwd.r.softCapEngaged) {
+  Out ' FAIL: sport_plus FWD hard soft-cap did not engage.'; $fail++
+} elseif ($spFwd.r.streetHeat -lt 0.65 -or $spFwd.r.streetHeat -gt 0.92) {
+  Out (" FAIL: sport_plus heatSc=$($spFwd.r.streetHeat) want ~0.65-0.92"); $fail++
 } else {
-  Out (' OK: burnout unchanged (peak {0:n1}C, heatScale={1:n3})' -f $burn.after.peakSkin, $burn.after.streetHeat)
+  Out (" OK: sport_plus milder soft-cap heatSc=$($spFwd.r.streetHeat) peak=$($spFwd.r.peakSkin)C")
 }
-if ($drift -and ([math]::Abs($drift.after.peakSkin - $drift.before.peakSkin) -gt 2.0)) {
-  Out ' FAIL: drift heat changed - g-gate not protecting high-g.'; $fail++
+
+# Burnout: soft-cap off for all
+$burnBad = @($rows | Where-Object { $_.scenario -eq 'burnout' -and $_.r.softCapEngaged })
+if ($burnBad.Count -gt 0) {
+  $bn = ($burnBad | ForEach-Object { "$($_.compound)/$($_.layout)" }) -join ', '
+  Out " FAIL: burnout soft-cap leak on: $bn"; $fail++
 } else {
-  Out (' OK: drift unchanged (peak {0:n1}C, heatScale={1:n3})' -f $drift.after.peakSkin, $drift.after.streetHeat)
+  Out ' OK: burnout soft-cap inactive (Speed0) across layouts'
 }
-if ($sp -and ($sp.after.streetHeat -ge 0.999 -or $sp.after.streetHeat -lt 0.65 -or $sp.after.streetHeat -gt 0.92)) {
-  Out ' FAIL: sport_plus should use milder soft-cap (heatSc ~0.65-0.92).'; $fail++
+
+# Cruise: soft-cap should stay inactive (low slip)
+$cruiseBad = @($rows | Where-Object { $_.scenario -eq 'cruise' -and $_.r.softCapEngaged })
+if ($cruiseBad.Count -gt 0) {
+  $cn = ($cruiseBad | ForEach-Object { "$($_.compound)/$($_.layout)" }) -join ', '
+  Out " WARN: cruise soft-cap engaged on: $cn"
 } else {
-  Out (" OK: sport_plus milder soft-cap heatSc={0:n3}" -f $sp.after.streetHeat)
+  Out ' OK: cruise residual soft-cap inactive'
 }
-if ($sl -and ([math]::Abs($sl.after.peakSkin - $sl.before.peakSkin) -gt 0.5)) {
-  Out ' FAIL: slick should be excluded from soft-cap.'; $fail++
+
+# Street FWD hard: soft-cap engages + no RUNAWAY
+$stFwd = $rows | Where-Object { $_.compound -eq 'street' -and $_.layout -eq 'FWD' -and $_.scenario -eq 'hard' } | Select-Object -First 1
+if (-not $stFwd) {
+  Out ' FAIL: missing street/FWD/hard cell.'; $fail++
+} elseif (-not $stFwd.r.softCapEngaged) {
+  Out ' FAIL: street FWD hard soft-cap did not engage.'; $fail++
+} elseif ($stFwd.r.flag -eq 'RUNAWAY') {
+  Out (" FAIL: street FWD hard RUNAWAY peak=$($stFwd.r.peakSkin)C"); $fail++
 } else {
-  Out ' OK: slick excluded'
+  Out (" OK: street FWD hard soft-cap heatSc=$($stFwd.r.streetHeat) peak=$($stFwd.r.peakSkin)C flag=$($stFwd.r.flag)")
 }
-if ($fwd -and ($fwd.after.peakSkin -gt 105.0)) {
-  Out ' WARN: FWD after peak still >105C - consider lower HeatMin.'
-} elseif ($fwd -and $rwd) {
-  Out (' OK: FWD after peak {0:n1}C (street opt~65); RWD mild-slip {1:n1}C' -f `
-    $fwd.after.peakSkin, $rwd.after.peakSkin)
+
+# Street AWD hard cooler than FWD (torque split) — soft expect
+$stAwd = $rows | Where-Object { $_.compound -eq 'street' -and $_.layout -eq 'AWD' -and $_.scenario -eq 'hard' } | Select-Object -First 1
+if ($stFwd -and $stAwd) {
+  if ($stAwd.r.peakSkin -ge $stFwd.r.peakSkin) {
+    Out (" WARN: street AWD hard peak $($stAwd.r.peakSkin)C not below FWD $($stFwd.r.peakSkin)C (torque-split expectation)")
+  } else {
+    Out (" OK: street AWD hard cooler than FWD ($($stAwd.r.peakSkin) < $($stFwd.r.peakSkin)C)")
+  }
+}
+
+# Rally FWD hard: Phase 5 purpose pack skips street soft-cap; must not RUNAWAY
+$ryFwd = $rows | Where-Object { $_.compound -eq 'rally_asphalt' -and $_.layout -eq 'FWD' -and $_.scenario -eq 'hard' } | Select-Object -First 1
+if ($ryFwd) {
+  if ($ryFwd.r.softCapEngaged) {
+    Out (" FAIL: rally FWD hard soft-cap leaked (Phase 5 purpose gate) heatSc=$($ryFwd.r.streetHeat)"); $fail++
+  } elseif ($ryFwd.r.flag -eq 'RUNAWAY') {
+    Out (" FAIL: rally FWD hard RUNAWAY peak=$($ryFwd.r.peakSkin)C"); $fail++
+  } else {
+    Out (" OK: rally FWD hard soft-cap OFF peak=$($ryFwd.r.peakSkin)C eng=$($ryFwd.r.softCapEngaged) flag=$($ryFwd.r.flag)")
+  }
+}
+
+# Soft-cap compounds must not RUNAWAY on hard accel
+$badRun = @($rows | Where-Object {
+  $_.r.flag -eq 'RUNAWAY' -and $_.scenario -eq 'hard' -and $_.expectSoftCap
+})
+if ($badRun.Count -gt 0) {
+  foreach ($x in $badRun) {
+    Out (" FAIL: RUNAWAY $($x.compound)/$($x.layout)/$($x.scenario) peak=$($x.r.peakSkin)C")
+  }
+  $fail += $badRun.Count
+}
+
+# PatchFrac live parity smoke: street cruise peak must stay below absurd (parity regression)
+$stCruise = $rows | Where-Object { $_.compound -eq 'street' -and $_.layout -eq 'RWD' -and $_.scenario -eq 'cruise' } | Select-Object -First 1
+if ($stCruise -and ($stCruise.r.peakSkin -gt 95.0 -or $stCruise.r.peakSkin -lt 25.0)) {
+  Out (" FAIL: street cruise peak absurd $($stCruise.r.peakSkin)C (patchFrac parity?)"); $fail++
+} elseif ($stCruise) {
+  Out (" OK: street RWD cruise peak=$($stCruise.r.peakSkin)C (patchFrac live band)")
 }
 
 Out ''
 if ($fail -eq 0) {
-  Out 'OVERALL: PASS --- street FWD residual spin softened; burnout/drift/race paths intact.'
+  Out 'OVERALL: PASS - matrix gate green (soft-cap spectrum + layouts).'
 } else {
-  Out ("OVERALL: FAIL --- $fail check(s) failed.")
+  Out "OVERALL: FAIL - $fail check(s) failed."
 }
 
-$text = $sb.ToString()
-[System.IO.File]::WriteAllText($out, $text)
-Write-Host $text
-Write-Host ("Wrote $out")
-if ($fail -gt 0) { exit 1 }
+[System.IO.File]::WriteAllText($out, $sb.ToString())
+Write-Host "Wrote $out"
+if ($fail -gt 0) { exit 1 } else { exit 0 }

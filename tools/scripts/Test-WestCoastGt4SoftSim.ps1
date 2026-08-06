@@ -43,6 +43,9 @@ $DRIVE_PROP_SLICK_CARCASS_SCALE = 0.22
 $PRIOR_SKIN_SCALE = 0.50
 $PRIOR_CARCASS_SCALE = 0.30
 $SOFTSIM_RR_MULT = 0.55
+# Coast-axle warm-up folded into flexWarmGain (live 0.00125); soft-sim uses flex bump on fronts
+$SOFTSIM_HYST_SKIN = 0.21
+$SOFTSIM_FLEX_FRONT = 1.30  # ~flexWarmGain 0.00108→0.00125 + former undrivenRr 1.18
 
 function ThermalGrip([hashtable]$prof, [double]$temp) {
   $soft = [double]$prof.softness
@@ -70,7 +73,7 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
 
   $skin = Lerp $env ([double]$prof.tOpt) 0.50
   $core = $skin - 3.0
-  $cond = 100.0; $blister = 0.0; $marbles = 0.0; $hotStint = 0.0
+  $cond = 100.0; $blister = 0.0; $hotStint = 0.0
   $peakSkin = $skin
   $peakCore = $core
   $startSkin = $skin
@@ -127,6 +130,10 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
     $angHeat = $airspeed / (1.0 + $airspeed / 90.0)
     $rrSkin = 0.012 * $loadKg * $angHeat * 0.0000028 * [double]$prof.rollingRes * $cruiseRR * 8000.0 * $SOFTSIM_RR_MULT
     if ($inCorner) { $rrSkin = $rrSkin * 1.35 }
+    # Fronts: flexWarmGain coast warm-up (folded undrivenRr) + hystSkinShare
+    if (-not $isRear) {
+      $rrSkin = $rrSkin * $SOFTSIM_FLEX_FRONT * (1.0 + ($SOFTSIM_HYST_SKIN - 0.18) * 2.5)
+    }
     $raw = $raw + $rrSkin
 
     $effGateSkin = 0.0
@@ -182,9 +189,6 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
       $sf = [math]::Min(2.2, $slipEff / 0.32)
       $blister = Clamp ($blister + 0.00028 * $scaleW * $oh * $sf * $dt) 0 1
     }
-    if (($skin -gt [double]$prof.tOpt * 0.95) -and ($slipEff -gt 0.20)) {
-      $marbles = Clamp ($marbles + 0.0004 * $slipEff * $scaleW * $dt) 0 1
-    }
     if ($skin -ge [double]$prof.tOpt * 0.90) { $hotStint += $dt }
     if ($leakAt -lt 0 -and (($skin -gt $heatLeakStart) -or ($core -gt $heatLeakStart) -or
         (($blister -gt 0.70) -and ($skin -gt [double]$prof.tOpt * 1.30)))) {
@@ -199,7 +203,7 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
       $grip = $base * $therm * [double]$prof.gm * [double]$prof.dryGrip * (Lerp 0.75 1.0 ($cond * 0.01))
       $bPen = 0.0
       if ($blister -gt 0.08) { $bPen = ($blister - 0.08) * 0.32 }
-      $grip = $grip * (1.0 - $bPen) * (1.0 - $marbles * 0.18) * (1.0 - [math]::Min(0.12, $hotStint / 10000.0))
+      $grip = $grip * (1.0 - $bPen) * (1.0 - [math]::Min(0.12, $hotStint / 10000.0))
       $latGrip = $grip * [double]$prof.lat
       $beamRef = [math]::Max(0.18, [math]::Min(1.20, $surfMu))
       $latGrip = [math]::Min($latGrip, $surfaceCap / $beamRef)
@@ -309,9 +313,11 @@ function Expect([bool]$ok, [string]$msg) {
   else { $script:fail++; [void]$sb.AppendLine("FAIL  $msg") }
 }
 
-# Fronts: still warm into window, not cooked by rear drive scales
-Expect ([math]::Abs($aF1.avg - $bF1.avg) -lt 8.0) 'front skin not wildly shifted vs prior package'
-Expect ($aF1.avg -ge 68 -and $aF1.avg -lt 105) ("AFTER front skin lap1 in band (got {0})" -f $aF1.avg)
+# Fronts: P2 undriven warm-up into window; not cooked; stay near rear without overshoot
+Expect ([math]::Abs($aF1.avg - $bF1.avg) -lt 14.0) 'front skin not wildly shifted vs prior package'
+Expect ($aF1.avg -ge 80 -and $aF1.avg -lt 105) ("AFTER front skin lap1 in window band >=80 (got {0})" -f $aF1.avg)
+Expect (($aR1.avg - $aF1.avg) -lt 14.0) ("AFTER R-F skin gap <14C (got {0:n1})" -f ($aR1.avg - $aF1.avg))
+Expect ($aF1.avg -le ($aR1.avg + 4.0)) ("AFTER front not hotter than rear+4C (got F={0} R={1})" -f $aF1.avg, $aR1.avg)
 
 # Skin: cooler than prior; still usable hotlap band near opt
 Expect ($aR1.avg -lt ($bR1.avg - 2.0)) ("AFTER rear skin cooler than BEFORE by >=2C (got d={0:n1})" -f ($aR1.avg - $bR1.avg))

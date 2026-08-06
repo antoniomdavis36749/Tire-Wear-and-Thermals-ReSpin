@@ -157,7 +157,10 @@ angular.module("beamng.apps")
                         <div class="ttm-card" ng-repeat="w in wheels">
                             <div class="ttm-card-header">
                                 <span class="ttm-wheel-name">{{ w.name }}</span>
-                                <span class="ttm-compound-tag">{{ formatProfile(w.profile) }}</span>
+                                <span style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                                    <span class="ttm-compound-tag">{{ formatProfile(w.profile) }}</span>
+                                    <span class="ttm-compound-tag" ng-if="w.purpose">{{ formatPurpose(w.purpose) }}</span>
+                                </span>
                             </div>
 
                             <div class="ttm-stat-row">
@@ -278,13 +281,6 @@ angular.module("beamng.apps")
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
-                                    <span class="ttm-diag-label">MARBLES</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.marbles)}">{{ (w.marbles || 0).toFixed(0) }}%</span>
-                                    <div class="ttm-bar-container">
-                                        <div class="ttm-bar-fill" ng-style="{'width': (w.marbles || 0) + '%', 'background-color': getDiagnosticColor(w.marbles)}"></div>
-                                    </div>
-                                </div>
-                                <div class="ttm-diagnostic-item">
                                     <span class="ttm-diag-label">FLATSPOT</span>
                                     <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ (w.flatspot || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
@@ -336,7 +332,7 @@ angular.module("beamng.apps")
                 var WHEEL_LERP_KEYS = [
                     "condition", "tyreGrip", "pressure", "camber", "toe", "avgTemp",
                     "working_temp", "rimTemp", "airTemp", "aeroLoadN",
-                    "clog", "graining", "blistering", "marbles", "flatspot", "leak", "waterFilm",
+                    "clog", "graining", "blistering", "flatspot", "leak", "waterFilm",
                     "stintFade", "ductPercent"
                 ];
 
@@ -350,6 +346,13 @@ angular.module("beamng.apps")
                 scope.formatProfile = function (profile) {
                     if (!profile) return "";
                     return String(profile).replace(/_/g, " ");
+                };
+
+                scope.formatPurpose = function (purpose) {
+                    if (!purpose) return "";
+                    return String(purpose).replace(/_/g, " ").replace(/\b\w/g, function (c) {
+                        return c.toUpperCase();
+                    });
                 };
 
                 scope.tempCategoryColor = function (cat) {
@@ -449,6 +452,8 @@ angular.module("beamng.apps")
                 function copyStaticWheel(dst, src) {
                     dst.name = src.name;
                     dst.profile = src.profile;
+                    dst.purpose = src.purpose;
+                    dst.classifyReason = src.classifyReason;
                     dst.tempCategory = src.tempCategory;
                     dst.surfaceName = src.surfaceName;
                     dst.surfaceType = src.surfaceType;

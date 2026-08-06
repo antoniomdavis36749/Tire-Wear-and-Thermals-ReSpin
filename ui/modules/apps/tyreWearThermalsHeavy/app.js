@@ -177,13 +177,24 @@ angular.module("beamng.apps")
                             <!-- Wheel Header -->
                             <div class="tth-card-header">
                                 <span class="tth-wheel-name">{{ w.name }}</span>
-                                <span class="tth-compound-tag">{{ formatProfile(w.compoundClass || w.profile) }}</span>
+                                <span style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                                    <span class="tth-compound-tag">{{ formatProfile(w.compoundClass || w.profile) }}</span>
+                                    <span class="tth-compound-tag" ng-if="w.purpose">{{ formatPurpose(w.purpose) }}</span>
+                                </span>
                             </div>
                             <div class="tth-stat-row" ng-if="w.profile1 || w.profile2" style="font-size: 8px; margin-top: -3px;">
                                 <span class="tth-label">Profiles</span>
                                 <span class="tth-value" style="font-size: 8px; color: #94a3b8;">
                                     {{ formatProfile(w.profile1) }} → {{ formatProfile(w.profile2) }}
                                 </span>
+                            </div>
+                            <div class="tth-stat-row" ng-if="w.classifyReason" style="font-size: 8px; margin-top: -2px;">
+                                <span class="tth-label">Classify</span>
+                                <span class="tth-value" style="font-size: 8px; color: #64748b;">{{ w.classifyReason }}</span>
+                            </div>
+                            <div class="tth-stat-row" ng-if="w.dutyMods" style="font-size: 8px; margin-top: -2px;">
+                                <span class="tth-label">Duty mods</span>
+                                <span class="tth-value" style="font-size: 8px; color: #64748b;">{{ formatDutyMods(w.dutyMods) }}</span>
                             </div>
 
                             <!-- Structural Condition -->
@@ -412,13 +423,6 @@ angular.module("beamng.apps")
                                     </div>
                                 </div>
                                 <div class="tth-diagnostic-item">
-                                    <span class="tth-diag-label">MARBLES</span>
-                                    <span class="tth-value" ng-style="{'color': getDiagnosticColor(w.marbles)}">{{ (w.marbles || 0).toFixed(0) }}%</span>
-                                    <div class="tth-bar-container">
-                                        <div class="tth-bar-fill" ng-style="{'width': (w.marbles || 0) + '%', 'background-color': getDiagnosticColor(w.marbles)}"></div>
-                                    </div>
-                                </div>
-                                <div class="tth-diagnostic-item">
                                     <span class="tth-diag-label">FLATSPOT</span>
                                     <span class="tth-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ (w.flatspot || 0).toFixed(0) }}%</span>
                                     <div class="tth-bar-container">
@@ -487,7 +491,7 @@ angular.module("beamng.apps")
                     "suspCompressionMm", "suspVel", "suspStress", "suspBumpMm", "suspDroopMm", "dynamicRadius",
                     "muStatic", "muSlide", "contactDepth", "rough",
                     "patchFrac", "patchHeatScale", "depthHeatBoost", "hertzArea", "deflArea", "depthBlend",
-                    "clog", "graining", "blistering", "marbles", "flatspot", "leak", "waterFilm",
+                    "clog", "graining", "blistering", "flatspot", "leak", "waterFilm",
                     "stintFade", "ductPercent", "luaPressure", "nativePressure", "pressureDelta"
                 ];
 
@@ -511,6 +515,43 @@ angular.module("beamng.apps")
                 scope.formatProfile = function (profile) {
                     if (!profile) return '';
                     return String(profile).replace(/_/g, ' ');
+                };
+
+                scope.formatPurpose = function (purpose) {
+                    if (!purpose) return '';
+                    return String(purpose).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+                        return c.toUpperCase();
+                    });
+                };
+
+                var DUTY_MOD_LABELS = {
+                    fwd_slip_softcap: 'FWD slip soft-cap',
+                    street_slip_softcap: 'Street slip soft-cap',
+                    sport_plus_slip_softcap: 'Sport+ slip soft-cap',
+                    street_high_v_damp: 'High-V street damp',
+                    undriven_warmup: 'Undriven warm-up',
+                    awd_prop_gate: 'AWD prop gate',
+                    brake_tire_soak: 'Brake tire soak',
+                    duct_tire_side: 'Duct tire-side',
+                    soft_sink_damp: 'Soft-sink damp'
+                };
+
+                scope.formatDutyMod = function (id) {
+                    if (!id) return '';
+                    return DUTY_MOD_LABELS[id] || String(id).replace(/_/g, ' ');
+                };
+
+                scope.formatDutyMods = function (dutyMods) {
+                    if (!dutyMods) return '';
+                    var parts = String(dutyMods).split(',');
+                    var labels = [];
+                    var i, id;
+                    for (i = 0; i < parts.length; i++) {
+                        id = parts[i].replace(/^\s+|\s+$/g, '');
+                        if (!id) continue;
+                        labels.push(scope.formatDutyMod(id));
+                    }
+                    return labels.join(' · ');
                 };
 
                 scope.isLargeSkinGap = function (gap) {

@@ -30,7 +30,7 @@ $topo = @{
   drivePropFlexGateStart = 0.12; drivePropFlexExcess = 0.00054
   drivePropSlipWorkMult = 1.28
   drivePropSlickScale = 0.50; drivePropSlickCarcassScale = 0.30
-  drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0; drivePropStreetCarcassScale = 0.28
+  drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   aeroHeatScale = 0.55; aeroHeatSpeedStart = 15.0; aeroHeatSpeedFull = 52.0; aeroHeatMaxFrac = 0.48
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
@@ -60,6 +60,7 @@ $compounds = @(
     staticLoadN = 3800.0
     # Mild passenger aero: ~0 at low V → ~500 N/wheel @ 300 mph
     aeroPeakN = 500.0
+    driveSlipHeatMin = 0.40; driveSlipPropMin = 0.62; driveHighVCarcassScale = 0.28
   }
   @{
     name = 'medium_slick'
@@ -73,6 +74,7 @@ $compounds = @(
     staticLoadN = 3400.0
     # Race wing aero: ~0 low → ~2200 N/wheel @ 300 mph
     aeroPeakN = 2200.0
+    driveSlipHeatMin = 1.0; driveSlipPropMin = 1.0; driveHighVCarcassScale = 1.0
   }
 )
 
@@ -194,12 +196,13 @@ function Simulate-Cruise {
     $slickDrive = [double]$topo.drivePropSlickScale
     $slickCarcass = [double]$topo.drivePropSlickCarcassScale
   }
-  # Street/non-slick high-V carcass damp (mirrors live drivePropStreet*)
+  # Street/non-slick high-V carcass damp (profile driveHighVCarcassScale; topo Speed0/1 enable)
   $streetCarcass = 1.0
-  if ($slickCarcass -ge 0.999) {
+  $highVFull = if ($null -ne $comp.driveHighVCarcassScale) { [double]$comp.driveHighVCarcassScale } else { 1.0 }
+  if ($highVFull -lt 0.999) {
     $vRamp = Clamp (($airspeed - [double]$topo.drivePropStreetSpeed0) /
       [math]::Max(1.0, [double]$topo.drivePropStreetSpeed1 - [double]$topo.drivePropStreetSpeed0)) 0 1
-    $streetCarcass = 1.0 + ([double]$topo.drivePropStreetCarcassScale - 1.0) * $vRamp
+    $streetCarcass = 1.0 + ($highVFull - 1.0) * $vRamp
   }
   $carcassPropScale = $slickCarcass * $streetCarcass
   $excessSkin = $excessPropGate * $slickDrive

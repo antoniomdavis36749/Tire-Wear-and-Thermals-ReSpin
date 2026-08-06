@@ -31,7 +31,7 @@ $topo = @{
   drivePropFlexGateStart = 0.12; drivePropFlexExcess = 0.00054
   drivePropSlipWorkMult = 1.28
   drivePropSlickScale = 0.50; drivePropSlickCarcassScale = 0.30
-  drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0; drivePropStreetCarcassScale = 0.28
+  drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   aeroHeatScale = 0.55; aeroHeatSpeedStart = 15.0; aeroHeatSpeedFull = 52.0; aeroHeatMaxFrac = 0.48
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
@@ -60,6 +60,7 @@ $compounds = @(
     tyreWidthM = 0.235; tyreRadius = 0.33; pressurePsi = 28.0
     staticLoadN = 3600.0
     aeroPeakN = 400.0   # mild rally aero / body
+    driveSlipHeatMin = 0.40; driveSlipPropMin = 0.62; driveHighVCarcassScale = 0.28
   }
   @{
     name = 'rally_gravel_medium'
@@ -72,6 +73,7 @@ $compounds = @(
     tyreWidthM = 0.235; tyreRadius = 0.33; pressurePsi = 28.0
     staticLoadN = 3600.0
     aeroPeakN = 400.0
+    driveSlipHeatMin = 0.40; driveSlipPropMin = 0.62; driveHighVCarcassScale = 0.28
   }
 )
 
@@ -219,12 +221,13 @@ function Simulate-Cruise {
   $excessPropGate = Clamp (($propAbs - [double]$topo.drivePropCruiseNm) /
     [math]::Max(1.0, [double]$topo.drivePropExcessFullNm)) 0 1
   $slickDrive = 1.0; $slickCarcass = 1.0
-  # Rally is non-slick → street high-V carcass damp applies
+  # Rally is non-slick → street high-V carcass damp from profile pack
   $streetCarcass = 1.0
-  if ($slickCarcass -ge 0.999) {
+  $highVFull = if ($null -ne $comp.driveHighVCarcassScale) { [double]$comp.driveHighVCarcassScale } else { 1.0 }
+  if ($highVFull -lt 0.999) {
     $vRamp = Clamp (($airspeed - [double]$topo.drivePropStreetSpeed0) /
       [math]::Max(1.0, [double]$topo.drivePropStreetSpeed1 - [double]$topo.drivePropStreetSpeed0)) 0 1
-    $streetCarcass = 1.0 + ([double]$topo.drivePropStreetCarcassScale - 1.0) * $vRamp
+    $streetCarcass = 1.0 + ($highVFull - 1.0) * $vRamp
   }
   $carcassPropScale = $slickCarcass * $streetCarcass
   $excessSkin = $excessPropGate * $slickDrive

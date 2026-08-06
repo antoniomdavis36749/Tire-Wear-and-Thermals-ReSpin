@@ -16,13 +16,10 @@ function Get-PressureScales([double]$currentPsi, [double]$optP, [double]$sensiti
   $pOffset = ($currentPsi / [math]::Max(1.0, $optP)) - 1.0
   $sens = [math]::Max(0.05, $sensitivity)
   $ph = 0.04; $nu = 0.14; $no = 0.32
-  $bonus = 0.020
   $mildMax = 0.028 + 0.022 * $sens
   $ao = [math]::Abs($pOffset)
   if ($ao -le $ph) {
-    $t = 1.0 - $ao / $ph
-    $s = 1.0 + $bonus * $t * $t
-    return @{ Lat = $s; Long = $s; POffset = $pOffset; Band = 'perfect' }
+    return @{ Lat = 1.0; Long = 1.0; POffset = $pOffset; Band = 'neutral' }
   }
   if ($pOffset -lt 0) {
     if ($pOffset -ge -$nu) {
@@ -66,7 +63,7 @@ function Get-DynamicPsi([double]$initialPsi, [double]$airTempC, [double]$initial
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('=== Pressure Window Soft-Sim (three-band grip) ===')
 [void]$sb.AppendLine('Bands (ratio = hotPSI / optimalPressure):')
-[void]$sb.AppendLine('  perfect: |off| <= 4%  -> up to +2% grip')
+[void]$sb.AppendLine('  neutral: |off| <= 4%  -> scale 1.0 (no perfect bonus)')
 [void]$sb.AppendLine('  normal under: -14%..-4%  | normal over: +4%..+32% (asymmetric)')
 [void]$sb.AppendLine('  outer: beyond normal -> soft-then-steep (sens-scaled), floors 0.15/0.30/0.35')
 [void]$sb.AppendLine('')
@@ -82,7 +79,7 @@ foreach ($c in $compounds) {
   $sens = [double]$c.Sens
   $mildMax = 0.028 + 0.022 * $sens
   [void]$sb.AppendLine(('--- {0} optP={1:N0} sens={2:N2} mildEdge={3:N1}% ---' -f $c.Name, $opt, $sens, ($mildMax * 100.0)))
-  [void]$sb.AppendLine(('  band PSI: perfect {0:N1}-{1:N1} | normal {2:N1}-{3:N1}' -f `
+  [void]$sb.AppendLine(('  band PSI: neutral {0:N1}-{1:N1} | normal {2:N1}-{3:N1}' -f `
     ($opt * 0.96), ($opt * 1.04), ($opt * 0.86), ($opt * 1.32)))
 
   $coldFills = @(24.0, 28.0, 30.0, 32.0, 34.0, 36.0, 38.0, 42.0, 50.0)
@@ -111,11 +108,11 @@ $farOver = Get-PressureScales 60.0 32.0 0.5
 $slickExact = Get-PressureScales 28.0 28.0 0.95
 
 [void]$sb.AppendLine('=== LOCK CHECKS ===')
-[void]$sb.AppendLine(('perfect_bonus_ok={0} (lat={1:N3} expect ~1.020)' -f ($std.Lat -ge 1.015 -and $std.Lat -le 1.025), $std.Lat))
+[void]$sb.AppendLine(('neutral_deadband_ok={0} (lat={1:N3} expect 1.000)' -f ($std.Lat -ge 0.999 -and $std.Lat -le 1.001 -and $std.Band -eq 'neutral'), $std.Lat))
 [void]$sb.AppendLine(('stock_cold35_mild_ok={0} (band={1} lat={2:N3} expect normal_over & >=0.95)' -f `
   ($stockWarm.Band -eq 'normal_over' -and $stockWarm.Lat -ge 0.95), $stockWarm.Band, $stockWarm.Lat))
 [void]$sb.AppendLine(('far_over_punish_ok={0} (lat={1:N3} expect <0.75)' -f ($farOver.Lat -lt 0.75), $farOver.Lat))
-[void]$sb.AppendLine(('slick_perfect_ok={0} (lat={1:N3})' -f ($slickExact.Band -eq 'perfect' -and $slickExact.Lat -ge 1.015), $slickExact.Lat))
+[void]$sb.AppendLine(('slick_neutral_ok={0} (lat={1:N3} band={2})' -f ($slickExact.Band -eq 'neutral' -and $slickExact.Lat -ge 0.999), $slickExact.Lat, $slickExact.Band))
 
 $text = $sb.ToString()
 Set-Content -Path $outPath -Value $text -Encoding UTF8
@@ -123,7 +120,7 @@ Write-Host $text
 Write-Host "Wrote $outPath"
 
 # Hard fail if locks break
-if (-not ($std.Lat -ge 1.015 -and $std.Lat -le 1.025)) { throw 'perfect bonus lock failed' }
+if (-not ($std.Lat -ge 0.999 -and $std.Lat -le 1.001 -and $std.Band -eq 'neutral')) { throw 'neutral deadband lock failed' }
 if (-not ($stockWarm.Band -eq 'normal_over' -and $stockWarm.Lat -ge 0.95)) { throw 'stock mild lock failed' }
 if (-not ($farOver.Lat -lt 0.75)) { throw 'far-over punish lock failed' }
-if (-not ($slickExact.Band -eq 'perfect')) { throw 'slick perfect lock failed' }
+if (-not ($slickExact.Band -eq 'neutral' -and $slickExact.Lat -ge 0.999)) { throw 'slick neutral lock failed' }
