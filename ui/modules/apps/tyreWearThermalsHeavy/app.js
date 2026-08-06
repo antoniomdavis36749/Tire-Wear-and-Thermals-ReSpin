@@ -218,7 +218,10 @@ angular.module("beamng.apps")
                                     </span>
                                     <span style="font-size: 8px; color: #64748b;">
                                         (Cold: {{ (w.coldPressure || w.initialPressure || 0).toFixed(2) }} / Hot tgt: {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(2) }}
-                                        · r{{ (w.pressureRatio || 0).toFixed(2) }})
+                                        · r{{ (w.pressureRatio || 0).toFixed(2) }}
+                                        · Lua {{ (w.luaPressure !== undefined ? w.luaPressure : w.pressure || 0).toFixed(1) }}
+                                        → Nat {{ (w.nativePressure !== undefined ? w.nativePressure : w.pressure || 0).toFixed(1) }}
+                                        <span ng-style="{'color': pressureConvColor(w)}"> Δ{{ pressureDeltaAbs(w) }}</span>)
                                     </span>
                                 </span>
                             </div>
@@ -270,6 +273,17 @@ angular.module("beamng.apps")
                                     <span ng-if="w.underWater" style="color:#38bdf8;"> · H2O</span>
                                 </span>
                             </div>
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Patch / Heat / DepthBoost:</span>
+                                <span class="tth-value" style="font-size: 9px;">
+                                    {{ (w.patchFrac||0).toFixed(3) }} × {{ (w.patchHeatScale||1).toFixed(2) }}
+                                    · boost{{ (w.depthHeatBoost||1).toFixed(2) }}
+                                    <span style="color:#64748b;">
+                                        · Hz{{ (w.hertzArea||0).toFixed(4) }} / defl{{ (w.deflArea||0).toFixed(4) }}
+                                        · blend{{ (w.depthBlend||0).toFixed(2) }}
+                                    </span>
+                                </span>
+                            </div>
 
                             <!-- Skin Thermal Distribution (Outer | Middle | Inner) -->
                             <div class="tth-section-label-muted">Surface Heat Map (O | M | I):</div>
@@ -303,6 +317,18 @@ angular.module("beamng.apps")
                                 <span class="tth-value" ng-style="{'color': getTempColor(w.brakeSurface, 400)}">
                                     {{ (w.brakeSurface !== undefined ? w.brakeSurface : 0).toFixed(2) }} /
                                     {{ (w.brakeCore !== undefined ? w.brakeCore : 0).toFixed(2) }} °C
+                                    <span style="font-size: 8px; color: #64748b;">
+                                        · η{{ ((w.brakeThermalEfficiency !== undefined ? w.brakeThermalEfficiency : 1) * 100).toFixed(0) }}%
+                                    </span>
+                                </span>
+                            </div>
+
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Brake→rim soak:</span>
+                                <span class="tth-value" style="font-size: 9px;">
+                                    {{ ((w.brakeSoakRateCs !== undefined ? w.brakeSoakRateCs : 0) >= 0 ? '+' : '') }}{{ (w.brakeSoakRateCs !== undefined ? w.brakeSoakRateCs : 0).toFixed(2) }} °C/s
+                                    · duct air×{{ (w.ductAirCoolFactor !== undefined ? w.ductAirCoolFactor : 1).toFixed(2) }}
+                                    / soak×{{ (w.ductSoakCondFactor !== undefined ? w.ductSoakCondFactor : 1.15).toFixed(2) }}
                                 </span>
                             </div>
 
@@ -453,13 +479,16 @@ angular.module("beamng.apps")
                 var WHEEL_LERP_KEYS = [
                     "condition", "tyreGrip", "pressure", "pressureRatio", "camber", "toe", "avgTemp",
                     "working_temp", "rimTemp", "airTemp", "aeroLoadN", "skinCarcassGap",
-                    "brakeSurface", "brakeCore", "driveHeatGate", "driveHeatGateCarcass",
+                    "brakeSurface", "brakeCore", "brakeThermalEfficiency", "brakeSoakRateCs",
+                    "ductAirCoolFactor", "ductSoakCondFactor",
+                    "driveHeatGate", "driveHeatGateCarcass",
                     "loadN", "peakForce", "longGrip", "latGrip",
                     "slipEnergy", "longSlip", "sideSlip",
                     "suspCompressionMm", "suspVel", "suspStress", "suspBumpMm", "suspDroopMm", "dynamicRadius",
                     "muStatic", "muSlide", "contactDepth", "rough",
+                    "patchFrac", "patchHeatScale", "depthHeatBoost", "hertzArea", "deflArea", "depthBlend",
                     "clog", "graining", "blistering", "marbles", "flatspot", "leak", "waterFilm",
-                    "stintFade", "ductPercent"
+                    "stintFade", "ductPercent", "luaPressure", "nativePressure", "pressureDelta"
                 ];
 
                 scope.wheels = [];
@@ -500,6 +529,22 @@ angular.module("beamng.apps")
                     if (ratio <= 1.32) return "WARM+";
                     if (ratio <= 1.55) return "OVER";
                     return "HIGH";
+                };
+
+                // |Lua−Nat| for hot write-back convergence (green when tight, amber while catching up)
+                scope.pressureDeltaAbs = function (w) {
+                    var d = (w && w.pressureDelta !== undefined)
+                        ? w.pressureDelta
+                        : ((w && w.luaPressure !== undefined ? w.luaPressure : 0) - (w && w.nativePressure !== undefined ? w.nativePressure : 0));
+                    return Math.abs(d || 0).toFixed(1);
+                };
+                scope.pressureConvColor = function (w) {
+                    var d = Math.abs((w && w.pressureDelta !== undefined)
+                        ? w.pressureDelta
+                        : ((w && w.luaPressure !== undefined ? w.luaPressure : 0) - (w && w.nativePressure !== undefined ? w.nativePressure : 0)));
+                    if (d <= 0.2) return "#10b981"; // converged (within ~deadband)
+                    if (d <= 1.0) return "#94a3b8"; // closing in
+                    return "#f59e0b"; // warm-up lag / write-back catching Nat
                 };
 
                 scope.tempCategoryColor = function (cat) {

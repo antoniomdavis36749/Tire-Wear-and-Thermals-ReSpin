@@ -16,7 +16,7 @@ local function makeDuctVar(name, title, subCategory, savedVal)
         category = "Brakes",
         subCategory = subCategory,
         title = title,
-        description = "Brake cooling duct opening. 1%=Closed (stock / no ducts), 100%=Fully open. Affects brake and tyre heat soak. Saved with vehicle configs.",
+        description = "Tyre/rim cooling duct opening. 1%=Closed (stock / no ducts), 100%=Fully open. Boosts tyre & rim air cooling and slightly reduces brake→rim heat soak. Does NOT change native rotor cooling. Saved with vehicle configs.",
         type = "range",
         unit = "%",
         min = 1,

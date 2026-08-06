@@ -20,7 +20,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # ---- Live THERMAL_TOPOLOGY + post-fix globals (match StraightLineSpeedSweep) ----
 $topo = @{
-  patchFracMin = 0.09; patchFracMax = 0.22; patchFracRef = 0.140
+  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
   freeBeltCoolMult = 1.32
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
@@ -36,6 +36,7 @@ $topo = @{
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
   hystSkinShare = 0.18
+  softSinkHeatCoef = 1.2; softSinkRoughCoef = 0.35; softSinkHeatFloor = 0.72
 }
 $SPAWN_CONV_GRACE_S = 14.0
 $STREET_PREHEAT_BLEND = 0.34
@@ -181,14 +182,12 @@ function Simulate-Cruise {
   }
 
   $estArea = [math]::Max(0.004, [math]::Min($tyreWidthM * 0.24, $loadRaw / $pressurePa))
-  # Soft-surface sink (live contactDepth > 0.02)
-  if ($contactDepth -gt 0.02) {
-    $estArea = $estArea * [math]::Max(0.45, 1.0 - $contactDepth * 1.5)
-  }
+  # Soft sink: conduction denom only — no area-shrink (live parity)
   $patchLen = $estArea / $tyreWidthM
-  $patchFrac = Clamp ($patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)) `
-    ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
-  $patchHeatScale = Clamp ($patchFrac / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
+  $patchFracRaw = $patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)
+  $patchFrac = Clamp $patchFracRaw ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
+  $patchFracHeat = Clamp $patchFracRaw ([double]$topo.patchFracHeatMin) ([double]$topo.patchFracMax)
+  $patchHeatScale = Clamp ($patchFracHeat / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
   $freeBeltBias = 1.0 + (1.0 - $patchFrac) * ([double]$topo.freeBeltCoolMult - 1.0)
 
   $combinedAir = $airspeed + $omega * $tyreRadius * 0.35

@@ -109,6 +109,50 @@ else { Write-Host 'PASS hard_smooth slick scale ~0.95 (lerp 0.96 to 0.90 at trea
 $fail += $capFail
 $pass += (4 - $capFail)
 
+# Street asphalt vs loose relative soft-sim (live applyProfileSurfaceBias street-family)
+# standard tread~0.70: dry_paved *1.02, gravel/dirt *0.90, mud *0.86
+function SurfScale([string]$s, [double]$tread, [double]$drain) {
+    switch ($s) {
+        'dry_paved' { return (Lerp 1.04 0.90 $tread) }
+        'gravel' { return (Lerp 0.55 1.05 $tread) }
+        'dirt' { return (Lerp 0.62 1.02 $tread) }
+        'mud' { return (Lerp 0.34 1.08 $tread) }
+        default { return 1.0 }
+    }
+}
+$stTread = 0.70
+$stDryBefore = SurfScale 'dry_paved' $stTread 0.8
+$stGravBefore = SurfScale 'gravel' $stTread 0.8
+$stDirtBefore = SurfScale 'dirt' $stTread 0.8
+$stMudBefore = SurfScale 'mud' $stTread 0.8
+$stDryAfter = $stDryBefore * 1.02
+$stGravAfter = $stGravBefore * 0.90
+$stDirtAfter = $stDirtBefore * 0.90
+$stMudAfter = $stMudBefore * 0.86
+$rAG0 = $stDryBefore / $stGravBefore
+$rAG1 = $stDryAfter / $stGravAfter
+$rAD1 = $stDryAfter / $stDirtAfter
+$rAM1 = $stDryAfter / $stMudAfter
+$rMG1 = $stMudAfter / $stGravAfter
+Write-Host ""
+Write-Host ("Street asphalt:loose (standard tread={0}): before A:G={1:N3}  after A:G={2:N3} A:D={3:N3} A:M={4:N3} mud/grav={5:N3}" -f `
+    $stTread, $rAG0, $rAG1, $rAD1, $rAM1, $rMG1)
+$streetFail = 0
+if ($rAG1 -lt 1.12) { Write-Host "FAIL street asphalt:gravel gap too small ($rAG1)"; $streetFail++ }
+else { Write-Host "PASS street asphalt:gravel >= 1.12" }
+if ($rAD1 -lt 1.12) { Write-Host "FAIL street asphalt:dirt gap too small ($rAD1)"; $streetFail++ }
+else { Write-Host "PASS street asphalt:dirt >= 1.12" }
+if ($rMG1 -ge 1.0) { Write-Host "FAIL street mud not below gravel ($rMG1)"; $streetFail++ }
+else { Write-Host "PASS street mud < gravel" }
+if ($rAG1 -le $rAG0) { Write-Host "FAIL street asphalt:gravel did not widen ($rAG0 -> $rAG1)"; $streetFail++ }
+else { Write-Host "PASS street asphalt:gravel widened vs pre-bias" }
+# Rally gravel bias untouched (1.20)
+$rallyGrav = (SurfScale 'gravel' 0.70 0.75) * 1.20
+if ($rallyGrav -lt 1.05) { Write-Host "FAIL rally medium gravel bite eroded ($rallyGrav)"; $streetFail++ }
+else { Write-Host ("PASS rally medium gravel bias intact ({0:N3})" -f $rallyGrav) }
+$fail += $streetFail
+$pass += (5 - $streetFail)
+
 Write-Host ""
 Write-Host "Classification: $pass passed, $fail failed"
 if ($fail -gt 0) { exit 1 }

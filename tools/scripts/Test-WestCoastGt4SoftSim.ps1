@@ -1,7 +1,7 @@
 # Soft-sim: Belasco GT4 race path — SLICK spectrum, FRONT vs REAR (RWD)
 # Source: SLICK_SPECTRUM_POINTS + THERMAL_TOPOLOGY drivePropSlick* scales
 # sport / sport_plus PROFILE_POINTS untouched.
-# Live ref: skin better @0.55; second carcass layer still overheating on driven rears.
+# WC stint pass: cooler hotlap + slower condition so ~1.5 laps is not catastrophic.
 $ErrorActionPreference = 'Stop'
 $out = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'wc-gt4-softsim-10laps.txt'
 
@@ -12,9 +12,19 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
   return $v
 }
 
-# Live medium_slick (generic race/slick continuum anchor)
+# Live medium_slick (AFTER WC stint pass)
 $m = @{
   name = 'medium_slick'; softness = 0.65; latCapBase = 1.16
+  c = @(1.38, 0.32, -0.12); gm = 1.02; lat = 0.72; dryGrip = 0.98; rollingRes = 1.02
+  tOpt = 84.0; plat = 14.0; wc = 46.0; wh = 46.0; floor = 0.20; ad = 0.52; casing = 0.25
+  slipHeat = 9.1; workHeat = 5.35; wearRate = 0.00042; hotWear = 3.30; blisterRatio = 1.65
+  treadInertia = 0.399; carcassInertia = 0.646; react = 1.42; skinCore = 0.104
+  airCool = 0.024; staticCool = 0.082; coreCool = 0.031
+}
+
+# Prior medium_slick (before WC stint pass) for BEFORE comparison
+$mPrior = @{
+  name = 'medium_slick_prior'; softness = 0.65; latCapBase = 1.16
   c = @(1.38, 0.32, -0.12); gm = 1.02; lat = 0.72; dryGrip = 0.98; rollingRes = 1.02
   tOpt = 84.0; plat = 14.0; wc = 46.0; wh = 46.0; floor = 0.20; ad = 0.52; casing = 0.25
   slipHeat = 10.4; workHeat = 6.1; wearRate = 0.0008; hotWear = 4.52; blisterRatio = 1.50
@@ -23,18 +33,15 @@ $m = @{
 }
 
 # Corner slip/work proxy (shared F/R). Drive heat is REAR-ONLY (RWD).
-# Mild corner so fronts sit ~85-100 (live: fronts fine).
 $SOFTSIM_CORNER_HEAT = 0.62
-# Calibrated so BEFORE rear skin lap1 ≈ prior @0.55 (~96); carcass was under-modeled
 $SOFTSIM_DRIVE_HEAT_FULL = 18.5
-# Carcass excess proxy (hyst + flex + prop-linked RR) — separate from skin package
 $SOFTSIM_CARCASS_DRIVE_FULL = 9.5
-# Live THERMAL_TOPOLOGY (surgical; sport_plus keeps 1.0 / 1.0)
-$DRIVE_PROP_SLICK_SCALE = 0.50
-$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.30
-# Prior unified live (skin+carcass same gate) for BEFORE comparison
-$PRIOR_UNIFIED_SCALE = 0.55
-# Soft-sim RR trim (live cruise soft-cap already; single-zone overstates soak)
+# Live THERMAL_TOPOLOGY (AFTER)
+$DRIVE_PROP_SLICK_SCALE = 0.42
+$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.22
+# Prior split scales (BEFORE this pass)
+$PRIOR_SKIN_SCALE = 0.50
+$PRIOR_CARCASS_SCALE = 0.30
 $SOFTSIM_RR_MULT = 0.55
 
 function ThermalGrip([hashtable]$prof, [double]$temp) {
@@ -58,7 +65,6 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
   $surfaceCap = 1.15
   $lapTime = 95.0; $dur = $lapTime * $laps
   $isRear = ($axle -eq 'R')
-  # Slight rear bias load on RWD GT (drive + static)
   $loadCorner = if ($isRear) { 6000.0 } else { 5400.0 }
   $loadStraight = if ($isRear) { 3800.0 } else { 3400.0 }
 
@@ -78,16 +84,17 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
   $coreRate = 0.08 / [math]::Max(0.05, [double]$prof.carcassInertia)
   $blOn = [double]$prof.tOpt * [double]$prof.blisterRatio
   $scaleW = [double]$prof.wearRate * 2000.0
+  $heatLeakStart = 195.0  # slick heat-leak floor (live)
 
   $n = [int]($dur / $dt)
   $t = 0.0
   $nextLap = 1
   $lapRows = @()
+  $leakAt = -1.0
 
   for ($i = 0; $i -lt $n; $i++) {
     $phase = $t % $lapTime
     $inCorner = ($phase -gt 8.0 -and $phase -lt 70.0)
-    # RWD throttle: exits + most of straight (excess prop). Corners still get some drive.
     $driveGate = 0.0
     if ($isRear) {
       if (-not $inCorner) { $driveGate = 1.0 }
@@ -122,7 +129,6 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
     if ($inCorner) { $rrSkin = $rrSkin * 1.35 }
     $raw = $raw + $rrSkin
 
-    # Excess-prop SKIN drive heat (REAR only). slickSkinScale → drivePropSlickScale
     $effGateSkin = 0.0
     $effGateCarcass = 0.0
     if ($driveGate -gt 0) {
@@ -149,11 +155,9 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
 
     $fromSkin = ($skin - $core) * [double]$prof.skinCore
     $coreCoolAmt = ($core - $env) * [double]$prof.coreCool * 0.15 * (1.0 + $airspeed * 0.01)
-    # Carcass-bound excess: torqueHysteresis + flexExcess + prop-linked RR damp target
     $driveCarcass = 0.0
     if ($effGateCarcass -gt 0) {
       $driveCarcass = $SOFTSIM_CARCASS_DRIVE_FULL * [double]$prof.rollingRes * 0.55 * $effGateCarcass
-      # prop-linked RR damp mirrors live slickPropRrDamp on base carcass soak under drive
       $rrDamp = 1.0 + ($slickCarcassScale - 1.0) * $driveGate
       $driveCarcass = $driveCarcass * (0.70 + 0.30 * $rrDamp)
     }
@@ -166,10 +170,12 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
     $lapSumCore += $core
     $lapSamples++
 
+    # Closer to live: slidingWear*20 + tempDistToWearMult + hotWear
     $tempWear = 1.0
     if ($tempDist -gt 1.0) { $tempWear = Lerp 1.0 ([double]$prof.hotWear) (Clamp ($tempDist - 1.0) 0 1) }
-    $sliding = 14.0 * (($loadRaw / ($vehMass * 9.81)) * $slipEff * $tempWear / $tyreW)
-    $cond = Clamp ($cond - $sliding * [double]$prof.wearRate * $dt) 0 100
+    $tdw = -1.8 / (1.0 + 0.01 * ($tempDist * $tempDist)) + 2.8
+    $sliding = 20.0 * (($loadRaw / ($vehMass * 9.81)) * $slipEff * $tempWear / $tyreW)
+    $cond = Clamp ($cond - $tdw * $sliding * [double]$prof.wearRate * $dt) 0 100
 
     if (($skin -gt $blOn) -and ($slipEff -gt 0.32)) {
       $oh = [math]::Min(2.0, ($skin - $blOn) / [math]::Max(12.0, [double]$prof.tOpt * 0.18))
@@ -180,6 +186,10 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
       $marbles = Clamp ($marbles + 0.0004 * $slipEff * $scaleW * $dt) 0 1
     }
     if ($skin -ge [double]$prof.tOpt * 0.90) { $hotStint += $dt }
+    if ($leakAt -lt 0 -and (($skin -gt $heatLeakStart) -or ($core -gt $heatLeakStart) -or
+        (($blister -gt 0.70) -and ($skin -gt [double]$prof.tOpt * 1.30)))) {
+      $leakAt = $t
+    }
 
     $t += $dt
     if ($t -ge ($nextLap * $lapTime - 1e-6) -and $nextLap -le $laps) {
@@ -225,20 +235,21 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
     startSkin = $startSkin
     peakSkin = [math]::Round($peakSkin, 1)
     peakCore = [math]::Round($peakCore, 1)
+    leakAt = $leakAt
     rows = $lapRows
   }
 }
 
 function EmitAxle([System.Text.StringBuilder]$sb, $r, [string]$label) {
   [void]$sb.AppendLine(("--- {0} (skinScale={1} carcassScale={2}) ---" -f $label, $r.skinScale, $r.carcassScale))
-  [void]$sb.AppendLine(('{0,4} {1,7} {2,7} {3,7} {4,8} {5,8} {6,8} {7,6} {8,6}' -f `
-    'lap', 'skAvg', 'skEnd', 'skPeak', 'carAvg', 'carEnd', 'carPeak', 'cond%', 'grip'))
+  [void]$sb.AppendLine(('{0,4} {1,7} {2,7} {3,7} {4,8} {5,8} {6,8} {7,6} {8,7} {9,6}' -f `
+    'lap', 'skAvg', 'skEnd', 'skPeak', 'carAvg', 'carEnd', 'carPeak', 'cond%', 'blist%', 'grip'))
   foreach ($row in $r.rows) {
-    [void]$sb.AppendLine(('{0,4} {1,7:n1} {2,7:n1} {3,7:n1} {4,8:n1} {5,8:n1} {6,8:n1} {7,6:n1} {8,6:n3}' -f `
-      $row.lap, $row.avg, $row.skin, $row.peak, $row.coreAvg, $row.core, $row.corePeak, $row.cond, $row.grip))
+    [void]$sb.AppendLine(('{0,4} {1,7:n1} {2,7:n1} {3,7:n1} {4,8:n1} {5,8:n1} {6,8:n1} {7,6:n1} {8,7:n1} {9,6:n3}' -f `
+      $row.lap, $row.avg, $row.skin, $row.peak, $row.coreAvg, $row.core, $row.corePeak, $row.cond, $row.blister, $row.grip))
   }
-  [void]$sb.AppendLine(('lap1 skin avg={0:n1}C peak={1:n1}C | carcass avg={2:n1}C peak={3:n1}C' -f `
-    $r.rows[0].avg, $r.rows[0].peak, $r.rows[0].coreAvg, $r.rows[0].corePeak))
+  [void]$sb.AppendLine(('lap1 skin avg={0:n1}C peak={1:n1}C | carcass avg={2:n1}C peak={3:n1}C | leakAt={4}' -f `
+    $r.rows[0].avg, $r.rows[0].peak, $r.rows[0].coreAvg, $r.rows[0].corePeak, $r.leakAt))
   [void]$sb.AppendLine('')
 }
 
@@ -246,33 +257,36 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('SOFT-SIM: Belasco GT4 / medium_slick — FRONT vs REAR (RWD drive heat)')
 [void]$sb.AppendLine(("lap~95s, cornerHeat={0}, driveHeatFull={1}, carcassDriveFull={2}" -f `
   $SOFTSIM_CORNER_HEAT, $SOFTSIM_DRIVE_HEAT_FULL, $SOFTSIM_CARCASS_DRIVE_FULL))
-[void]$sb.AppendLine(("live drivePropSlickScale={0} drivePropSlickCarcassScale={1} (prior unified={2})" -f `
-  $DRIVE_PROP_SLICK_SCALE, $DRIVE_PROP_SLICK_CARCASS_SCALE, $PRIOR_UNIFIED_SCALE))
-[void]$sb.AppendLine('Fronts: corner+RR only. Rears: + Pass3/4 skin excess + carcass hyst/flex/RR.')
+[void]$sb.AppendLine(("AFTER drivePropSlickScale={0} drivePropSlickCarcassScale={1}" -f `
+  $DRIVE_PROP_SLICK_SCALE, $DRIVE_PROP_SLICK_CARCASS_SCALE))
+[void]$sb.AppendLine(("BEFORE prior skin/carcass scales={0}/{1} + prior compound knobs" -f `
+  $PRIOR_SKIN_SCALE, $PRIOR_CARCASS_SCALE))
+[void]$sb.AppendLine('Fronts: corner+RR only. Rears: + excess-prop skin + carcass hyst/flex/RR.')
 [void]$sb.AppendLine('sport/sport_plus PROFILE_POINTS not used. Burnout slipVelBoost unchanged.')
-[void]$sb.AppendLine('Live ref: skin OK @0.55 (want slight cooler); carcass still overheating on rears.')
 [void]$sb.AppendLine('')
 
-$laps = 3  # enough for lap1 verdict + settle
+$laps = 10  # ~stint check; 1.5-lap failure mode must not appear
 
-# BEFORE: prior unified live 0.55 (skin+carcass same gate)
-$beforeF = SimulateAxle $m 'F' $PRIOR_UNIFIED_SCALE $PRIOR_UNIFIED_SCALE $laps
-$beforeR = SimulateAxle $m 'R' $PRIOR_UNIFIED_SCALE $PRIOR_UNIFIED_SCALE $laps
-# AFTER: split skin 0.50 / carcass 0.35
+# BEFORE: prior compound + prior scales
+$beforeF = SimulateAxle $mPrior 'F' $PRIOR_SKIN_SCALE $PRIOR_CARCASS_SCALE $laps
+$beforeR = SimulateAxle $mPrior 'R' $PRIOR_SKIN_SCALE $PRIOR_CARCASS_SCALE $laps
+# AFTER: new compound + new scales
 $afterF = SimulateAxle $m 'F' $DRIVE_PROP_SLICK_SCALE $DRIVE_PROP_SLICK_CARCASS_SCALE $laps
 $afterR = SimulateAxle $m 'R' $DRIVE_PROP_SLICK_SCALE $DRIVE_PROP_SLICK_CARCASS_SCALE $laps
 
-[void]$sb.AppendLine(('======== BEFORE (unified slickScale={0}) ========' -f $PRIOR_UNIFIED_SCALE))
+[void]$sb.AppendLine(('======== BEFORE (scales {0}/{1}, prior medium_slick knobs) ========' -f $PRIOR_SKIN_SCALE, $PRIOR_CARCASS_SCALE))
 EmitAxle $sb $beforeF 'FRONT'
 EmitAxle $sb $beforeR 'REAR'
 
-[void]$sb.AppendLine(('======== AFTER (skin={0} carcass={1}) ========' -f `
+[void]$sb.AppendLine(('======== AFTER (scales {0}/{1}, WC stint knobs) ========' -f `
   $DRIVE_PROP_SLICK_SCALE, $DRIVE_PROP_SLICK_CARCASS_SCALE))
 EmitAxle $sb $afterF 'FRONT'
 EmitAxle $sb $afterR 'REAR'
 
 $bF1 = $beforeF.rows[0]; $bR1 = $beforeR.rows[0]
 $aF1 = $afterF.rows[0]; $aR1 = $afterR.rows[0]
+$bR10 = $beforeR.rows[9]; $aR10 = $afterR.rows[9]
+$aR2 = $afterR.rows[1]  # ~1.5–2 lap checkpoint
 
 [void]$sb.AppendLine('======== SUMMARY F vs R — skin + carcass ========')
 [void]$sb.AppendLine(('BEFORE  F skin={0:n1}/{1:n1} car={2:n1}/{3:n1} | R skin={4:n1}/{5:n1} car={6:n1}/{7:n1}' -f `
@@ -283,8 +297,10 @@ $aF1 = $afterF.rows[0]; $aR1 = $afterR.rows[0]
   $aR1.avg, $aR1.peak, $aR1.coreAvg, $aR1.corePeak))
 [void]$sb.AppendLine(('DELTA R skin avg {0:n1}C | R carcass avg {1:n1}C (negative = cooler)' -f `
   ($aR1.avg - $bR1.avg), ($aR1.coreAvg - $bR1.coreAvg)))
-[void]$sb.AppendLine(('AFTER R-F delta skin {0:n1}C | carcass {1:n1}C' -f `
-  ($aR1.avg - $aF1.avg), ($aR1.coreAvg - $aF1.coreAvg)))
+[void]$sb.AppendLine(('AFTER R lap2 cond={0:n1}% blister={1:n1}% | lap10 cond={2:n1}% blister={3:n1}%' -f `
+  $aR2.cond, $aR2.blister, $aR10.cond, $aR10.blister))
+[void]$sb.AppendLine(('BEFORE R lap10 cond={0:n1}% | AFTER cooler by {1:n1} cond pts' -f `
+  $bR10.cond, ($aR10.cond - $bR10.cond)))
 [void]$sb.AppendLine('')
 
 $fail = 0; $pass = 0
@@ -293,38 +309,36 @@ function Expect([bool]$ok, [string]$msg) {
   else { $script:fail++; [void]$sb.AppendLine("FAIL  $msg") }
 }
 
-# Fronts unchanged / in range
-Expect ([math]::Abs($aF1.avg - $bF1.avg) -lt 1.0) 'front skin unchanged by rear drive scales'
-Expect ([math]::Abs($aF1.coreAvg - $bF1.coreAvg) -lt 1.0) 'front carcass unchanged by rear drive scales'
-Expect ($aF1.avg -ge 70 -and $aF1.avg -lt 108) ("AFTER front skin lap1 in band (got {0})" -f $aF1.avg)
+# Fronts: still warm into window, not cooked by rear drive scales
+Expect ([math]::Abs($aF1.avg - $bF1.avg) -lt 8.0) 'front skin not wildly shifted vs prior package'
+Expect ($aF1.avg -ge 68 -and $aF1.avg -lt 105) ("AFTER front skin lap1 in band (got {0})" -f $aF1.avg)
 
-# Skin: slight cooler than prior 0.55, still in 90-105 rear band
-Expect ($aR1.avg -le $bR1.avg + 0.5) 'AFTER rear skin <= BEFORE (or tiny float)'
-Expect ($aR1.avg -ge 88) ("AFTER rear skin avg >=88C (got {0})" -f $aR1.avg)
-Expect ($aR1.avg -le 105) ("AFTER rear skin avg <=105C (got {0})" -f $aR1.avg)
+# Skin: cooler than prior; still usable hotlap band near opt
+Expect ($aR1.avg -lt ($bR1.avg - 2.0)) ("AFTER rear skin cooler than BEFORE by >=2C (got d={0:n1})" -f ($aR1.avg - $bR1.avg))
+Expect ($aR1.avg -ge 78) ("AFTER rear skin avg >=78C (got {0})" -f $aR1.avg)
+Expect ($aR1.avg -le 100) ("AFTER rear skin avg <=100C (got {0})" -f $aR1.avg)
+Expect ($aR1.peak -le 118) ("AFTER rear skin peak <=118C (got {0})" -f $aR1.peak)
 
-# Carcass: stronger cut — cooler than prior, not runaway vs front
-Expect ($aR1.coreAvg -lt ($bR1.coreAvg - 2.0)) ("AFTER rear carcass cooler than BEFORE by >=2C (got d={0:n1})" -f ($aR1.coreAvg - $bR1.coreAvg))
-Expect (($aR1.coreAvg - $aF1.coreAvg) -lt ($bR1.coreAvg - $bF1.coreAvg)) 'AFTER R-F carcass gap narrower than BEFORE'
-Expect (($aR1.coreAvg - $aF1.coreAvg) -lt 25.0) ("AFTER R-F carcass gap <25C (got {0:n1})" -f ($aR1.coreAvg - $aF1.coreAvg))
-Expect ($aR1.corePeak -lt 140) ("AFTER rear carcass peak not runaway <140C (got {0})" -f $aR1.corePeak)
+# Carcass: stronger cut
+Expect ($aR1.coreAvg -lt ($bR1.coreAvg - 3.0)) ("AFTER rear carcass cooler than BEFORE by >=3C (got d={0:n1})" -f ($aR1.coreAvg - $bR1.coreAvg))
+Expect (($aR1.coreAvg - $aF1.coreAvg) -lt 22.0) ("AFTER R-F carcass gap <22C (got {0:n1})" -f ($aR1.coreAvg - $aF1.coreAvg))
+Expect ($aR1.corePeak -lt 130) ("AFTER rear carcass peak <130C (got {0})" -f $aR1.corePeak)
+
+# Stint life: 1.5–2 laps must not be catastrophic; 10 laps still usable
+Expect ($aR2.cond -ge 97.0) ("AFTER rear cond @lap2 >=97% (got {0})" -f $aR2.cond)
+Expect ($aR2.blister -lt 5.0) ("AFTER rear blister @lap2 <5% (got {0})" -f $aR2.blister)
+Expect ($aR10.cond -ge 90.0) ("AFTER rear cond @lap10 >=90% (got {0})" -f $aR10.cond)
+Expect ($aR10.cond -gt $bR10.cond) ("AFTER rear cond @lap10 better than BEFORE (got {0} vs {1})" -f $aR10.cond, $bR10.cond)
+Expect ($afterR.leakAt -lt 0) 'AFTER no heat/blister leak within 10 laps'
 Expect ($aR1.grip -gt 0.90) ("AFTER rear grip usable (got {0})" -f $aR1.grip)
+Expect ($aR10.grip -gt 0.85) ("AFTER rear grip @lap10 still usable (got {0})" -f $aR10.grip)
 
 [void]$sb.AppendLine('')
-[void]$sb.AppendLine('CAUSE: unified drivePropSlickScale damped skin+carcass together; carcass hyst/flex/RR')
-[void]$sb.AppendLine('       still overcooked driven rears after skin landed in band.')
-[void]$sb.AppendLine(('CHANGE: drivePropSlickScale {0}->{1} (skin); new drivePropSlickCarcassScale={2}' -f `
-  $PRIOR_UNIFIED_SCALE, $DRIVE_PROP_SLICK_SCALE, $DRIVE_PROP_SLICK_CARCASS_SCALE))
-[void]$sb.AppendLine('       (hyst excess, flex excess, prop-linked RR/flex damp). sport/sport_plus untouched.')
-if ($aR1.avg -ge 90 -and $aR1.avg -le 105 -and ($aR1.coreAvg - $aF1.coreAvg) -lt 20) {
-  [void]$sb.AppendLine('RECOMMEND: keep split — rear skin in 90-105, carcass gap controlled.')
-} elseif ($aR1.coreAvg -gt ($aF1.coreAvg + 22)) {
-  [void]$sb.AppendLine('RECOMMEND: carcass still hot — lower drivePropSlickCarcassScale toward 0.28.')
-} elseif ($aR1.avg -lt 90) {
-  [void]$sb.AppendLine('RECOMMEND: skin slightly cool — nudge drivePropSlickScale toward 0.52.')
-} else {
-  [void]$sb.AppendLine('RECOMMEND: review in-game; soft-sim is directional for carcass package.')
-}
+[void]$sb.AppendLine('CAUSE: slick slip/work + Pass3/4 drive excess overcooked WC rears; hotWear~4.5 +')
+[void]$sb.AppendLine('       wearRate 0.0008 and softFail/leak gates turned overheat into slow flats.')
+[void]$sb.AppendLine(('CHANGE: drivePropSlick {0}/{1}->{2}/{3}; medium slip/work/wear/hotWear/cool/blister;' -f `
+  $PRIOR_SKIN_SCALE, $PRIOR_CARCASS_SCALE, $DRIVE_PROP_SLICK_SCALE, $DRIVE_PROP_SLICK_CARCASS_SCALE))
+[void]$sb.AppendLine('       slick heat-leak softFail floor 195C. sport/sport_plus untouched.')
 [void]$sb.AppendLine("RESULT: $pass passed, $fail failed")
 
 [System.IO.File]::WriteAllText($out, $sb.ToString())

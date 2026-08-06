@@ -15,3 +15,7 @@ Tire-Wear-and-Thermals-ReSpin is derived from open-source BeamNG.drive tyre ther
 Please preserve these credits when redistributing or forking this ReSpin.
 
 License: GNU Affero General Public License v3 (`license`).
+
+## Brake / duct scope note
+
+Tire-side brake coupling only: native BeamNG owns rotor thermals and fade. ReSpin soaks rim/carcass from stock brake temps; duct sliders cool tyre/rim air and modulate soak — they do not write native rotor cooling coefficients.

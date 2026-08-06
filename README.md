@@ -48,3 +48,6 @@ Build a correctly nested release zip (excludes `tools/` and the WC lap harness):
 
 Repo listing copy-paste text: **`LISTING.md`**.
 
+## Brake coupling (non-goals)
+
+ReSpin reads native brake surface/core temps and soaks the tyre rim/carcass only. It does **not** replace native brake thermals, write `brakeTypeSurfaceCoolingCoef` for duct boost (restore-only), own torque fade / pad μ / ABS, or use arcade brake-bite grip hacks. Ducts affect tyre/rim air cooling and brake→rim soak — not native rotors.

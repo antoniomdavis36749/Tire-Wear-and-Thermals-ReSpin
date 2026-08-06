@@ -21,7 +21,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # ---- Live THERMAL_TOPOLOGY + post-fix globals (match RallyLooseSpeedSweep) ----
 $topo = @{
-  patchFracMin = 0.09; patchFracMax = 0.22; patchFracRef = 0.140
+  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
   freeBeltCoolMult = 1.32
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
@@ -38,6 +38,7 @@ $topo = @{
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
   hystSkinShare = 0.18
   slipVelBoostStart = 8.0; slipVelBoostFull = 24.0; slipVelBoostMax = 9.0
+  softSinkHeatCoef = 1.2; softSinkRoughCoef = 0.35; softSinkHeatFloor = 0.72
 }
 $SPAWN_CONV_GRACE_S = 14.0
 $STREET_PREHEAT_BLEND = 0.34
@@ -323,13 +324,12 @@ function Simulate-BrakeStop {
     }
 
     $estArea = [math]::Max(0.004, [math]::Min($tyreWidthM * 0.24, $loadRaw / $pressurePa))
-    if ($contactDepth -gt 0.02) {
-      $estArea = $estArea * [math]::Max(0.45, 1.0 - $contactDepth * 1.5)
-    }
+    # Soft sink: conduction denom only — no area-shrink (live parity)
     $patchLen = $estArea / $tyreWidthM
-    $patchFrac = Clamp ($patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)) `
-      ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
-    $patchHeatScale = Clamp ($patchFrac / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
+    $patchFracRaw = $patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)
+    $patchFrac = Clamp $patchFracRaw ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
+    $patchFracHeat = Clamp $patchFracRaw ([double]$topo.patchFracHeatMin) ([double]$topo.patchFracMax)
+    $patchHeatScale = Clamp ($patchFracHeat / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
     $freeBeltBias = 1.0 + (1.0 - $patchFrac) * ([double]$topo.freeBeltCoolMult - 1.0)
 
     $combinedAir = $airspeed + $omega * $tyreRadius * 0.35
@@ -399,6 +399,10 @@ function Simulate-BrakeStop {
     if ($tempDist -gt 1.1) { $thermFric = [math]::Max(0.30, 1.0 - ($tempDist - 1.1) * 0.6) }
     $gain = ($raw / $heatMassScale) * $thermFric * $patchHeatScale *
       (1.0 + ([double]$topo.drivePropSlipWorkMult - 1.0) * $excessSkin)
+    # Phase D soft-sink frictional damp (conduction has separate denom)
+    $sinkDamp = 1.0 / (1.0 + [math]::Max(0.0, $contactDepth) * [double]$topo.softSinkHeatCoef +
+      $rough * [double]$topo.softSinkRoughCoef)
+    $gain = $gain * [math]::Max([double]$topo.softSinkHeatFloor, $sinkDamp)
 
     # lockup floor (ABS keeps omega mostly above thresh; near-stop may dip)
     if (($omega -lt $LOCKUP_OMEGA_THRESH) -and ($slip -gt 0.20)) {
@@ -463,17 +467,24 @@ function Simulate-BrakeStop {
     $core = $core + $dt * ($fromSkin + $carcassWork * (1.0 - [double]$topo.hystSkinShare) +
       $rimToCarcass - $coreCoolAmt) * $coreRate
 
-    # Rim soak from native brake temps (live radiant + conduction)
+    # Rim soak from native brake temps (live: brakeSurfSoak 0.016 / brakeCoreSoak 0.0025,
+    # brakeRadiantCoef 2.2e-11, ductSoakCondFactor, brakeAreaScale on BOTH surf+core, rotorSoakMult)
     $brakeAreaScale = 1.0
-    $conductionDuct = 1.0  # ducts closed (stock)
-    $radiantToRim = 2.2e-11 * ([math]::Pow($brakeSurf + 273.15, 4) - [math]::Pow($rim + 273.15, 4)) *
-      $brakeGain * $conductionDuct * $brakeAreaScale
-    $rimCarcassNet = ($core - $rim) * $RIM_CARCASS_CONDUCTANCE * $conductionDuct
+    $ductSoakCond = 1.15  # ducts closed (stock) → closed conduction factor
+    $brakeEffSoak = 1.0
+    $rotorSoakMult = 1.0  # steel
+    $brakeSurfSoak = 0.016
+    $brakeCoreSoak = 0.0025
+    $brakeRadiantCoef = 2.2e-11
+    $soakCommon = $brakeGain * $ductSoakCond * $brakeAreaScale * $brakeEffSoak * $rotorSoakMult
+    $radiantToRim = $brakeRadiantCoef * ([math]::Pow($brakeSurf + 273.15, 4) - [math]::Pow($rim + 273.15, 4)) *
+      $brakeGain * $ductSoakCond * $brakeAreaScale * $rotorSoakMult
+    $rimCarcassNet = ($core - $rim) * $RIM_CARCASS_CONDUCTANCE * $ductSoakCond
     $rimCool = ($rim - $env) * (0.22 * ([math]::Pow([math]::Max(0.01, $effAir), 0.8) * 0.28) + 0.08) *
       $climateScale * $brakeAreaScale
     $rim = $rim + (
-      (0.012 * ($brakeSurf - $rim)) * $brakeGain * $conductionDuct * $brakeAreaScale +
-      (0.004 * ($brakeCoreT - $rim)) * $brakeGain * $conductionDuct +
+      ($brakeSurfSoak * ($brakeSurf - $rim)) * $soakCommon +
+      ($brakeCoreSoak * ($brakeCoreT - $rim)) * $soakCommon +
       $radiantToRim + $rimCarcassNet +
       ($airCav - $rim) * $RIM_AIR_CONDUCTANCE -
       $rimCool

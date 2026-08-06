@@ -18,7 +18,10 @@ local tyre_data = (has_tyre_data and tyre_data_mod) or _G.tyreData
 local tyre_utils = (has_tyre_utils and tyre_utils_mod) or _G.tyre_utils
 local fire = (has_fire and fire_mod) or _G.fire
 
--- BeamNG spike-strip ground material ID (wheels.lua puncture path)
+-- BeamNG spike-strip ground material ID (wheels.lua updateWheelsGFX puncture path).
+-- OWNERSHIP: native wheels.lua owns spike pressure writes (wd.isPunctured →
+-- setGroupPressure at wd.punctureLeakRate). ReSpin only tracks UI/condition and
+-- must NOT call applyPressureLeakPa for the same group while isPunctured.
 local SPIKE_STRIP_MATERIAL_ID = 32
 -- sounds.lua scales slipEnergy ≈ *5e-6 for a 0..1 working range
 local NATIVE_SLIP_ENERGY_SCALE = 0.000005
@@ -66,9 +69,13 @@ local RIM_AIR_CONDUCTANCE = 0.028
 local CARCASS_LATERAL_CONDUCTANCE = 0.050
 local THERMAL_TOPOLOGY = {
     -- P0-1: slip/work/torque heat deposits on patch-resident arc; free belt cools more
-    patchFracMin = 0.09,       -- circumferential share floor (light load / lock)
-    patchFracMax = 0.22,       -- raised from 0.20 to support high-downforce loads (3.5–5kN/wheel)
-    patchFracRef = 0.140,      -- re-normalised reference so ceiling raise doesn't over-amplify normal loads
+    -- Phase B: street Hertz F/P often yields rawFrac≈0.04–0.07; old Min=0.09 glued heatScale.
+    -- Heat uses softer floor (patchFracHeatMin); free-belt/display keep patchFracMin.
+    patchFracMin = 0.035,      -- geometric/cool floor (was 0.09; unsticks street load motion)
+    patchFracHeatMin = 0.025,  -- softer floor for patchHeatScale only
+    patchFracMax = 0.22,       -- high-downforce / deep-defl ceiling
+    patchFracRef = 0.070,      -- was 0.140; re-norm so street≈0.045 → heatScale≈0.64 (parity)
+    patchHeatEmaTau = 0.10,    -- s; light EMA on patchHeatScale (depth EMA alone insufficient)
     freeBeltCoolMult = 1.32,   -- convection boost as freeFrac → 1
     -- P0-2: gated flex/hysteresis into carcass (cruise RR soft-cap still owns straights)
     flexWarmGain = 0.00095,    -- scale on load·ω·RR flex energy → carcass
@@ -99,9 +106,10 @@ local THERMAL_TOPOLOGY = {
     -- GT4/RWD slicks overcooked driven rears while fronts stayed fine — scale excess only
     -- (sport_plus / street keep 1.0). Burnout slipVelBoost unchanged.
     -- Split: skin (slip/work + netTorque) vs carcass (hyst excess + flex excess + prop-linked RR).
-    -- 0.55 skin was good but slightly hot; carcass still runaway → stronger carcass cut.
-    drivePropSlickScale = 0.50,           -- skin excess gate (was 0.55)
-    drivePropSlickCarcassScale = 0.30,    -- carcass excess/RR under prop (stronger than skin)
+    -- WC GT4: rears still overcooked + condition crashed ~1.5 laps — further slick-only cut.
+    -- sport_plus / street keep 1.0; burnout slipVelBoost unchanged.
+    drivePropSlickScale = 0.42,           -- skin excess gate (was 0.50)
+    drivePropSlickCarcassScale = 0.22,    -- carcass excess/RR under prop (was 0.30)
     -- Street/non-slick: high freestream damp on excess-prop carcass (prop-hold cruise cook).
     -- Slicks already use drivePropSlickCarcassScale; street kept 1.0 for Scintilla accel but
     -- |prop|≈aero hold opens the excess gate at ~180–300 mph with slip/g still cruise-choked.
@@ -153,6 +161,8 @@ local THERMAL_TOPOLOGY = {
     skinCoreConductanceFloor = 0.070, -- floor so ultra-low compounds still equilibrate
     carcassCoolVelCoef = 0.28,       -- was hardcoded 0.18 on coreVelCool term
     carcassCoolStaticCoef = 0.20,    -- was hardcoded 0.12 on coreCool term
+    -- Phase C: bulk RR/flex → carcass; this leak warms skin WITHOUT × patchHeatScale
+    -- (slip/work/torque already patch-scaled — avoid double-warm of hysteresis on the patch).
     hystSkinShare = 0.18,            -- fraction of RR/flex carcass work also deposited on skin
     -- Pressure→grip bands (ratio error = currentPSI/optimalPressure - 1). Absolute PSI target;
     -- stock BeamNG cold fills often sit at/above opt, then Gay-Lussac warm pushes further over —
@@ -163,14 +173,40 @@ local THERMAL_TOPOLOGY = {
     pressurePerfectBonus = 0.020,    -- max +2% at exact opt
     pressureMildBase = 0.028,        -- mild penalty at normal-band edge (before sens)
     pressureMildSens = 0.022,        -- +sens contribution to mild edge (≈3.9% @ sens 0.5)
+    -- Behind-native coupling (contactDepth / ducts / pressure seed)
+    -- BRAKE NON-GOALS (tire-side only — native owns rotors):
+    --   * Do not replace/reimplement native brake thermals.
+    --   * Do not write brakeTypeSurfaceCoolingCoef for duct boost (restore-only).
+    --   * Do not own torque fade / pad μ / ABS; η is display + soft soak scale only.
+    --   * No arcade brake-bite long-grip hack on this track.
+    contactDepthEmaTau = 0.08,       -- s; short EMA so gravel/kerb depth doesn't jitter patchFrac
+    patchHertzDeflBlend = 0.35,      -- max weight of deflection proxy vs Hertz F/P area
+    patchDeflWidthFrac = 0.55,       -- effective width fraction of chord×width deflection area
+    patchLatLoadNudge = 0.05,        -- mild live lateral (gy) nudge on L/R ring weights
+    -- Phase C: mild peakForce/load utilization nudge on patch heat (corner work already uses peakWorkFactor)
+    patchUtilBlend = 0.12,           -- 0=off; blend peakWorkFactor into patchHeatScale
+    -- Phase D: soft sink / rough — conduction denom already; optional frictional heat damp
+    softSinkHeatCoef = 1.2,          -- frictionalGain /= (1 + depth×coef + rough×roughCoef)
+    softSinkRoughCoef = 0.35,
+    softSinkHeatFloor = 0.72,        -- min damp mult (keep some heat on deep gravel)
+    brakeSurfSoak = 0.016,           -- rim soak from brake surface (°C coupling; ≫ core)
+    brakeCoreSoak = 0.0025,          -- rim soak from brake core (lag path; was 0.004)
+    brakeEffSoakFloor = 0.92,        -- glazed/low-efficiency floor on soak scale (η soft only)
+    brakeRadiantCoef = 2.2e-11,      -- Stefan-ish radiant brake surface → rim (extracted)
+    pressureColdRefreshTau = 2.5,    -- s; soft cold-fill refresh toward native when cold
+    pressureTpmsDeadbandPsiS = 8.0,  -- |dP/dt| above this → active inflate/TPMS; skip cold refresh / hot WB
+    -- Safe hot PSI → native pressure-group write-back (Gay-Lussac → soft-body stiffness).
+    -- Native BeamNG has no thermo→PSI; ReSpin rate-limits so warm tires stiffen without slam/TPMS fight.
+    pressureHotWritebackEnable = true,       -- master switch (ON with conservative rate/deadband)
+    pressureHotWritebackMaxPsiS = 0.35,      -- max |ΔPSI|/s toward Lua hot target (slow approach)
+    pressureHotWritebackDeadbandPsi = 0.15,  -- skip setGroupPressure when |Lua−Nat| below this
 }
 local topo = THERMAL_TOPOLOGY -- module-level alias; avoids one function local in CalcTyreWear
 
 -- REALISM FEATURE FLAGS (safe defaults for BeamNG 0.35–0.38 compatibility)
 local ENABLE_FORCE_FEEDBACK_FX = false -- Flat-spot / chatter / hop spindle forces (arcade); off by default
 local FORCE_FEEDBACK_SCALE = 0.25      -- Used only when ENABLE_FORCE_FEEDBACK_FX is true
-local ENABLE_BRAKE_BITE_HACK = false   -- Artificial post-brake long-grip boost
-local MAX_DUCT_AIR_FACTOR = 1.45       -- Max tyre/brake cooling boost at 100% duct open
+local MAX_DUCT_AIR_FACTOR = 1.45       -- Max tyre/rim air-cooling boost at 100% duct open (NOT native rotors)
 local DUCT_DEFAULT_PCT = 1             -- Tuning default: closed (stock cars have no ducts)
 local SLICK_PREHEAT_BLEND = 0.25       -- Race slicks: mild blanket preheat toward optTemp
 local STREET_PREHEAT_BLEND = 0.34      -- Street/garage soak (was 0.50; reduced to ease spawn cool fight)
@@ -260,13 +296,31 @@ local scratchCarcassWeights = { 0, 0, 0 }
 
   TOPOLOGY KNOBS (module THERMAL_TOPOLOGY; not per-profile unless noted)
     patchFracMin/Max/Ref  Contact-patch circumferential share + heat normalize.
+    patchFracHeatMin      Softer floor for patchHeatScale (load/PSI/depth can move).
+    patchHeatEmaTau       Light EMA on patchHeatScale after raw compute.
+    patchUtilBlend        Mild peakForce/load blend into patchHeatScale.
+    softSinkHeat*/Rough*  Soft-surface frictional heat damp (conduction separate).
+    contactDepthEmaTau    Short EMA on contactDepth before patch blend.
+    patchHertzDeflBlend   Max weight of deflection proxy vs Hertz F/P area.
+    patchDeflWidthFrac    Width fraction on chord×width deflection area.
+    patchLatLoadNudge     Mild live gy nudge on L/R ring weights.
+    hystSkinShare         Bulk RR/flex→skin leak (NOT × patchHeatScale).
+    brakeSurfSoak/CoreSoak  Rim soak from brake surface (fast ≫) / core (lag).
+    brakeEffSoakFloor     Glazing/efficiency floor on rim soak scale (η soft only).
+    brakeRadiantCoef      Radiant brake surface → rim (T^4); area/duct/gain applied live.
+    -- Brake non-goals: no native rotor replace; no duct→brakeTypeSurfaceCoolingCoef write;
+    -- no torque-fade ownership; tire-side soak/duct/read only.
+    pressureColdRefreshTau / pressureTpmsDeadbandPsiS
+                          Cold fill soft-refresh vs native; skip on TPMS inflate.
+    pressureHotWritebackEnable / MaxPsiS / DeadbandPsi
+                          Rate-limited Gay-Lussac hot PSI → setGroupPressure (soft-body).
     freeBeltCoolMult      Free-belt convection bias on average skin.
     flexWarmGain (+gates) Gated flex energy into carcass (load/speed/g·slip).
     drivePropCruiseNm / ExcessFullNm / SkinCoef / Hyst* / Flex*
                           Excess-prop drive heat pass 4 (small bump on pass 3;
                           choke softens mid-prop; FlexExcess@FlexGateStart; SlipWorkMult).
     drivePropSlickScale   Skin excess-prop mult on slick/race only
-                          (sport_plus keeps 1.0; default 0.50).
+                          (sport_plus keeps 1.0; default 0.42).
     drivePropSlickCarcassScale  Carcass excess/RR mult on slick/race only
                           (hyst/flex excess + prop-linked RR; default 0.30).
     drivePropStreetSpeed0/1 / StreetCarcassScale
@@ -543,9 +597,11 @@ local PROFILE_POINTS = {
         bottomOutSensitivity = 1, scrubSensitivity = 1.1
     } },
     { tread = 0.70, profile = "standard", mods = {
+        -- Modest overall μ bump (~+4% gm): street default; asphalt>loose gap via applyProfileSurfaceBias
+        -- (street-family dry*1.02 / gravel|dirt*0.90 / mud*0.86) — not another global gm change.
         adhesion = 0.4, airConductionRate = 0.0135, airCoolingRate = 0.0275, brakeGainRate = 0.9,
         casingCompliance = 0.6, coreCoolRate = 0.0385, coreVelCoolRate = 0.0088, skinCoreConductance = 0.068,
-        gripMultiplier = 0.96, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.035,
+        gripMultiplier = 1.00, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.035,
         optimalPressure = 33, optimalTemp = 60, pressureSensitivity = 0.45, rollingRes = 0.82,
         staticCoolingRate = 0.08, slipHeatRate = 8.4, workHeatRate = 5.1, wearRate = 0.0005,
         treadInertia = 0.504, carcassInertia = 0.816, thermalReactionRate = 1.25, tempPlateau = 16,
@@ -593,40 +649,42 @@ local PROFILE_POINTS = {
 }
 
 -- CONTINUOUS SLICK COMPOUND SPECTRUM: Chemically Decoupled Racing Compounds (Only Soft, Medium, Hard)
+-- WC stint pass: cut slip/work heat + wear/hotWear so GT4 slicks survive many hotlaps;
+-- blister/leak reserved for abuse. sport_plus / PROFILE_POINTS untouched.
 local SLICK_SPECTRUM_POINTS = {
     { softness = 0.50, profile = "hard_slick", mods = {
-        adhesion = 0.48, airConductionRate = 0.015, airCoolingRate = 0.018, brakeGainRate = 1.5,
-        casingCompliance = 0.3, coreCoolRate = 0.035, coreVelCoolRate = 0.008, skinCoreConductance = 0.088,
+        adhesion = 0.48, airConductionRate = 0.015, airCoolingRate = 0.022, brakeGainRate = 1.5,
+        casingCompliance = 0.3, coreCoolRate = 0.038, coreVelCoolRate = 0.0088, skinCoreConductance = 0.088,
         gripMultiplier = 0.96, longGripMult = 1, latGripMult = 0.74, loadSensitivity = 0.11,
         optimalPressure = 28, optimalTemp = 90, pressureSensitivity = 0.95, rollingRes = 0.98,
-        staticCoolingRate = 0.072, slipHeatRate = 9.7, workHeatRate = 5.8, wearRate = 0.0005,
+        staticCoolingRate = 0.078, slipHeatRate = 8.5, workHeatRate = 5.1, wearRate = 0.00032,
         treadInertia = 0.4536, carcassInertia = 0.7344, thermalReactionRate = 1.25, tempPlateau = 14,
         coldWidth = 48, hotWidth = 48, gripFloor = 0.20, coldWearMult = 1.86,
-        hotWearMult = 4.4, grainTempRatio = 0.78, blisterTempRatio = 1.50, waterDrainage = 0,
+        hotWearMult = 3.15, grainTempRatio = 0.78, blisterTempRatio = 1.65, waterDrainage = 0,
         wetGripScale = 0.72, dryGripScale = 0.98, trackConductivityMult = 1.15, camberSensitivity = 1.45,
         bottomOutSensitivity = 1.1, scrubSensitivity = 1.55
     } },
     { softness = 0.65, profile = "medium_slick", mods = {
-        adhesion = 0.52, airConductionRate = 0.0165, airCoolingRate = 0.02, brakeGainRate = 1.5,
-        casingCompliance = 0.25, coreCoolRate = 0.028, coreVelCoolRate = 0.0064, skinCoreConductance = 0.104,
+        adhesion = 0.52, airConductionRate = 0.0165, airCoolingRate = 0.024, brakeGainRate = 1.5,
+        casingCompliance = 0.25, coreCoolRate = 0.031, coreVelCoolRate = 0.0072, skinCoreConductance = 0.104,
         gripMultiplier = 1.02, longGripMult = 1, latGripMult = 0.72, loadSensitivity = 0.12,
         optimalPressure = 27, optimalTemp = 84, pressureSensitivity = 1.05, rollingRes = 1.02,
-        staticCoolingRate = 0.076, slipHeatRate = 10.4, workHeatRate = 6.1, wearRate = 0.0008,
+        staticCoolingRate = 0.082, slipHeatRate = 9.1, workHeatRate = 5.35, wearRate = 0.00042,
         treadInertia = 0.399, carcassInertia = 0.646, thermalReactionRate = 1.42, tempPlateau = 14,
         coldWidth = 46, hotWidth = 46, gripFloor = 0.20, coldWearMult = 1.95,
-        hotWearMult = 4.52, grainTempRatio = 0.78, blisterTempRatio = 1.50, waterDrainage = 0,
+        hotWearMult = 3.30, grainTempRatio = 0.78, blisterTempRatio = 1.65, waterDrainage = 0,
         wetGripScale = 0.72, dryGripScale = 0.98, trackConductivityMult = 1.15, camberSensitivity = 1.45,
         bottomOutSensitivity = 1.1, scrubSensitivity = 1.65
     } },
     { softness = 0.80, profile = "soft_slick", mods = {
-        adhesion = 0.55, airConductionRate = 0.01725, airCoolingRate = 0.02, brakeGainRate = 1.5,
-        casingCompliance = 0.22, coreCoolRate = 0.028, coreVelCoolRate = 0.0068, skinCoreConductance = 0.116,
+        adhesion = 0.55, airConductionRate = 0.01725, airCoolingRate = 0.025, brakeGainRate = 1.5,
+        casingCompliance = 0.22, coreCoolRate = 0.031, coreVelCoolRate = 0.0076, skinCoreConductance = 0.116,
         gripMultiplier = 1.08, longGripMult = 1, latGripMult = 0.70, loadSensitivity = 0.13,
-        optimalPressure = 26, optimalTemp = 78, pressureSensitivity = 1.2, rollingRes = 1.08,
-        staticCoolingRate = 0.082, slipHeatRate = 11.6, workHeatRate = 6.4, wearRate = 0.0013,
+        optimalPressure = 26, optimalTemp = 82, pressureSensitivity = 1.2, rollingRes = 1.08,
+        staticCoolingRate = 0.088, slipHeatRate = 10.0, workHeatRate = 5.55, wearRate = 0.00065,
         treadInertia = 0.3444, carcassInertia = 0.5576, thermalReactionRate = 1.55, tempPlateau = 14,
         coldWidth = 44, hotWidth = 44, gripFloor = 0.18, coldWearMult = 1.992,
-        hotWearMult = 4.72, grainTempRatio = 0.78, blisterTempRatio = 1.50, waterDrainage = 0,
+        hotWearMult = 3.45, grainTempRatio = 0.78, blisterTempRatio = 1.62, waterDrainage = 0,
         wetGripScale = 0.72, dryGripScale = 0.98, trackConductivityMult = 1.15, camberSensitivity = 1.55,
         bottomOutSensitivity = 1.2, scrubSensitivity = 1.75
     } }
@@ -871,8 +929,8 @@ local wheelIndexMap = {}
 -- Local Cache states to prevent constant pattern matching / deserialization overhead
 local cachedVehicleType = nil
 -- BeamNG asphalt-rally configs often mount *_race tires (treadCoef 0) while gravel uses *_rally.
--- Cache whether the fitted vehicle has non-cosmetic rally hardware so race slicks aren't mislabeled.
-local cachedRallyHardware = nil
+-- Cache whether a plain rally coilover/strut is fitted (not chassis/lights/track-spec).
+local cachedRallyDamper = nil
 local lastTrackEnvMailbox = nil
 local lastEnvMailbox = nil
 
@@ -889,12 +947,13 @@ local EffectiveTyreTemp
 local getWheelJBeamData
 local collectBaseWheelFactors
 local getNativeBrakeTemps
+local getNativeGroupPressurePSI
 local getFreestreamAirspeed
 local updateWheelSuspension
 local tempDistToWearMult
 local getTrackTemp
 local getTirePartName
-local vehicleHasRallyHardware
+local vehicleHasPlainRallyDamper
 local getVehicleType
 local getInterpolatedProfile
 local initTyreData
@@ -918,6 +977,7 @@ local onInit
 local onReset
 local onSettingsChanged
 local calculateWheelAlignment
+local sampleContactSurfaceNormal
 local applySafeForce
 local interpolateSpectrum
 local copyMods
@@ -932,6 +992,8 @@ local setDraftWake
 local decayDraftWake
 local deflateTireCompat
 local applyPressureLeakPa
+local applyHotPressureWriteback
+local isTirePressureInflateActive
 local applyWheelFriction
 local isSpareOrAccessoryTireName
 local getTelemetryIo
@@ -1283,13 +1345,15 @@ getBrakeDuctPercent = function(isFront)
     return DUCT_DEFAULT_PCT
 end
 
--- Maps duct % to cooling multipliers for tyre thermals (and native brake coef)
+-- Maps duct % → tire-side factors (Lua only; native brakeTypeSurfaceCoolingCoef restored stock).
+-- Returns: ductAirCoolFactor, ductSoakCondFactor, open01
+--   ductAirCoolFactor  — freestream cooling on skin / carcass / rim (1.0→MAX @ open)
+--   ductSoakCondFactor — brake→rim soak + rim↔carcass conduction (1.15 closed → 0.85 open)
 ductPercentToFactors = function(ductPct)
     local open = max(0, min(1, (ductPct - 1) / 99)) -- 1→0, 100→1
-    local airFactor = lerp(1.0, MAX_DUCT_AIR_FACTOR, open)
-    -- Open ducts reduce brake→tyre conduction soak slightly (more air over rotor)
-    local conductionFactor = lerp(1.15, 0.85, open)
-    return airFactor, conductionFactor, open
+    local ductAirCoolFactor = lerp(1.0, MAX_DUCT_AIR_FACTOR, open)
+    local ductSoakCondFactor = lerp(1.15, 0.85, open)
+    return ductAirCoolFactor, ductSoakCondFactor, open
 end
 
 -- Raw pressureWheels / rotators JBeam row for this wheel
@@ -1361,10 +1425,7 @@ collectBaseWheelFactors = function(wd)
         brakeDiameter = max(0.15, brakeDiameter),
         brakeVentingCoef = max(0.2, brakeVenting),
         brakeCoolingArea = max(0.02, brakeCoolingArea),
-        brakeType = tostring(wd.brakeType or jb.brakeType or "vented-disc"),
         rotorMaterial = tostring(wd.rotorMaterial or jb.rotorMaterial or "steel"),
-        padMaterial = tostring(wd.padMaterial or jb.padMaterial or "basic"),
-        enableBrakeThermals = not not (wd.enableBrakeThermals or jb.enableBrakeThermals)
     }
 end
 
@@ -1603,9 +1664,13 @@ updateWheelSuspension = function(w, data, wd, dt, invQuat, upVector)
     w.suspStress = stress
 end
 
--- Progressive pressure leak via BeamNG native pressure-group API (same path as wheels.lua puncture)
+-- Progressive pressure leak via BeamNG native pressure-group API.
+-- Used for ReSpin-owned thermal/wear leaks ONLY. Spike-strip / wd.isPunctured
+-- leaks are owned by stock wheels.lua — never call this while isPunctured.
 applyPressureLeakPa = function(wd, leakPaPerSec, dt)
     if not wd or leakPaPerSec <= 0 or not obj then return nil end
+    -- Native owns spike/puncture setGroupPressure while isPunctured (wheels.lua).
+    if wd.isPunctured then return nil end
     if type(obj.getGroupPressure) ~= "function" or type(obj.setGroupPressure) ~= "function" then return nil end
     if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
     local pg = v.data.pressureGroups[wd.pressureGroup]
@@ -1615,6 +1680,56 @@ applyPressureLeakPa = function(wd, leakPaPerSec, dt)
     -- Match BeamNG wheels.lua minimum before final deflate (~105 kPa absolute)
     local minPressure = 105000
     local newP = max(minPressure, current - leakPaPerSec * dt)
+    pcall(obj.setGroupPressure, obj, pg, newP)
+    return newP
+end
+
+-- Gauge PSI from native pressure group (absolute Pa → PSI). nil if unavailable.
+getNativeGroupPressurePSI = function(wd)
+    if not wd or not obj or type(obj.getGroupPressure) ~= "function" then return nil end
+    if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
+    local pg = v.data.pressureGroups[wd.pressureGroup]
+    if not pg then return nil end
+    local ok, absPa = pcall(obj.getGroupPressure, obj, pg)
+    if not ok or type(absPa) ~= "number" then return nil end
+    return max(0.1, (absPa - 101325) / 6894.757)
+end
+
+-- True when TPMS / tirePressureControl / inflate electrics look active (don't fight user/AI fill).
+isTirePressureInflateActive = function()
+    local ev = electrics and electrics.values
+    if not ev then return false end
+    if ev.tireInflating or ev.tirePressureInflating then return true end
+    local tpc = ev.tirePressureControl
+    if tpc == true then return true end
+    if type(tpc) == "number" and abs(tpc) > 0.01 then return true end
+    if type(ev.tirePressureControlActive) == "boolean" and ev.tirePressureControlActive then return true end
+    if type(ev.inflateRate) == "number" and abs(ev.inflateRate) > 0.01 then return true end
+    return false
+end
+
+-- Rate-limited Gay-Lussac hot absolute Pa → native pressure group (soft-body stiffness).
+-- Deadband skips tiny deltas; min floor matches BeamNG puncture path. nil if unavailable / no-op.
+applyHotPressureWriteback = function(wd, targetAbsPa, dt, maxPsiPerSec, deadbandPsi)
+    if not wd or not obj or type(targetAbsPa) ~= "number" or not dt or dt <= 0 then return nil end
+    if type(obj.getGroupPressure) ~= "function" or type(obj.setGroupPressure) ~= "function" then return nil end
+    if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
+    local pg = v.data.pressureGroups[wd.pressureGroup]
+    if not pg then return nil end
+    local ok, current = pcall(obj.getGroupPressure, obj, pg)
+    if not ok or type(current) ~= "number" then return nil end
+    local minPressure = 105000
+    local target = max(minPressure, targetAbsPa)
+    local deltaPa = target - current
+    local psiPerPa = 1.0 / 6894.757
+    if abs(deltaPa) * psiPerPa < max(0.01, deadbandPsi or 0.15) then
+        return current -- within deadband; no write
+    end
+    local maxStepPa = max(0.0, maxPsiPerSec or 0.35) * 6894.757 * dt
+    if maxStepPa <= 0 then return current end
+    local step = max(-maxStepPa, min(maxStepPa, deltaPa))
+    local newP = max(minPressure, current + step)
+    if abs(newP - current) < 1.0 then return current end -- sub-Pa noise
     pcall(obj.setGroupPressure, obj, pg, newP)
     return newP
 end
@@ -1705,29 +1820,50 @@ getTirePartName = function(wheelName)
     return wheelName
 end
 
--- True when non-cosmetic rally hardware is fitted (coilovers, struts, skidplates, etc.).
--- Used to reclassify BeamNG asphalt-rally *_race mounts (UI type "Asphalt Rally") away from Slick.
-vehicleHasRallyHardware = function()
-    if cachedRallyHardware ~= nil then return cachedRallyHardware end
+-- True when a plain asphalt-rally damper is fitted (coilover/strut with "rally", not track/race).
+-- Used only as weak evidence for BeamNG asphalt-rally configs that mount generic *_race tires
+-- (Covet/Bolide/BX). MUST NOT match chassis/subframes: Vivace Ardente race mounts
+-- vivace_suspension_*_rally + vivace_rally_coilover_*_track — the suspension_*_rally parts
+-- previously forced Rally Asphalt despite track-spec coilovers.
+-- Also ignore strut_bar / strutbrace (anti-roll braces, not dampers).
+vehicleHasPlainRallyDamper = function()
+    if cachedRallyDamper ~= nil then return cachedRallyDamper end
     local found = false
     local activeParts = v and v.data and (v.data.activePartsData or v.data.activeParts)
     if type(activeParts) == "table" then
         for k, v_part in pairs(activeParts) do
-            local n = string.lower(tostring(
-                (type(v_part) == "string" and v_part)
-                or (type(v_part) == "table" and (v_part.name or v_part.partName))
-                or k
-                or ""
-            ))
-            if string.find(n, "rally", 1, true)
+            -- Prefer fitted part name; skip empty slots (do not fall back to slot key — empty
+            -- vivace_rally_* slots would otherwise look like fitted rally hardware).
+            local n = ""
+            if type(v_part) == "string" then
+                n = v_part
+            elseif type(v_part) == "table" then
+                n = tostring(v_part.name or v_part.partName or "")
+            end
+            n = string.lower(n)
+            if n ~= ""
+                and string.find(n, "rally", 1, true)
+                and (string.find(n, "coilover", 1, true) or string.find(n, "strut", 1, true))
+                and not string.find(n, "strut_bar", 1, true)
+                and not string.find(n, "strutbar", 1, true)
+                and not string.find(n, "strutbrace", 1, true)
                 and not string.find(n, "skin", 1, true)
-                and not string.find(n, "paint", 1, true) then
+                and not string.find(n, "paint", 1, true)
+                and not string.find(n, "light", 1, true)
+                and not string.find(n, "cover", 1, true)
+                and not string.find(n, "interior", 1, true)
+                and not string.find(n, "switch", 1, true)
+                and not string.find(n, "track", 1, true)     -- vivace_rally_coilover_*_track
+                and not string.find(n, "circuit", 1, true)
+                and not string.find(n, "gravel", 1, true)
+                and not string.find(n, "_race", 1, true)     -- race-spec dampers
+                and not string.find(n, "race_", 1, true) then
                 found = true
                 break
             end
         end
     end
-    cachedRallyHardware = found
+    cachedRallyDamper = found
     return found
 end
 
@@ -1775,16 +1911,26 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
     local isUTVTire = not isCommercialTire and not isUtilityTire and (vehType == "utv" or string.find(nameLower, "utv") or string.find(nameLower, "atv") or string.find(nameLower, "aurata") or string.find(nameLower, "sxs"))
     local isVintageTire = not isCommercialTire and not isUtilityTire and not isUTVTire and (string.find(nameLower, "vintage") or string.find(nameLower, "biasply") or string.find(nameLower, "bias_ply") or string.find(nameLower, "whitewall") or string.find(nameLower, "classic_radial"))
 
-    -- Name / vehicle cues for sealed-road rally rubber.
-    -- Newer BeamNG parts use *_asphalt / tarmac; older asphalt-rally configs mount *_race
-    -- (treadCoef 0, UI type "Asphalt Rally") on cars with rally coilovers/skidplates.
+    -- Sealed-road rally rubber — safer default: race/slick/low-tread → Slick unless strong evidence.
+    -- Strong: explicit *_asphalt / *_tarmac tire names, OR BeamNG competition tarmac SKUs that are
+    -- still named *_race (UI type "Asphalt Rally", meshes tire_rally_tarmac_*): 180/580, 200/600, 210/600.
+    -- Weak: generic *_race / *_slick tire name + plain rally coilover/strut only (not suspension
+    -- subframes — Vivace Ardente race keeps vivace_suspension_*_rally with track coilovers).
+    -- Tradeoff: Bolide/Covet/BX asphalt-rally keep working via plain rally dampers; if those
+    -- dampers are absent, only the competition SKUs / explicit asphalt names still map correctly.
     local isAsphaltName = string.find(nameLower, "tarmac", 1, true)
         or (string.find(nameLower, "asphalt", 1, true) and not string.find(nameLower, "supersport", 1, true))
+    -- Competition-size asphalt-rally race SKUs (not 210_650 race slicks).
+    local isAsphaltRallyRaceSku = string.find(nameLower, "race", 1, true)
+        and (string.find(nameLower, "180_580", 1, true)
+            or string.find(nameLower, "200_600", 1, true)
+            or string.find(nameLower, "210_600", 1, true))
     local isGravelRallyName = string.find(nameLower, "rally", 1, true) and not isAsphaltName
-    local isRaceLikeName = string.find(nameLower, "slick", 1, true) or string.find(nameLower, "race", 1, true) or treadCoef <= 0.12
-    local isRallyAsphaltMount = isAsphaltName
-        or (isRaceLikeName and not isGravelRallyName and not string.find(nameLower, "gravel", 1, true)
-            and vehicleHasRallyHardware())
+    local isRaceOrSlickName = string.find(nameLower, "slick", 1, true) or string.find(nameLower, "race", 1, true)
+    local isRaceLikeName = isRaceOrSlickName or treadCoef <= 0.12
+    local isRallyAsphaltMount = isAsphaltName or isAsphaltRallyRaceSku
+        or (isRaceOrSlickName and not isGravelRallyName and not string.find(nameLower, "gravel", 1, true)
+            and vehicleHasPlainRallyDamper())
 
     -- 1. DETECT DETACHED OR STANDALONE SPECIFIC DESIGNS FIRST
     -- Vintage before spare: spare slots often contain "tire" and used to win incorrectly.
@@ -1918,7 +2064,7 @@ end
 initTyreData = function()
     if not wheels or not wheels.wheelRotators then return end
     tyreData = {}
-    cachedRallyHardware = nil -- re-probe on part reload / re-init
+    cachedRallyDamper = nil -- re-probe on part reload / re-init
     
     -- Dynamically count active wheels to scale load-sensitivity curves for multi-axle trucks/duallys
     local count = 0
@@ -1947,6 +2093,11 @@ initTyreData = function()
         local carcassStart = lerp(ENV_TEMP, optTemp, preheatBlend)
         local skinStart = lerp(ENV_TEMP, optTemp, preheatBlend * SKIN_PREHEAT_FRAC)
         local coldPSI = max(1.0, wd.pressure or 25.0)
+        -- Prefer live pressure-group fill when available (matches stock TPMS / cold set)
+        do
+            local nativeCold = getNativeGroupPressurePSI(wd)
+            if nativeCold then coldPSI = max(1.0, nativeCold) end
+        end
         
         -- Axle side from wheel rotator name (FL/FR/RL/RR), not tire part (tire_R_* is rear axle compound)
         local wheelNameLower = string.lower(tostring(wheelName))
@@ -1968,6 +2119,11 @@ initTyreData = function()
             lastGrip = 1, lastLongGrip = 1, lastLatGrip = 1,
             coldPressurePSI = coldPSI,
             targetHotPressurePSI = mods and mods.optimalPressure or coldPSI,
+            luaPressurePSI = coldPSI,
+            nativePressurePSI = coldPSI,
+            lastNativePSI = coldPSI,
+            contactDepthSmooth = 0,
+            patchHeatScaleSmooth = nil,
             rideHeightZ = nil, -- adaptive suspension baseline (set on first settled sample)
             isFront = isFront,
             profile1 = p1,
@@ -1983,8 +2139,55 @@ initTyreData = function()
     end
 end
 
--- Translates 3D coordinates between the spindle nodes to calculate real camber & toe angles relative to GRAVITY
-calculateWheelAlignment = function(i, wd)
+-- Contact-patch surface normal (world), matching advancedwheeldebug's mapmgr path.
+-- Returns nx,ny,nz or nil. Rejects failed probes that fall back to gravity-up on a bank.
+sampleContactSurfaceNormal = function(wd, pos1, pos2, upVector)
+    local mm = rawget(_G, "mapmgr")
+    if not mm or type(mm.surfaceNormalBelow) ~= "function" then return nil end
+    if not obj or type(obj.getPosition) ~= "function" then return nil end
+    local vehPos = obj:getPosition()
+    if not vehPos then return nil end
+
+    local sx, sy, sz
+    local nodeId = wd and wd.lastTreadContactNode
+    if nodeId and type(obj.getNodePosition) == "function" then
+        local okN, np = pcall(obj.getNodePosition, obj, nodeId)
+        if okN and np then
+            sx, sy, sz = vehPos.x + np.x, vehPos.y + np.y, vehPos.z + np.z
+        end
+    end
+    if sx == nil and pos1 and pos2 then
+        -- Spindle midpoint when tread contact node is missing
+        sx = vehPos.x + (pos1.x + pos2.x) * 0.5
+        sy = vehPos.y + (pos1.y + pos2.y) * 0.5
+        sz = vehPos.z + (pos1.z + pos2.z) * 0.5
+    end
+    if sx == nil then return nil end
+
+    local sample = (vec3 and vec3(sx, sy, sz)) or { x = sx, y = sy, z = sz }
+    local ok, normal = pcall(mm.surfaceNormalBelow, sample, 0.1)
+    if not ok or not normal then return nil end
+    local nx, ny, nz = normal.x, normal.y, normal.z
+    if not nx or not ny or not nz then return nil end
+    if nx ~= nx or ny ~= ny or nz ~= nz then return nil end
+    local nlen = sqrt(nx * nx + ny * ny + nz * nz)
+    if nlen < 0.5 then return nil end
+    nx, ny, nz = nx / nlen, ny / nlen, nz / nlen
+    -- mapmgr returns (0,0,1) when height probes miss; on a steep bank that reintroduces
+    -- gravity-frame camber. Prefer vehicle-frame fallback instead.
+    if upVector and abs(nz) > 0.998 and (upVector.z or 1) < 0.90 then
+        return nil
+    end
+    return nx, ny, nz
+end
+
+-- Spindle camber/toe: ROAD-RELATIVE when loaded with a valid contact normal; otherwise
+-- VEHICLE frame via invQuat (same path as updateWheelSuspension).
+-- getNodePosition is an offset from the vehicle origin in world axes; using raw world-Z as
+-- "camber" treats bank angle as camber (NASCAR ovals: ~24–30° → grip collapse on asphalt).
+-- Road-relative (advancedwheeldebug-style surfaceNormalBelow) keeps setup camber on bank and
+-- picks up body-roll vs surface; vehicle-frame fallback covers airborne / missing normals.
+calculateWheelAlignment = function(i, wd, invQuat, upVector)
     if not wd.node1 or not wd.node2 or not obj or not obj.getNodePosition then return 0, 0, 0, 0 end
     local pos1 = obj:getNodePosition(wd.node1)
     local pos2 = obj:getNodePosition(wd.node2)
@@ -1994,14 +2197,52 @@ calculateWheelAlignment = function(i, wd)
     local dist = sqrt(dx*dx + dy*dy + dz*dz)
     if dist < 1e-5 then return 0, 0, 0, 0 end
     
-    local lax, lay, laz = dx / dist, dy / dist, dz / dist
+    -- World-axis spindle (kept for road-normal camber before vehicle-frame transform)
+    local wax, way, waz = dx / dist, dy / dist, dz / dist
+    local lax, lay, laz = wax, way, waz
+
+    -- Prefer road-relative camber while the tyre is loaded and a surface normal is available
+    local camberFromRoad = false
+    local camberRad, camberDeg
+    local loadRaw = wd.downForce or 0
+    local hasContact = wd.contactMaterialID1 ~= nil and wd.contactMaterialID1 ~= -1
+    if hasContact and loadRaw > 0 then
+        local nx, ny, nz = sampleContactSurfaceNormal(wd, pos1, pos2, upVector)
+        if nx then
+            local upDot = max(-0.999, min(0.999, wax * nx + way * ny + waz * nz))
+            camberRad = -asin(upDot)
+            camberDeg = deg(camberRad)
+            camberFromRoad = true
+        end
+    end
+
+    -- World-axis spindle → vehicle frame for toe (and camber fallback)
+    if invQuat and vec3 then
+        local axis = invQuat * vec3(lax, lay, laz)
+        lax, lay, laz = axis.x, axis.y, axis.z
+        local len = sqrt(lax * lax + lay * lay + laz * laz)
+        if len > 1e-5 then
+            lax, lay, laz = lax / len, lay / len, laz / len
+        end
+    elseif upVector then
+        -- Camber only: spindle · vehicle-up (toe stays world-approx without a full basis)
+        laz = max(-0.999, min(0.999, lax * upVector.x + lay * upVector.y + laz * upVector.z))
+    end
     
-    -- Camber: Angle between the spindle axis and vehicle local vertical axis (Z)
-    local camberRad = -asin(max(-0.999, min(0.999, laz)))
-    local camberDeg = deg(camberRad)
+    if not camberFromRoad then
+        -- Camber: angle of spindle vs vehicle horizontal (Z-up in vehicle frame)
+        camberRad = -asin(max(-0.999, min(0.999, laz)))
+        camberDeg = deg(camberRad)
+    end
     
-    -- Toe: Angle between the spindle axis and vehicle local longitudinal axis (Y)
-    local sideSign = pos1.x > 0 and 1 or -1
+    -- Toe: stay vehicle-frame (road-relative toe is noisy; grip path is camber-led)
+    local sideSign = 1
+    if invQuat and vec3 then
+        local hub = invQuat * vec3(pos1.x, pos1.y, pos1.z)
+        sideSign = hub.x > 0 and 1 or -1
+    else
+        sideSign = pos1.x > 0 and 1 or -1
+    end
     local toeRad = math.atan2(lay * sideSign, abs(lax))
     local toeDeg = deg(toeRad)
     
@@ -2084,7 +2325,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local rawJBeamTread = wd.treadCoef or 0.5
     local treadCoef = rawJBeamTread 
     
-    local initialPressurePSI = max(1.0, wd.pressure or 25.0)
+    -- Cold fill: prefer seeded group Pa (stock fill); fall back to wd.pressure
+    local initialPressurePSI = max(1.0, data.coldPressurePSI or wd.pressure or 25.0)
 
     -- Stock BeamNG construction + brake thermal factors
     local bf = data.baseFactors
@@ -2094,29 +2336,50 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     end
 
     local brakeSurfaceTemp, brakeCoreTemp = getNativeBrakeTemps(wd, localEnvTemp)
+    -- Read-only brake efficiency / glazing (no torque override); tiny soak scale when glazed
+    local brakeThermalEff = 1.0
+    if type(wd.brakeThermalEfficiency) == "number" then
+        brakeThermalEff = max(0.35, min(1.0, wd.brakeThermalEfficiency))
+    elseif type(wd.brakeThermal) == "table" and type(wd.brakeThermal.efficiency) == "number" then
+        brakeThermalEff = max(0.35, min(1.0, wd.brakeThermal.efficiency))
+    end
+    data.brakeThermalEfficiency = brakeThermalEff
+    local brakeEffSoak = (topo.brakeEffSoakFloor or 0.92) + (1.0 - (topo.brakeEffSoakFloor or 0.92)) * brakeThermalEff
 
-    -- Tuning-menu brake ducts (default closed). Affects tyre air cooling + brake→carcass soak.
+    -- Tuning-menu brake ducts (default closed). Tire-side only — native rotors unchanged.
+    -- Air path: skin velCool, carcassCoolCoef, rimCool (+ venting / G / draft / underwater).
+    -- Soak path: brake→rim conduction+radiant, rim↔carcass (ductSoakCondFactor).
     local ductPct = getBrakeDuctPercent(data.isFront)
-    local airCoolingDuctFactor, conductionDuctFactor, ductOpen = ductPercentToFactors(ductPct)
+    local ductAirCoolFactor, ductSoakCondFactor = ductPercentToFactors(ductPct)
     -- Multiply with stock venting so race vented discs + open ducts stack correctly
     local ventingMult = max(0.35, min(2.0, bf.brakeVentingCoef or 1.0))
-    airCoolingDuctFactor = airCoolingDuctFactor * lerp(1.0, ventingMult, 0.35)
+    ductAirCoolFactor = ductAirCoolFactor * lerp(1.0, ventingMult, 0.35)
     data.ductPercent = ductPct
+    data.ductAirCoolFactor = ductAirCoolFactor
+    data.ductSoakCondFactor = ductSoakCondFactor
+    -- Working air factor accumulates transient modifiers (G / water / draft) below
+    local airCoolingFactor = ductAirCoolFactor
 
-    -- Apply to BeamNG native brake thermals (wheels.lua uses brakeTypeSurfaceCoolingCoef)
+    -- Snapshot stock native brake cooling; restore every tick (tyre-side ducts only).
+    -- Writing duct-boosted brakeTypeSurfaceCoolingCoef double-cooled rotors vs Lua convection.
     if wd and baseBrakeCoolings[wheelID] == nil then
         baseBrakeCoolings[wheelID] = wd.brakeTypeSurfaceCoolingCoef or 1.0
     end
     if wd and baseBrakeCoolings[wheelID] then
-        -- Closed = stock coef; fully open ≈ 2.2× stock venting (realistic race duct range)
-        wd.brakeTypeSurfaceCoolingCoef = baseBrakeCoolings[wheelID] * lerp(1.0, 2.2, ductOpen) * ventingMult
+        wd.brakeTypeSurfaceCoolingCoef = baseBrakeCoolings[wheelID]
     end
     
     local slipEnergy = isAirborne and 0 or (w.dynamicSlipEnergy or 0)
     local longSlipEnergy = isAirborne and 0 or (w.longSlipEnergy or 0)
     local sideSlipEnergy = isAirborne and 0 or (w.sideSlipEnergy or 0)
     local peakForce = isAirborne and 0 or (w.peakForce or 0)
-    local contactDepth = isAirborne and 0 or (w.contactDepth or 0)
+    -- Short EMA on contactDepth so gravel/kerbs don't jitter patchFrac / heat
+    local rawContactDepth = isAirborne and 0 or (w.contactDepth or 0)
+    local depthTau = max(0.02, topo.contactDepthEmaTau or 0.08)
+    local depthAlpha = min(1.0, dt / depthTau)
+    local contactDepth = (data.contactDepthSmooth or rawContactDepth)
+        + (rawContactDepth - (data.contactDepthSmooth or rawContactDepth)) * depthAlpha
+    data.contactDepthSmooth = contactDepth
     local propulsionTorque = isAirborne and 0 or (wd.propulsionTorque or 0) * (wd.wheelDir or 1)
     local brakeTorque = isAirborne and 0 or (wd.brakeTorque or 0) * (wd.wheelDir or 1)
     local loadRaw = isAirborne and 0 or (wd.downForceRaw or wd.downForce or 0)
@@ -2145,9 +2408,9 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local underWater = w.underWater and true or false
 
     -- Yaw / sideslip cooling asymmetry (crossflow increases convection on the windward side)
-    airCoolingDuctFactor = airCoolingDuctFactor * (1.0 + min(0.25, abs(gx) * 0.08 + abs(gy) * 0.05))
+    airCoolingFactor = airCoolingFactor * (1.0 + min(0.25, abs(gx) * 0.08 + abs(gy) * 0.05))
     if underWater then
-        airCoolingDuctFactor = airCoolingDuctFactor * 1.55
+        airCoolingFactor = airCoolingFactor * 1.55
         staticCoolingRate = staticCoolingRate * 1.8
     end
 
@@ -2155,7 +2418,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     -- 0.39 interAero is absent (draft.convectionMult precomputed in refreshDraftCompat).
     if draft.convectionMult < 1.0 then
         effectiveAirspeed = effectiveAirspeed * draft.convectionMult
-        airCoolingDuctFactor = airCoolingDuctFactor * draft.convectionMult
+        airCoolingFactor = airCoolingFactor * draft.convectionMult
     end
 
     -- Thermal mass from stock tire/hub node weights (not just geometry)
@@ -2199,6 +2462,18 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
     -- Pass pressure ratio to warp edge load calculations dynamically based on inflation states
     local wLeft, wCenter, wRight = CalcBiasWeights(w.combinedBias, pressureRatio)
+    -- Mild live lateral load nudge (gy) toward loaded shoulder — not a soft-body node map
+    do
+        local nudge = max(-1.0, min(1.0, gy)) * (topo.patchLatLoadNudge or 0.05)
+        if abs(nudge) > 1e-5 then
+            wLeft = max(0.05, wLeft * (1.0 - nudge))
+            wRight = max(0.05, wRight * (1.0 + nudge))
+            local wSum = wLeft + wCenter + wRight
+            if wSum > 1e-6 then
+                wLeft, wCenter, wRight = wLeft / wSum, wCenter / wSum, wRight / wSum
+            end
+        end
+    end
 
     -- Detect surfaces via shared classifier cache (must match CalculateTyreGrip)
     local isRaining = electrics and electrics.values and type(electrics.values.rainState) == "number" and electrics.values.rainState > 0
@@ -2239,8 +2514,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local p1Lower = data.profile1Lower or ""
     local p2Lower = data.profile2Lower or ""
     if string.find(p1Lower, "slick", 1, true) or string.find(p2Lower, "slick", 1, true) then
-        slickDriveScale = topo.drivePropSlickScale or 0.50
-        slickCarcassScale = topo.drivePropSlickCarcassScale or 0.30
+        slickDriveScale = topo.drivePropSlickScale or 0.42
+        slickCarcassScale = topo.drivePropSlickCarcassScale or 0.22
     end
     -- Street/non-slick high-V: damp carcass excess when freestream opens prop-hold cook
     -- (soft-sim: 200→40C / 300→119C). Slicks already scaled; leave skin excess untouched.
@@ -2290,11 +2565,20 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     -- Pass 3+: boost slip/work skin heat with excess prop (driven tires only — undriven gate≈0)
     local tempDistWeighted = avgWeightedTemp / (data.working_temp > 0 and data.working_temp or 1)
 
-    local estimatedContactArea = max(0.004, min(tyreWidth * 0.24, loadRaw / max(10000, dynamicPressurePSI * 6894.76)))
-    -- Soft-surface sink reduces hard pavement conduction area
-    if contactDepth and contactDepth > 0.02 then
-        estimatedContactArea = estimatedContactArea * max(0.45, 1.0 - contactDepth * 1.5)
+    -- Contact patch area: blend Hertz F/P with deflection proxy from EMA contactDepth × dynamicRadius.
+    -- Soft-surface conduction still applies its own depth penalty separately (not via area shrink).
+    local hertzArea = max(0.004, min(tyreWidth * 0.24, loadRaw / max(10000, dynamicPressurePSI * 6894.76)))
+    local deflArea = hertzArea
+    if not isAirborne and contactDepth > 1e-4 and tyreRadius > 0.05 and tyreWidth > 0.04 then
+        local d = min(contactDepth, tyreRadius * 0.35)
+        local chord = 2.0 * sqrt(max(0, 2.0 * tyreRadius * d - d * d))
+        deflArea = max(0.004, min(tyreWidth * 0.28, tyreWidth * chord * (topo.patchDeflWidthFrac or 0.55)))
     end
+    local depthBlend = 0
+    if not isAirborne then
+        depthBlend = max(0, min(1.0, (contactDepth - 0.005) / 0.040)) * (topo.patchHertzDeflBlend or 0.35)
+    end
+    local estimatedContactArea = hertzArea * (1.0 - depthBlend) + deflArea * depthBlend
 
     local current_working_temp = (data.working_temp and data.working_temp > 0) and data.working_temp or WORKING_TEMP
 
@@ -2309,20 +2593,48 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local rimRate = RIM_REACTION_RATE / max(0.05, rimInertia)
 
     -- P0-1: contact-patch fraction of circumference (skin nodes are belt averages)
-    local patchFrac = topo.patchFracMin
+    -- Phase B: separate geometric cool floor from softer heat floor so street load/PSI/depth move scale.
+    local patchFracRaw = 0
     if not isAirborne and tyreWidth > 0.04 and tyreRadius > 0.05 then
-        patchFrac = max(topo.patchFracMin, min(topo.patchFracMax, (estimatedContactArea / tyreWidth) / max(0.4, 2.0 * pi * tyreRadius)))
+        patchFracRaw = (estimatedContactArea / tyreWidth) / max(0.4, 2.0 * pi * tyreRadius)
     end
-    local patchHeatScale = max(0.40, min(1.20, patchFrac / max(0.05, topo.patchFracRef)))
+    local patchFrac = max(topo.patchFracMin, min(topo.patchFracMax, patchFracRaw))
+    local patchFracHeat = max(topo.patchFracHeatMin or topo.patchFracMin, min(topo.patchFracMax, patchFracRaw))
+    -- Depth boost still useful when area blend is small vs kerb/soft sink (kept after Phase B unstick)
+    local depthHeatBoost = 1.0
+    if not isAirborne and contactDepth > 0.006 then
+        depthHeatBoost = 1.0 + min(0.16, (contactDepth - 0.006) * 2.0)
+    end
+    -- Phase C: mild peak utilization nudge on patch heat (corner work already has peakWorkFactor)
+    local peakWorkFactorEarly = 1.0
+    if peakForce and peakForce > 100 and loadRaw > 100 then
+        peakWorkFactorEarly = max(0.85, min(1.35, peakForce / max(loadRaw, 1)))
+    end
+    local utilNudge = 1.0 + ((peakWorkFactorEarly - 1.0) * (topo.patchUtilBlend or 0))
+    local patchHeatScaleRaw = max(0.40, min(1.20, (patchFracHeat / max(0.05, topo.patchFracRef)) * depthHeatBoost * utilNudge))
+    -- Light EMA on heat scale (depth EMA alone insufficient when geom was floor-clamped)
+    local patchHeatScale = patchHeatScaleRaw
+    do
+        local hsTau = max(0.02, topo.patchHeatEmaTau or 0.10)
+        local hsAlpha = min(1.0, dt / hsTau)
+        local hsPrev = data.patchHeatScaleSmooth
+        if hsPrev == nil then hsPrev = patchHeatScaleRaw end
+        patchHeatScale = hsPrev + (patchHeatScaleRaw - hsPrev) * hsAlpha
+        data.patchHeatScaleSmooth = patchHeatScale
+    end
+    -- Phase A diagnostics (streamed to Heavy SURFACE CONTACT)
+    data.lastPatchFrac = patchFrac
+    data.lastPatchFracRaw = patchFracRaw
+    data.lastPatchHeatScale = patchHeatScale
+    data.lastDepthHeatBoost = depthHeatBoost
+    data.lastHertzArea = hertzArea
+    data.lastDeflArea = deflArea
+    data.lastDepthBlend = depthBlend
 
     -- Stock friction multipliers shape heat generation
     local jbeamMu = max(0.4, min(1.8, bf.frictionCoef or 1.0))
     local jbeamSlideMu = max(0.35, min(1.8, bf.slidingFrictionCoef or jbeamMu))
-    local peakWorkFactor = 1.0
-    if peakForce and peakForce > 100 and loadRaw > 100 then
-        -- Near peak force capacity → more hysteresis / scrub heat
-        peakWorkFactor = max(0.85, min(1.35, peakForce / max(loadRaw, 1)))
-    end
+    local peakWorkFactor = peakWorkFactorEarly
 
     -- Suspension damper / bump-stop heat into carcass (power ~ load·|v| + bump stress)
     local verticalCarcassHeat = 0
@@ -2404,12 +2716,19 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         -- P0-1: deposit slip/work/torque heat on patch-resident fraction (integrates with lockup floor)
         -- Street residual slip soft-cap also trims excess-prop slip/work boost (driven FWD cook).
         frictionalGain = frictionalGain * patchHeatScale * (1.0 + ((topo.drivePropSlipWorkMult or 1.0) - 1.0) * excessPropGateEff * streetSlipHeatScale)
+        -- Phase D: soft sink / rough damp frictional heat (conduction has its own depth/rough denom)
+        if not isAirborne then
+            local sinkDamp = 1.0 / (1.0 + max(0, contactDepth or 0) * (topo.softSinkHeatCoef or 1.2)
+                + (tonumber(groundModel.rough) or 0) * (topo.softSinkRoughCoef or 0.35))
+            frictionalGain = frictionalGain * max(topo.softSinkHeatFloor or 0.72, sinkDamp)
+        end
 
         local tempDelta = ((skinSnap[i] or localEnvTemp) - localEnvTemp)
         
         -- TURBULENT CONVECTION (v^0.8). 0.155 skin scale: cruise still mild; track retains more heat.
-        -- Under sustained lateral load, convection is slightly reduced (patch/wake retention).
-        local velCool = (effectiveAirspeed ^ 0.8) * airCoolingRate * 0.155 * airCoolingDuctFactor * surfaceAreaScale / (1.0 + min(0.18, max(0, g_mag - 0.20) * 0.22))
+        -- Free-belt cool uses geometric patchFrac (not heat floor): larger patch → less freeFrac cool.
+        -- Intentionally separate from patchHeatScale so we don't also amplify RR via hystSkinShare.
+        local velCool = (effectiveAirspeed ^ 0.8) * airCoolingRate * 0.155 * airCoolingFactor * surfaceAreaScale / (1.0 + min(0.18, max(0, g_mag - 0.20) * 0.22))
         local totalConvection = tempDelta * (staticCoolingRate * 0.04 + velCool) * climateScale * (1.0 + (1.0 - patchFrac) * (topo.freeBeltCoolMult - 1.0)) * spawnConvScale
         
         if tempDelta > 0 then
@@ -2509,10 +2828,11 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         end
     end
 
-    local carcassCoolCoef = ((topo.carcassCoolVelCoef or 0.28) * coreVelCoolRate * (effectiveAirspeed ^ 0.8 * 0.20) * airCoolingDuctFactor
+    local carcassCoolCoef = ((topo.carcassCoolVelCoef or 0.28) * coreVelCoolRate * (effectiveAirspeed ^ 0.8 * 0.20) * airCoolingFactor
         + (topo.carcassCoolStaticCoef or 0.20) * coreCoolRate) * climateScale
 
-    -- Share a slice of RR/flex work with skin so carcass doesn't runaway vs freestream-cooled tread
+    -- Share a slice of RR/flex work with skin so carcass doesn't runaway vs freestream-cooled tread.
+    -- Phase C: bulk leak — intentionally NOT × patchHeatScale (slip/work already patch-scaled).
     local carcassWork = totalHysteresisHeat + flexWarmHeat
     local hystSkinShare = max(0, min(0.45, topo.hystSkinShare or 0.18))
     if hystSkinShare > 1e-6 and carcassWork > 0 then
@@ -2535,7 +2855,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         end
         data.temp[i + 3] = carT + (
             ((skinSnap[i] or localEnvTemp) - carT) * skinCoreConductance * conductanceTreadScale
-            + (rimSnap - carT) * RIM_CARCASS_CONDUCTANCE * conductionDuctFactor
+            + (rimSnap - carT) * RIM_CARCASS_CONDUCTANCE * ductSoakCondFactor
             + (airSnap - carT) * airConductionRate * 0.05
             + lateral
             + carcassWorkRemain * weight
@@ -2545,14 +2865,25 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
     avgCarcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
 
-    -- Rim / brake soak node: rotor heat enters here, then conducts into carcass + cavity air
+    -- Rim / brake soak node: rotor heat enters here, then conducts into carcass + cavity air.
+    -- brakeMass/diameter already scale rimInertia→rimRate; area + rotorMaterial scale soak gain.
     local brakeAreaScale = max(0.6, min(1.8, (bf.brakeCoolingArea or 0.1) / 0.12))
-    local radiantToRim = 2.2e-11 * ((brakeSurfaceTemp+273.15)^4 - (rimSnap+273.15)^4) * brakeGainRate * conductionDuctFactor * brakeAreaScale
-    local rimCarcassNet = (carcassWeights[1]*((carcassSnap[1] or localEnvTemp)-rimSnap) + carcassWeights[2]*((carcassSnap[2] or localEnvTemp)-rimSnap) + carcassWeights[3]*((carcassSnap[3] or localEnvTemp)-rimSnap)) * RIM_CARCASS_CONDUCTANCE * conductionDuctFactor
-    -- Rotor material heat capacity proxy (steel default; carbon-ceramic holds less / cools differently)
     local rotorMat = string.lower(bf.rotorMaterial or "steel")
-    local rotorCoolMult = (rotorMat == "aluminum" or rotorMat == "aluminium") and 1.15 or (string.find(rotorMat, "carbon") and 0.90 or 1.0)
-    local rimCool = (rimSnap - localEnvTemp) * (0.22 * (effectiveAirspeed ^ 0.8 * 0.28) * airCoolingDuctFactor * rotorCoolMult + 0.08) * climateScale * brakeAreaScale
+    local rotorCoolMult = (rotorMat == "aluminum" or rotorMat == "aluminium") and 1.15
+        or (string.find(rotorMat, "carbon") and 0.90 or 1.0)
+    -- Soak coupling (separate from rim air-cool): Al conducts more into hub; carbon-ceramic less
+    local rotorSoakMult = (rotorMat == "aluminum" or rotorMat == "aluminium") and 1.08
+        or (string.find(rotorMat, "carbon") and 0.82 or 1.0)
+    local radiantCoef = topo.brakeRadiantCoef or 2.2e-11
+    local radiantToRim = radiantCoef * ((brakeSurfaceTemp + 273.15)^4 - (rimSnap + 273.15)^4)
+        * brakeGainRate * ductSoakCondFactor * brakeAreaScale * rotorSoakMult
+    local rimCarcassNet = (carcassWeights[1] * ((carcassSnap[1] or localEnvTemp) - rimSnap)
+        + carcassWeights[2] * ((carcassSnap[2] or localEnvTemp) - rimSnap)
+        + carcassWeights[3] * ((carcassSnap[3] or localEnvTemp) - rimSnap))
+        * RIM_CARCASS_CONDUCTANCE * ductSoakCondFactor
+    local rimCool = (rimSnap - localEnvTemp)
+        * (0.22 * (effectiveAirspeed ^ 0.8 * 0.28) * airCoolingFactor * rotorCoolMult + 0.08)
+        * climateScale * brakeAreaScale
 
     -- Fire / hot-node soak (same helper BeamNG brake thermals use)
     local fireToRim = 0
@@ -2563,10 +2894,14 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         end
     end
 
+    local soakCommon = brakeGainRate * ductSoakCondFactor * brakeAreaScale * brakeEffSoak * rotorSoakMult
+    local brakeSurfTerm = ((topo.brakeSurfSoak or 0.016) * (brakeSurfaceTemp - rimSnap)) * soakCommon
+    local brakeCoreTerm = ((topo.brakeCoreSoak or 0.0025) * (brakeCoreTemp - rimSnap)) * soakCommon
+    local brakeSoakPower = brakeSurfTerm + brakeCoreTerm + radiantToRim
+    data.brakeSoakRateCs = brakeSoakPower * rimRate
+
     data.temp[7] = rimSnap + (
-        (0.012 * (brakeSurfaceTemp - rimSnap)) * brakeGainRate * conductionDuctFactor * brakeAreaScale
-        + (0.004 * (brakeCoreTemp - rimSnap)) * brakeGainRate * conductionDuctFactor
-        + radiantToRim + rimCarcassNet
+        brakeSoakPower + rimCarcassNet
         + (airSnap - rimSnap) * RIM_AIR_CONDUCTANCE
         + fireToRim - rimCool
     ) * rimRate * dt
@@ -2728,18 +3063,30 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     data.surfaceDamage = max(data.clog or 0, data.graining or 0, data.blistering or 0, data.marbles or 0)
 
     -- Progressive puncture (BeamNG pressure-group leak), not instant deflate
+    -- Slicks: higher heat-leak floor so WC hotlaps don't "slow flat" near the working window;
+    -- soft_slick used to inherit the street 165C gate when optTemp < 80.
+    -- Spike/puncture: stock wheels.lua owns setGroupPressure while wd.isPunctured.
+    local nativeOwnsSpikeLeak = wd.isPunctured and true or false
     local leak = data.leakRatePa or 0
+    local isSlickLeak = string.find(data.profile1Lower or "", "slick", 1, true)
+        or string.find(data.profile2Lower or "", "slick", 1, true)
     if (data.blistering or 0) > 0.70 and avgWeightedTemp > current_optimal_temp * 1.30 then
         leak = max(leak, lerp(0, 22000, min(1, (data.blistering - 0.70) / 0.30))) -- Pa/s
     end
-    if avgWeightedTemp > ((mods.optimalTemp or 65) >= 80 and 185 or 165) then
-        leak = max(leak, 8000 + (avgWeightedTemp - 165) * 200)
+    local heatLeakStart = isSlickLeak and 195 or (((mods.optimalTemp or 65) >= 80) and 185 or 165)
+    if avgWeightedTemp > heatLeakStart then
+        leak = max(leak, 8000 + (avgWeightedTemp - (heatLeakStart - 20)) * 200)
     end
     if data.condition < 5 then
         leak = max(leak, 15000)
     end
     data.leakRatePa = leak
-    if leak > 0 then
+    if nativeOwnsSpikeLeak then
+        -- Defer pressure writes to native; track UI severity + follow native gauge.
+        data.punctureSeverity = min(1.0, (data.punctureSeverity or 0) + dt * 0.02)
+        -- Informational rate for HUD / diagnostics (does not drive setGroupPressure).
+        data.leakRatePa = max(leak, wd.punctureLeakRate or 20000)
+    elseif leak > 0 then
         local newAbs = applyPressureLeakPa(wd, leak, dt)
         if newAbs then
             data.punctureSeverity = min(1.0, (data.punctureSeverity or 0) + dt * 0.02)
@@ -2754,16 +3101,53 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     end
 
     data.currentPressurePSI = dynamicPressurePSI
-    -- Prefer live BeamNG pressure-group reading when leaking (matches native puncture path)
-    if (data.leakRatePa or 0) > 0 and wd.pressureGroup and v and v.data and v.data.pressureGroups and obj and type(obj.getGroupPressure) == "function" then
-        local pg = v.data.pressureGroups[wd.pressureGroup]
-        if pg then
-            local okP, absPa = pcall(obj.getGroupPressure, obj, pg)
-            if okP and type(absPa) == "number" then
-                data.currentPressurePSI = max(0.1, (absPa - 101325) / 6894.757)
+    data.luaPressurePSI = dynamicPressurePSI
+    -- Native group gauge (Pa→PSI); optional rate-limited hot write-back for soft-body stiffness
+    local nativePSI = getNativeGroupPressurePSI(wd)
+    local dPdt = 0
+    if nativePSI then
+        local prevNative = data.lastNativePSI or nativePSI
+        dPdt = abs(nativePSI - prevNative) / max(dt, 1e-3)
+        data.lastNativePSI = nativePSI
+        data.nativePressurePSI = nativePSI
+        -- Prefer live BeamNG pressure-group reading when leaking or native spike-puncture owns writes
+        if (data.leakRatePa or 0) > 0 or nativeOwnsSpikeLeak then
+            data.currentPressurePSI = nativePSI
+        elseif (data.leakRatePa or 0) <= 0
+            and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)
+            and abs(currentTempK - initialTempK) < 8.0 then
+            -- Soft refresh cold fill toward native when tire is still cold (stock fill / garage)
+            local coldAlpha = min(1.0, dt / max(0.5, topo.pressureColdRefreshTau or 2.5))
+            data.coldPressurePSI = (data.coldPressurePSI or nativePSI) * (1.0 - coldAlpha) + nativePSI * coldAlpha
+        end
+
+        -- Safe hot PSI write-back: Lua Gay-Lussac absolute → native group (rate-limited).
+        -- Leak path / native spike puncture owns writes; TPMS/inflate |dP/dt| or electrics skip WB.
+        if (topo.pressureHotWritebackEnable ~= false)
+            and (data.leakRatePa or 0) <= 0
+            and not nativeOwnsSpikeLeak
+            and not (w.isBroken or w.isTireDeflated)
+            and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)
+            and not isTirePressureInflateActive()
+        then
+            local targetAbsPa = warmAbsolutePressurePSI * 6894.757
+            local newAbs = applyHotPressureWriteback(
+                wd,
+                targetAbsPa,
+                dt,
+                topo.pressureHotWritebackMaxPsiS or 0.35,
+                topo.pressureHotWritebackDeadbandPsi or 0.15
+            )
+            if newAbs then
+                nativePSI = max(0.1, (newAbs - 101325) / 6894.757)
+                data.nativePressurePSI = nativePSI
+                data.lastNativePSI = nativePSI
             end
         end
+    else
+        data.nativePressurePSI = dynamicPressurePSI
     end
+    data.pressurePsiDelta = (data.luaPressurePSI or dynamicPressurePSI) - (data.nativePressurePSI or dynamicPressurePSI)
     data.currentFlatSpot = data.flatSpot or 0
     data.currentSurfaceDamage = data.surfaceDamage or 0
     data.currentClog = data.clog or 0
@@ -2959,6 +3343,21 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
     local isTruckHighway = has("highway") or has("trailer") or (has("steer") and has("truck"))
     local isLightTruckHd = has("light_truck_hd") or has("heavy_duty")
     local isLightTruck = has("light_truck") and not isLightTruckHd
+    -- Street continuum (standard / sport / vintage): asphalt preference + loose penalty.
+    -- Restores asphalt>loose gap after global gm bump; excludes rally/AT/MT/race/truck specialists.
+    -- Asphalt *1.02 only on standard/vintage (sport already has dryGripScale 1.02).
+    local isSportPlus = has("sport_plus")
+    local isSport = has("sport") and not isSportPlus
+    local isStreetLoose = (has("standard") or isSport or has("vintage"))
+        and not isRally and not isAllTerrain and not isMudTerrain and not isCrawler
+        and not isSlick and not isDrag and not isPaddle
+        and not isTruckOffroad and not isTruckDrive and not isTruckHighway
+        and not isLightTruck and not isLightTruckHd
+    local isStreetAsphalt = (has("standard") or has("vintage"))
+        and not isRally and not isAllTerrain and not isMudTerrain and not isCrawler
+        and not isSlick and not isDrag and not isPaddle
+        and not isTruckOffroad and not isTruckDrive and not isTruckHighway
+        and not isLightTruck and not isLightTruckHd
 
     if surfaceType == "sand" then
         if isPaddle then tyreGrip = tyreGrip * 1.35
@@ -2967,6 +3366,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         elseif isTruckOffroad then tyreGrip = tyreGrip * 1.08
         elseif isTruckDrive then tyreGrip = tyreGrip * 1.04
         elseif isTruckHighway then tyreGrip = tyreGrip * 0.90
+        elseif isStreetLoose then tyreGrip = tyreGrip * 0.90
         elseif isSlick or isDrag then tyreGrip = tyreGrip * 0.88
         end
     elseif surfaceType == "mud" then
@@ -2977,6 +3377,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         elseif isTruckDrive then tyreGrip = tyreGrip * 1.06
         elseif isLightTruckHd or isLightTruck then tyreGrip = tyreGrip * 1.04
         elseif isTruckHighway then tyreGrip = tyreGrip * 0.88
+        elseif isStreetLoose then tyreGrip = tyreGrip * 0.86
         elseif isSlick or isDrag then tyreGrip = tyreGrip * 0.82
         end
     elseif surfaceType == "rock" then
@@ -2996,6 +3397,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         elseif isTruckDrive then tyreGrip = tyreGrip * 1.05
         elseif isLightTruckHd or isLightTruck then tyreGrip = tyreGrip * 1.04
         elseif isTruckHighway then tyreGrip = tyreGrip * 0.94
+        elseif isStreetLoose then tyreGrip = tyreGrip * 0.90
         elseif isSlick or isDrag then tyreGrip = tyreGrip * 0.90
         elseif isDrift then tyreGrip = tyreGrip * 0.95
         end
@@ -3006,6 +3408,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         elseif isTruckDrive then tyreGrip = tyreGrip * 1.04
         elseif isRain then tyreGrip = tyreGrip * 1.06
         elseif isTruckHighway then tyreGrip = tyreGrip * 0.90
+        elseif isStreetLoose then tyreGrip = tyreGrip * 0.88
         elseif isSlick then tyreGrip = tyreGrip * 0.85
         end
     elseif surfaceType == "snow" or surfaceType == "ice" then
@@ -3014,6 +3417,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         elseif isAllTerrain or isTruckOffroad then tyreGrip = tyreGrip * 1.05
         elseif isTruckDrive then tyreGrip = tyreGrip * 1.03
         elseif isTruckHighway then tyreGrip = tyreGrip * 0.92
+        elseif isStreetLoose then tyreGrip = tyreGrip * 0.92
         elseif isSlick or isDrag then tyreGrip = tyreGrip * 0.82
         end
     elseif surfaceType == "wet_paved" then
@@ -3026,6 +3430,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
         if isSlick or isDrag then tyreGrip = tyreGrip * 1.0
         elseif isMudTerrain or isCrawler or isTruckOffroad then tyreGrip = tyreGrip * 0.96
         elseif isPaddle then tyreGrip = tyreGrip * 0.90
+        elseif isStreetAsphalt then tyreGrip = tyreGrip * 1.02
         elseif isTruckHighway then tyreGrip = tyreGrip * 1.02
         end
     end
@@ -3044,7 +3449,7 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     local rawJBeamTread = wd.treadCoef or 0.5
     local treadCoef = rawJBeamTread 
     local softnessCoef = wd.softnessCoef or 0.5
-    local initialPressurePSI = max(1.0, wd.pressure or 25.0)
+    local initialPressurePSI = max(1.0, data.coldPressurePSI or wd.pressure or 25.0)
     local currentPSI = data.currentPressurePSI or initialPressurePSI
     
     local optP = max(1.0, mods.optimalPressure or 25.0)
@@ -3166,6 +3571,12 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
             elseif string.find(p1, "highway", 1, true) or string.find(p2, "highway", 1, true)
                 or string.find(p1, "trailer", 1, true) or string.find(p2, "trailer", 1, true) then
                 dryBias = 1.02
+            else
+                -- Mirror street asphalt bias (standard/vintage only; sport uses dryGripScale)
+                if string.find(p1, "standard", 1, true) or string.find(p2, "standard", 1, true)
+                    or string.find(p1, "vintage", 1, true) or string.find(p2, "vintage", 1, true) then
+                    dryBias = 1.02
+                end
             end
             local ratioCap = (dryScale * dryMod * dryBias) / max(1e-3, wetScale * wetMod) * 0.98
             if ratioCap < 1.0 then
@@ -3304,16 +3715,6 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
         end
     end
 
-    -- Optional arcade brake-release bite (disabled by default)
-    if ENABLE_BRAKE_BITE_HACK then
-        local brakeInput = electrics and electrics.values and electrics.values.brake or 0
-        local angularVel = abs(wd.angularVelocity or 0)
-        local isSliding = w.slipEnergy and w.slipEnergy > 0.15
-        if brakeInput < 0.05 and angularVel < 6.0 and isSliding and not w.isAirborne then
-            longGrip = longGrip * 1.15
-        end
-    end
-
     tyreGripTable[wheelID] = tyreGrip
     return longGrip, latGrip, tyreGrip
 end
@@ -3344,12 +3745,15 @@ initGuiStream = function()
             working_temp = WORKING_TEMP, condition = 100, zoneCondition = { 100, 100, 100 },
             tyreGrip = 1, longGrip = 1, latGrip = 1, camber = 0, toe = 0, pressure = 25,
             initialPressure = 25, optimalPressure = 25, coldPressure = 25, targetHotPressure = 25,
+            luaPressure = 25, nativePressure = 25, pressureDelta = 0,
             pressureRatio = 1, skinCarcassGap = 0, driveHeatGate = 0, driveHeatGateCarcass = 0,
             streetSlipScale = 1,
             clog = 0, cycles = 0, graining = 0, blistering = 0, marbles = 0, flatspot = 0,
             surfaceDamage = 0, stintFade = 0, leak = 0, waterFilm = 0, ductPercent = 1,
+            ductAirCoolFactor = 1, ductSoakCondFactor = 1.15, brakeSoakRateCs = 0,
             carcassAvg = ENV_TEMP, rimTemp = ENV_TEMP, airTemp = ENV_TEMP,
-            brakeSurface = ENV_TEMP, brakeCore = ENV_TEMP, contactDepth = 0, underWater = false,
+            brakeSurface = ENV_TEMP, brakeCore = ENV_TEMP, brakeThermalEfficiency = 1,
+            contactDepth = 0, underWater = false,
             -- Surface / contact diagnostics
             surfaceName = "unknown", surfaceType = "generic",
             muStatic = 1, muSlide = 1, rough = 0,
@@ -3431,7 +3835,7 @@ prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, 
         if data then
             updateWheelSuspension(w, data, wd, dt, invQuat, upVector)
 
-            local camberDeg, toeDeg, camberRad, toeRad = calculateWheelAlignment(i, wd)
+            local camberDeg, toeDeg, camberRad, toeRad = calculateWheelAlignment(i, wd, invQuat, upVector)
             w.camber = camberDeg
             w.toe = toeDeg
             w.camberRad = camberRad
@@ -3473,10 +3877,12 @@ prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, 
                 w.underWater = okW and inW and true or false
             end
 
-            -- Spike-strip material (ID 32) — sync progressive leak with stock puncture
+            -- Spike-strip (mat 32): native wheels.lua owns setGroupPressure while isPunctured.
+            -- ReSpin only mirrors UI/condition — do NOT arm leakRatePa for applyPressureLeakPa.
+            w.isPunctured = wd.isPunctured and true or false
             local mat1, mat2 = wd.contactMaterialID1, wd.contactMaterialID2
-            if (mat1 == SPIKE_STRIP_MATERIAL_ID or mat2 == SPIKE_STRIP_MATERIAL_ID) and not w.isTireDeflated and not w.isBroken then
-                data.leakRatePa = max(data.leakRatePa or 0, wd.punctureLeakRate or 20000)
+            if (mat1 == SPIKE_STRIP_MATERIAL_ID or mat2 == SPIKE_STRIP_MATERIAL_ID or w.isPunctured)
+                and not w.isTireDeflated and not w.isBroken then
                 data.punctureSeverity = max(data.punctureSeverity or 0, 0.5)
             end
 
@@ -3537,7 +3943,10 @@ runFixedPhysicsSteps = function(dt, localizedEnvTemp)
                 CalcTyreWear(i, FIXED_DT, localizedEnvTemp)
 
                 local carcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias or 0, 1.0, localizedEnvTemp)
-                local softFailTemp = (data.interpolatedMods and data.interpolatedMods.optimalTemp and data.interpolatedMods.optimalTemp >= 80) and 185 or 165
+                local isSlickFail = string.find(data.profile1Lower or "", "slick", 1, true)
+                    or string.find(data.profile2Lower or "", "slick", 1, true)
+                local optFail = data.interpolatedMods and data.interpolatedMods.optimalTemp
+                local softFailTemp = isSlickFail and 195 or ((optFail and optFail >= 80) and 185 or 165)
                 if carcassTemp > softFailTemp and (data.leakRatePa or 0) < 5000 then
                     data.leakRatePa = max(data.leakRatePa or 0, 6000)
                 end
@@ -3603,6 +4012,9 @@ flushGuiStream = function(localizedEnvTemp)
                 entry.camber = (w.isBroken) and 0 or ((w.camber or 0) * (wd.wheelDir or 1))
                 entry.toe = (w.isBroken) and 0 or math.floor((w.toe or 0) * 100) / 100
                 entry.pressure = (w.isBroken or w.isTireDeflated) and 0 or (math.floor((data.currentPressurePSI or initialPressurePSI) * 10) / 10)
+                entry.luaPressure = (w.isBroken or w.isTireDeflated) and 0 or (math.floor((data.luaPressurePSI or data.currentPressurePSI or initialPressurePSI) * 10) / 10)
+                entry.nativePressure = (w.isBroken or w.isTireDeflated) and 0 or (math.floor((data.nativePressurePSI or data.currentPressurePSI or initialPressurePSI) * 10) / 10)
+                entry.pressureDelta = (w.isBroken or w.isTireDeflated) and 0 or (math.floor(((data.pressurePsiDelta or ((data.luaPressurePSI or 0) - (data.nativePressurePSI or 0))) * 10) + 0.5) / 10)
                 entry.initialPressure = data.coldPressurePSI or initialPressurePSI
                 entry.coldPressure = data.coldPressurePSI or initialPressurePSI
                 entry.optimalPressure = interpolatedMods and interpolatedMods.optimalPressure or 25
@@ -3617,9 +4029,18 @@ flushGuiStream = function(localizedEnvTemp)
                 entry.leak = math.floor((data.punctureSeverity or 0) * 100)
                 entry.waterFilm = math.floor(waterFilmDepth * 100)
                 entry.ductPercent = data.ductPercent or getBrakeDuctPercent(data.isFront)
+                entry.ductAirCoolFactor = math.floor((data.ductAirCoolFactor or 1) * 1000) / 1000
+                entry.ductSoakCondFactor = math.floor((data.ductSoakCondFactor or 1.15) * 1000) / 1000
+                entry.brakeSoakRateCs = math.floor((data.brakeSoakRateCs or 0) * 100) / 100
                 entry.driveHeatGate = math.floor((data.lastDriveHeatGate or 0) * 1000) / 1000
                 entry.driveHeatGateCarcass = math.floor((data.lastDriveHeatGateCarcass or 0) * 1000) / 1000
                 entry.streetSlipScale = math.floor((data.lastStreetSlipHeatScale or 1) * 1000) / 1000
+                entry.patchFrac = math.floor((data.lastPatchFrac or 0) * 1000) / 1000
+                entry.patchHeatScale = math.floor((data.lastPatchHeatScale or 1) * 1000) / 1000
+                entry.depthHeatBoost = math.floor((data.lastDepthHeatBoost or 1) * 1000) / 1000
+                entry.hertzArea = math.floor((data.lastHertzArea or 0) * 100000) / 100000
+                entry.deflArea = math.floor((data.lastDeflArea or 0) * 100000) / 100000
+                entry.depthBlend = math.floor((data.lastDepthBlend or 0) * 1000) / 1000
 
                 entry.clog = (w.isBroken) and 0 or math.floor((data.currentClog or data.clog or 0) * 100)
                 entry.graining = (w.isBroken) and 0 or math.floor((data.currentGraining or data.graining or 0) * 100)
@@ -3659,7 +4080,8 @@ flushGuiStream = function(localizedEnvTemp)
                     local bSurf, bCore = getNativeBrakeTemps(wd, localizedEnvTemp)
                     entry.brakeSurface = math.floor(bSurf * 10) / 10
                     entry.brakeCore = math.floor(bCore * 10) / 10
-                    entry.contactDepth = math.floor((w.contactDepth or 0) * 1000) / 1000
+                    entry.brakeThermalEfficiency = math.floor((data.brakeThermalEfficiency or 1) * 1000) / 1000
+                    entry.contactDepth = math.floor((data.contactDepthSmooth or w.contactDepth or 0) * 1000) / 1000
                     entry.underWater = not not w.underWater
                     entry.working_temp = math.floor(data.working_temp * 10) / 10
                 else
@@ -3668,7 +4090,13 @@ flushGuiStream = function(localizedEnvTemp)
                     end
                     entry.carcassAvg, entry.rimTemp, entry.airTemp = localizedEnvTemp, localizedEnvTemp, localizedEnvTemp
                     entry.brakeSurface, entry.brakeCore = localizedEnvTemp, localizedEnvTemp
+                    entry.brakeThermalEfficiency = 1
+                    entry.brakeSoakRateCs = 0
+                    entry.ductAirCoolFactor = 1
+                    entry.ductSoakCondFactor = 1.15
                     entry.contactDepth, entry.underWater = 0, false
+                    entry.patchFrac, entry.patchHeatScale, entry.depthHeatBoost = 0, 1, 1
+                    entry.hertzArea, entry.deflArea, entry.depthBlend = 0, 0, 0
                     entry.working_temp = WORKING_TEMP
                 end
 
@@ -4072,7 +4500,7 @@ onInit = function()
         lastTrackEnvMailbox = nil
         lastEnvMailbox = nil
         cachedVehicleType = nil
-        cachedRallyHardware = nil
+        cachedRallyDamper = nil
         typeRetryCount = 0
         rawEnvMin = 100
         rawEnvMax = -100
@@ -4160,7 +4588,6 @@ M.setDraftWake = setDraftWake
 M.hasNativeInterAero = function() return draft.hasNativeInterAero end
 M.getInferredWake = function() return draft.inferredWake end
 M.setForceFeedbackFX = function(enabled) ENABLE_FORCE_FEEDBACK_FX = not not enabled end
-M.setBrakeBiteHack = function(enabled) ENABLE_BRAKE_BITE_HACK = not not enabled end
 M.flushTelemetryCsv = function()
     flushTelemetryBuffer()
 end

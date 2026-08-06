@@ -13,7 +13,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # Live THERMAL_TOPOLOGY
 $topo = @{
-  patchFracMin = 0.09; patchFracMax = 0.20; patchFracRef = 0.135
+  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
   freeBeltCoolMult = 1.32
   drivePropCruiseNm = 650.0; drivePropExcessFullNm = 1100.0
   drivePropSkinCoef = 0.021
@@ -110,11 +110,13 @@ function SimulateBurnout {
   $adj = [double]$knobs.react / [math]::Max(0.05, [double]$knobs.treadInertia)
   $coreRate = $CORE_REACTION_RATE / [math]::Max(0.05, [double]$knobs.carcassInertia)
 
-  # patchFrac from contact area (live)
+  # patchFrac from contact area (live Phase B — soft heat floor)
   $estArea = [math]::Max(0.004, [math]::Min($tyreWidthM * 0.24, $loadRaw / $pressurePa))
   $patchLen = $estArea / $tyreWidthM
-  $patchFrac = Clamp ($patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)) ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
-  $patchHeatScale = Clamp ($patchFrac / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
+  $patchFracRaw = $patchLen / [math]::Max(0.4, 2.0 * [math]::PI * $tyreRadius)
+  $patchFrac = Clamp $patchFracRaw ([double]$topo.patchFracMin) ([double]$topo.patchFracMax)
+  $patchFracHeat = Clamp $patchFracRaw ([double]$topo.patchFracHeatMin) ([double]$topo.patchFracMax)
+  $patchHeatScale = Clamp ($patchFracHeat / [math]::Max(0.05, [double]$topo.patchFracRef)) 0.40 1.20
   $freeBeltCoolBias = 1.0 + (1.0 - $patchFrac) * ([double]$topo.freeBeltCoolMult - 1.0)
 
   $propAbs = [math]::Abs($propNm)
