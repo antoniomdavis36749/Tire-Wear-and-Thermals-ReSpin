@@ -286,6 +286,7 @@ local scratchCarcassWeights = { 0, 0, 0 }
     PROFILE_POINTS          tread 0.30/0.40/0.50/0.60/0.70/0.80/0.85/0.90/1.00
                             sport_plus → sport_tour → sport → standard → …
     SLICK_SPECTRUM_POINTS   softness 0.50/0.575/0.65/0.725/0.80
+                            (JBeam soft 0.5/0.8/1.0 remapped onto hard/med/soft anchors)
     UTILITY_SPECTRUM        tread 0.50/0.60/0.70/0.85/0.95
     COMMERCIAL_SPECTRUM     tread 0.50/0.60/0.70/0.80/0.90
     ATV_UTV_SPECTRUM        tread 0.50/0.60/0.70/0.85
@@ -1285,81 +1286,11 @@ local cachedRallyDamper = nil
 local lastTrackEnvMailbox = nil
 local lastEnvMailbox = nil
 
--- Forward declarations of local functions to ensure proper lexical scope and prevent global lookup errors
-local sanitizeEnvTemp
-local GetGroundModelData
-local setGroundModels
-local CalcBiasWeights
-local CalcPressureGripScales
-local ensureTempNodes
-local TempRingsToAvgTemp
-local TempCarcassToAvgTemp
-local EffectiveTyreTemp
-local getWheelJBeamData
-local collectBaseWheelFactors
-local getNativeBrakeTemps
-local getNativeGroupPressurePSI
-local getFreestreamAirspeed
-local updateWheelSuspension
-local tempDistToWearMult
-local getTrackTemp
-local getTirePartName
-local vehicleHasPlainRallyDamper
-local getVehicleType
-local getInterpolatedProfile
-local initTyreData
-local CalcTyreWear
-local getProfileBaselineGrip
-local CalculateTyreGrip
-local classifySurfaceGrip
-local getSurfaceSanityScale
-local fillSurfaceFlags
-local resolveWheelSurface
-local surfaceFlagsFromType
-local applyProfileSurfaceBias
-local initGuiStream
-local update
-local updateGFX
-local prepareWheelFrame
-local runFixedPhysicsSteps
-local flushGuiStream
-local writeTelemetryIfEnabled
-local onInit
-local onReset
-local onSettingsChanged
-local calculateWheelAlignment
-local sampleContactSurfaceNormal
-local interpolateSpectrum
-local copyMods
-local normalizeProfileMods
-local getProfileThermalGrip
-local getBrakeDuctPercent
-local ductPercentToFactors
-local getVehicleAirspeedRef
-local refreshDraftCompat
-local updateInferredNativeWake
-local setDraftWake
-local decayDraftWake
-local deflateTireCompat
-local applyPressureLeakPa
-local applyHotPressureWriteback
-local isTirePressureInflateActive
-local applyWheelFriction
-local isSpareOrAccessoryTireName
-local getTelemetryIo
-local ensureTelemetryHeader
-local clearTelemetryCsvBuffer
-local flushTelemetryBuffer
-local telemetryBufferNeedsFlush
-local writeTelemetryArmMarker
-local clearTelemetryArmMarker
-local appendTelemetryResetMarker
-local restoreTelemetryAfterReload
-local onDeserialized
-local onExtensionUnloaded
+-- Function table: one chunk local instead of N forward decls (Lua ~200 local cap)
+local F = {}
 
 -- Dynamic Spectrum Interpolator Helper (0-Allocation In-Place Table Updates)
-interpolateSpectrum = function(spectrum, searchKey, value, targetTable)
+F.interpolateSpectrum = function(spectrum, searchKey, value, targetTable)
     local p1, p2
     value = tonumber(value) or 0
     if value ~= value then value = 0 end -- Safe NaN check
@@ -1409,40 +1340,16 @@ interpolateSpectrum = function(spectrum, searchKey, value, targetTable)
 end
 
 -- Helper to safely clear and copy table values in-place without allocations
-copyMods = function(src, target)
+F.copyMods = function(src, target)
     local t = target or {}
     for k in pairs(t) do t[k] = nil end
     for k, v in pairs(src) do t[k] = v end
     return t
 end
 
--- Migrates legacy profile keys and fills missing high-value knobs (keeps spectrum interpolation stable)
-normalizeProfileMods = function(mods)
+-- Fills missing knobs from DEFAULT_MODS (keeps spectrum interpolation stable)
+F.normalizeProfileMods = function(mods)
     if type(mods) ~= "table" then return mods end
-
-    -- Merge dual conductance into single skinCoreConductance
-    if mods.skinCoreConductance == nil then
-        local a = mods.skinToCoreRate
-        local b = mods.coreToSkinRate
-        if a or b then
-            mods.skinCoreConductance = ((a or b or 0.068) + (b or a or 0.068)) * 0.5
-        else
-            mods.skinCoreConductance = DEFAULT_MODS.skinCoreConductance
-        end
-    end
-    mods.skinToCoreRate = nil
-    mods.coreToSkinRate = nil
-    mods.coreReactionRate = nil -- global CORE_REACTION_RATE
-
-    -- Split thermalInertia into tread/carcass masses
-    if mods.treadInertia == nil or mods.carcassInertia == nil then
-        local ti = mods.thermalInertia or ((mods.treadInertia or DEFAULT_MODS.treadInertia) / 0.42)
-        if mods.treadInertia == nil then mods.treadInertia = ti * 0.42 end
-        if mods.carcassInertia == nil then mods.carcassInertia = ti * 0.68 end
-    end
-    mods.thermalInertia = nil
-
-    -- Fill any missing new-schema keys from defaults (interpolated tables already have them)
     for k, v in pairs(DEFAULT_MODS) do
         if mods[k] == nil then mods[k] = v end
     end
@@ -1451,7 +1358,7 @@ end
 
 -- Plateau-Gaussian thermal grip from profile knobs (single source of truth with optimalTemp)
 -- Cold side uses a softer exponent so street/sport compounds are not cliffed below ~40C.
-getProfileThermalGrip = function(mods, temp, compliance, softness)
+F.getProfileThermalGrip = function(mods, temp, compliance, softness)
     temp = temp or 21
     compliance = compliance or 0.5
     softness = softness or 0.5
@@ -1473,7 +1380,7 @@ end
 
 -- Cleanly filters ambient temperature. BeamNG native env is Kelvin; mailboxes are usually Celsius.
 -- Never silently treat hot desert Celsius (e.g. 48C) as Fahrenheit.
-sanitizeEnvTemp = function(rawTemp)
+F.sanitizeEnvTemp = function(rawTemp)
     if not rawTemp then return 21 end
     local temp = tonumber(rawTemp) or 21
     -- Kelvin from obj:getEnvTemperature or GE absolute scale
@@ -1485,7 +1392,7 @@ end
 
 local DOESNT_EXIST_DATA = { name = "DOESNT EXIST", nameLower = "doesnt exist", staticFrictionCoefficient = 1, slidingFrictionCoefficient = 1 }
 
-GetGroundModelData = function(id)
+F.GetGroundModelData = function(id)
     if not id then return "DOESNT EXIST", DOESNT_EXIST_DATA end
     if groundModelsLut[id] then return groundModelsLut[id].name, groundModelsLut[id] end
 
@@ -1510,12 +1417,12 @@ GetGroundModelData = function(id)
     return name, data
 end
 
-setGroundModels = function(data)
+F.setGroundModels = function(data)
     groundModels = data or {}
     groundModelsLut = {} -- Invalidate LUT cache to force evaluation under the new environment
 end
 
-CalcBiasWeights = function(loadBias, pressureRatio)
+F.CalcBiasWeights = function(loadBias, pressureRatio)
     local dampedBias = loadBias * 0.40
     local weightLeft = max(0.15, -0.75 * dampedBias + 1)
     local weightRight = max(0.15, 0.75 * dampedBias + 1)
@@ -1544,7 +1451,7 @@ end
 
 -- Three-band pressure→grip: neutral deadband, wide mild normal (asymmetric over), progressive outer.
 -- pOffset = currentPSI/optimalPressure - 1. Returns longScale, latScale.
-CalcPressureGripScales = function(pOffset, sensitivity, isLooseSurface)
+F.CalcPressureGripScales = function(pOffset, sensitivity, isLooseSurface)
     local sens = max(0.05, sensitivity or 0.5)
     if isLooseSurface then
         -- Loose: keep under-inflation flotation; over uses same banded outer as paved
@@ -1595,7 +1502,7 @@ CalcPressureGripScales = function(pOffset, sensitivity, isLooseSurface)
 end
 
 -- Migrate legacy 5-node tables (skin×3, core, air) → 8-node in place
-ensureTempNodes = function(temps, envTemp)
+F.ensureTempNodes = function(temps, envTemp)
     envTemp = envTemp or ENV_TEMP
     if type(temps) ~= "table" then
         return { envTemp, envTemp, envTemp, envTemp, envTemp, envTemp, envTemp, envTemp }
@@ -1618,24 +1525,24 @@ ensureTempNodes = function(temps, envTemp)
     return temps
 end
 
-TempRingsToAvgTemp = function(temps, loadBias, pressureRatio, localEnvTemp)
+F.TempRingsToAvgTemp = function(temps, loadBias, pressureRatio, localEnvTemp)
     local fallbackEnv = localEnvTemp or ENV_TEMP
     if not temps then return fallbackEnv end
-    local wLeft, wCenter, wRight = CalcBiasWeights(loadBias, pressureRatio)
+    local wLeft, wCenter, wRight = F.CalcBiasWeights(loadBias, pressureRatio)
     return (temps[1] or fallbackEnv) * wLeft + (temps[2] or fallbackEnv) * wCenter + (temps[3] or fallbackEnv) * wRight
 end
 
-TempCarcassToAvgTemp = function(temps, loadBias, pressureRatio, localEnvTemp)
+F.TempCarcassToAvgTemp = function(temps, loadBias, pressureRatio, localEnvTemp)
     local fallbackEnv = localEnvTemp or ENV_TEMP
     if not temps then return fallbackEnv end
-    local wLeft, wCenter, wRight = CalcBiasWeights(loadBias, pressureRatio)
+    local wLeft, wCenter, wRight = F.CalcBiasWeights(loadBias, pressureRatio)
     return (temps[4] or fallbackEnv) * wLeft + (temps[5] or fallbackEnv) * wCenter + (temps[6] or fallbackEnv) * wRight
 end
 
 -- Skin-led grip thermometer with carcass lag; cold → more carcass weight (P2)
-EffectiveTyreTemp = function(temps, loadBias, pressureRatio, localEnvTemp, mods)
-    local skin = TempRingsToAvgTemp(temps, loadBias, pressureRatio, localEnvTemp)
-    local carcass = TempCarcassToAvgTemp(temps, loadBias, pressureRatio, localEnvTemp)
+F.EffectiveTyreTemp = function(temps, loadBias, pressureRatio, localEnvTemp, mods)
+    local skin = F.TempRingsToAvgTemp(temps, loadBias, pressureRatio, localEnvTemp)
+    local carcass = F.TempCarcassToAvgTemp(temps, loadBias, pressureRatio, localEnvTemp)
     local topo = THERMAL_TOPOLOGY
     local blend = topo.gripBlendWarm
     if mods then
@@ -1649,12 +1556,12 @@ EffectiveTyreTemp = function(temps, loadBias, pressureRatio, localEnvTemp, mods)
     return skin * (1.0 - blend) + carcass * blend
 end
 
-tempDistToWearMult = function(tempDist)
+F.tempDistToWearMult = function(tempDist)
     return -1.8 / (1 + 0.01 * (tempDist * (tempDist or 1))) + 2.8
 end
 
 -- Track surface temperature: asphalt often runs well above air in sun (+20–35C typical)
-getTrackTemp = function(envTemp, tod, cloudCover)
+F.getTrackTemp = function(envTemp, tod, cloudCover)
     tod = tod or 0.5
     if tod > 1.0 then tod = tod / 24.0 end
     
@@ -1676,7 +1583,7 @@ end
 
 -- Tuning-menu brake duct opening (1%=closed / stock, 100%=fully open)
 -- Source priority: mailbox from GE createbrakeductsliders → v.data.variables → default
-getBrakeDuctPercent = function(isFront)
+F.getBrakeDuctPercent = function(isFront)
     local idx = isFront and 1 or 2
     local key = isFront and "$WheelCoolingDuctFront" or "$WheelCoolingDuctRear"
     if v and v.data and type(v.data.variables) == "table" then
@@ -1697,7 +1604,7 @@ end
 -- Returns: ductAirCoolFactor, ductSoakCondFactor, open01
 --   ductAirCoolFactor  — freestream cooling on skin / carcass / rim (1.0→MAX @ open)
 --   ductSoakCondFactor — brake→rim soak + rim↔carcass conduction (1.15 closed → 0.85 open)
-ductPercentToFactors = function(ductPct)
+F.ductPercentToFactors = function(ductPct)
     local open = max(0, min(1, (ductPct - 1) / 99)) -- 1→0, 100→1
     local ductAirCoolFactor = lerp(1.0, MAX_DUCT_AIR_FACTOR, open)
     local ductSoakCondFactor = lerp(1.15, 0.85, open)
@@ -1705,7 +1612,7 @@ ductPercentToFactors = function(ductPct)
 end
 
 -- Raw pressureWheels / rotators JBeam row for this wheel
-getWheelJBeamData = function(wd)
+F.getWheelJBeamData = function(wd)
     if not wd or not v or not v.data or type(v.data.wheels) ~= "table" then return nil end
     local row = v.data.wheels[wd.cid]
     if type(row) == "table" then return row end
@@ -1717,8 +1624,8 @@ getWheelJBeamData = function(wd)
 end
 
 -- One-shot cache of stock BeamNG tyre/brake construction factors
-collectBaseWheelFactors = function(wd)
-    local jb = getWheelJBeamData(wd) or {}
+F.collectBaseWheelFactors = function(wd)
+    local jb = F.getWheelJBeamData(wd) or {}
     local frictionCoef = tonumber(wd.frictionCoef) or tonumber(jb.frictionCoef) or 1.0
     local slidingFrictionCoef = tonumber(wd.slidingFrictionCoef) or tonumber(jb.slidingFrictionCoef) or frictionCoef
     local noLoadCoef = tonumber(wd.noLoadCoef) or tonumber(jb.noLoadCoef) or 1.0
@@ -1778,7 +1685,7 @@ collectBaseWheelFactors = function(wd)
 end
 
 -- Native brake surface/core temps (wheels.lua → electrics.wheelThermals + live wd fields)
-getNativeBrakeTemps = function(wd, envTemp)
+F.getNativeBrakeTemps = function(wd, envTemp)
     envTemp = envTemp or ENV_TEMP
     local surface, core = envTemp, envTemp
     if wd then
@@ -1801,7 +1708,7 @@ getNativeBrakeTemps = function(wd, envTemp)
     return surface, core
 end
 
-getFreestreamAirspeed = function()
+F.getFreestreamAirspeed = function()
     local ev = electrics and electrics.values
     if not ev then return 0 end
     -- Brake thermals use airflowspeed; fall back to airspeed
@@ -1809,7 +1716,7 @@ getFreestreamAirspeed = function()
     return max(0, a)
 end
 
-getVehicleAirspeedRef = function()
+F.getVehicleAirspeedRef = function()
     local ev = electrics and electrics.values
     if ev then
         local a = tonumber(ev.airspeed)
@@ -1828,7 +1735,7 @@ getVehicleAirspeedRef = function()
 end
 
 -- Recompute pack-air / convection vs native 0.39 interAero.
-refreshDraftCompat = function()
+F.refreshDraftCompat = function()
     if draft.hasNativeInterAero then
         -- Drag/cooling freestream already handled by setWindAero → airflowspeed.
         draft.convectionMult = 1.0
@@ -1842,13 +1749,13 @@ refreshDraftCompat = function()
 end
 
 -- Infer wake shelter from native aero: airflowspeed drops vs vehicle airspeed in a tow.
-updateInferredNativeWake = function(dt)
+F.updateInferredNativeWake = function(dt)
     if not draft.hasNativeInterAero then
         draft.inferredWake = 0
         return
     end
-    local spd = getVehicleAirspeedRef()
-    local air = getFreestreamAirspeed()
+    local spd = F.getVehicleAirspeedRef()
+    local air = F.getFreestreamAirspeed()
     local target = 0
     if spd >= draft.inferMinSpeed then
         local deadband = max(draft.inferDeadbandMin, spd * draft.inferDeadband)
@@ -1865,30 +1772,30 @@ end
 
 -- Optional legacy companion (LuuksDraftingMod). On 0.39+, convection cut is ignored;
 -- airTempDelta can still raise pack ambient if stronger than inference.
-setDraftWake = function(wake, side, push, airTempDelta)
+F.setDraftWake = function(wake, side, push, airTempDelta)
     draft.wake = max(0, min(1, tonumber(wake) or 0))
     draft.side = max(0, min(1, tonumber(side) or 0))
     draft.push = max(0, min(1, tonumber(push) or 0))
     draft.airTempDelta = max(0, min(draft.airTempCap, tonumber(airTempDelta) or 0))
     draft.coolingWake = max(draft.wake, draft.side * 0.7, draft.push * 0.25)
     draft.lastRxClock = os.clock()
-    refreshDraftCompat()
+    F.refreshDraftCompat()
 end
 
-decayDraftWake = function(dt)
-    updateInferredNativeWake(dt)
+F.decayDraftWake = function(dt)
+    F.updateInferredNativeWake(dt)
 
     if draft.coolingWake <= 0 and draft.airTempDelta <= 0 then
         if not draft.hasNativeInterAero then
             draft.convectionMult = 1.0
             draft.airTempEffective = 0
         else
-            refreshDraftCompat()
+            F.refreshDraftCompat()
         end
         return
     end
     if (os.clock() - draft.lastRxClock) < draft.staleSec then
-        refreshDraftCompat()
+        F.refreshDraftCompat()
         return
     end
     local k = min(1.0, (dt or 0.05) * 3.0)
@@ -1900,11 +1807,11 @@ decayDraftWake = function(dt)
     if draft.coolingWake < 0.001 then
         draft.wake, draft.side, draft.push, draft.coolingWake, draft.airTempDelta = 0, 0, 0, 0, 0
     end
-    refreshDraftCompat()
+    F.refreshDraftCompat()
 end
 
 -- Prefer wheels.deflateTire (0.39 surface) then beamstate fallback
-deflateTireCompat = function(wheelID)
+F.deflateTireCompat = function(wheelID)
     if wheels and type(wheels.deflateTire) == "function" then
         wheels.deflateTire(wheelID)
         return true
@@ -1930,7 +1837,7 @@ local susp = {  -- packed: frees 4 main-chunk locals
     rideAdapt = 0.55,    -- 1/s adaptive ride-height rate when settled
 }
 
-updateWheelSuspension = function(w, data, wd, dt, invQuat, upVector)
+F.updateWheelSuspension = function(w, data, wd, dt, invQuat, upVector)
     w.suspensionVelocity = 0
     w.suspensionDeflection = 0
     w.suspCompression = 0
@@ -2015,7 +1922,7 @@ end
 -- Progressive pressure leak via BeamNG native pressure-group API.
 -- Used for ReSpin-owned thermal/wear leaks ONLY. Spike-strip / wd.isPunctured
 -- leaks are owned by stock wheels.lua — never call this while isPunctured.
-applyPressureLeakPa = function(wd, leakPaPerSec, dt)
+F.applyPressureLeakPa = function(wd, leakPaPerSec, dt)
     if not wd or leakPaPerSec <= 0 or not obj then return nil end
     -- Native owns spike/puncture setGroupPressure while isPunctured (wheels.lua).
     if wd.isPunctured then return nil end
@@ -2033,7 +1940,7 @@ applyPressureLeakPa = function(wd, leakPaPerSec, dt)
 end
 
 -- Gauge PSI from native pressure group (absolute Pa → PSI). nil if unavailable.
-getNativeGroupPressurePSI = function(wd)
+F.getNativeGroupPressurePSI = function(wd)
     if not wd or not obj or type(obj.getGroupPressure) ~= "function" then return nil end
     if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
     local pg = v.data.pressureGroups[wd.pressureGroup]
@@ -2044,7 +1951,7 @@ getNativeGroupPressurePSI = function(wd)
 end
 
 -- True when TPMS / tirePressureControl / inflate electrics look active (don't fight user/AI fill).
-isTirePressureInflateActive = function()
+F.isTirePressureInflateActive = function()
     local ev = electrics and electrics.values
     if not ev then return false end
     if ev.tireInflating or ev.tirePressureInflating then return true end
@@ -2058,7 +1965,7 @@ end
 
 -- Rate-limited Gay-Lussac hot absolute Pa → native pressure group (soft-body stiffness).
 -- Deadband skips tiny deltas; min floor matches BeamNG puncture path. nil if unavailable / no-op.
-applyHotPressureWriteback = function(wd, targetAbsPa, dt, maxPsiPerSec, deadbandPsi)
+F.applyHotPressureWriteback = function(wd, targetAbsPa, dt, maxPsiPerSec, deadbandPsi)
     if not wd or not obj or type(targetAbsPa) ~= "number" or not dt or dt <= 0 then return nil end
     if type(obj.getGroupPressure) ~= "function" or type(obj.setGroupPressure) ~= "function" then return nil end
     if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
@@ -2083,7 +1990,7 @@ applyHotPressureWriteback = function(wd, targetAbsPa, dt, maxPsiPerSec, deadband
 end
 
 -- Safe 8-arg friction API (BeamNG stage2 signature; ignore legacy 9th arg)
-applyWheelFriction = function(wheel, longGrip, latGrip)
+F.applyWheelFriction = function(wheel, longGrip, latGrip)
     if not wheel or type(wheel.setFrictionThermalSensitivity) ~= "function" then return end
     local mid = (longGrip + latGrip) * 0.5
     -- Disable native thermal curve; grip comes from this mod
@@ -2092,7 +1999,7 @@ end
 
 -- Translates the wheel index position (e.g., "FL") to its actual active JBeam part name (Compatible with 0.35+)
 -- Skips trunk/side spare parts — those contain "tire"/"spare" and were stealing classification from road tires.
-isSpareOrAccessoryTireName = function(pLower)
+F.isSpareOrAccessoryTireName = function(pLower)
     pLower = pLower or ""
     -- plain find: avoid pattern surprises; match common BeamNG spare slot/part names
     if string.find(pLower, "spare", 1, true) then return true end
@@ -2102,7 +2009,7 @@ isSpareOrAccessoryTireName = function(pLower)
     return false
 end
 
-getTirePartName = function(wheelName)
+F.getTirePartName = function(wheelName)
     local nameLower = string.lower(tostring(wheelName or ""))
     local isFront = string.match(nameLower, "^f")
     local isRear = string.match(nameLower, "^r")
@@ -2122,7 +2029,7 @@ getTirePartName = function(wheelName)
         if not string.find(pLower, "tire", 1, true) and not string.find(pLower, "tyre", 1, true) then
             return -1
         end
-        if isSpareOrAccessoryTireName(pLower) then return -1 end
+        if F.isSpareOrAccessoryTireName(pLower) then return -1 end
 
         local score = 10
         -- Axle-slot naming: tire_F_* = front, tire_R_* = rear (BeamNG common tires)
@@ -2175,7 +2082,7 @@ end
 -- Vivace Ardente race mounts vivace_suspension_*_rally + vivace_rally_coilover_*_track —
 -- suspension_*_rally previously forced tarmac_rally despite track-spec coilovers.
 -- Also ignore strut_bar / strutbrace (anti-roll braces, not dampers).
-vehicleHasPlainRallyDamper = function()
+F.vehicleHasPlainRallyDamper = function()
     if cachedRallyDamper ~= nil then return cachedRallyDamper end
     local found = false
     local activeParts = v and v.data and (v.data.activePartsData or v.data.activeParts)
@@ -2217,7 +2124,7 @@ vehicleHasPlainRallyDamper = function()
 end
 
 local typeRetryCount = 0
-getVehicleType = function()
+F.getVehicleType = function()
     if cachedVehicleType then return cachedVehicleType end
     local vehType = "passenger_car"
     
@@ -2242,8 +2149,23 @@ getVehicleType = function()
     return cachedVehicleType or vehType
 end
 
+-- BeamNG race tires often ship softnessCoef=1.0 (and discrete 0.5/0.8/1.0 tiers).
+-- Densified SLICK_SPECTRUM_POINTS live in 0.50–0.80; remap common JBeam values onto that band.
+-- Soft=0 / very low floors to hard (do not treat fantasy 0 as soft). Continuous midpoints
+-- already in 0.50–0.80 (0.575/0.725/…) keep interpolating unchanged.
+F.remapSlickSoftness = function(softnessCoef)
+    local s = tonumber(softnessCoef) or 0.5
+    if s ~= s then s = 0.5 end
+    if s >= 0.99 then return 0.80 end                 -- 1.0 and above → soft anchor
+    if abs(s - 0.8) <= 0.012 then return 0.65 end      -- ~0.8 → medium anchor
+    if s >= 0.50 and s <= 0.80 then return s end       -- densified continuum
+    if s < 0.50 then return 0.50 end                  -- hard floor (incl. soft=0)
+    -- (0.80, 0.99): approach soft from medium
+    return 0.65 + ((s - 0.80) / 0.19) * 0.15
+end
+
 -- Hybrid Profile Resolving Engine (With Dynamic Dimensional Scaling & All Continuous Spectrums)
-getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable, radius, width, hubRadius)
+F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable, radius, width, hubRadius)
     treadCoef, softnessCoef = treadCoef or 0.5, softnessCoef or 0.5
     local nameLower = string.lower(tostring(tireName or ""))
     local mods = targetTable or {}
@@ -2253,7 +2175,7 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
     local hr = max(0.05, min(r - 0.01, hubRadius or (r * 0.65)))
     local sidewall = r - hr
     
-    local vehType = getVehicleType()
+    local vehType = F.getVehicleType()
     local isHeavyCommercialName = string.find(nameLower, "22.5") or string.find(nameLower, "19.5") or string.find(nameLower, "24.5") or string.find(nameLower, "steer") or string.find(nameLower, "drive") or string.find(nameLower, "semi")
     local isCommercialTire = (vehType == "semi_truck" or vehType == "medium_duty") or (radius and radius >= 0.44 and width and width >= 0.22) or (isHeavyCommercialName and radius and radius >= 0.40)
     local isUtilityTire = not isCommercialTire and ((vehType == "light_truck") or (radius and radius >= 0.36 and radius < 0.44))
@@ -2278,13 +2200,19 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
     local isGravelRallyName = string.find(nameLower, "rally", 1, true) and not isAsphaltName
     local isSlickName = string.find(nameLower, "slick", 1, true)
     local isRaceName = string.find(nameLower, "race", 1, true)
-    local isRaceOrSlickName = isSlickName or isRaceName
-    local isRaceLikeName = isRaceOrSlickName or treadCoef <= 0.12
+    -- Bare "race" in the name does NOT force slick when tread is clearly street (≥~0.35).
+    -- Stronger evidence still forces: slick token, low tread, or gt3/gt4/formula/retro|modernrace.
+    local isRaceLikeName = isSlickName or treadCoef <= 0.12
+        or string.find(nameLower, "gt3", 1, true) or string.find(nameLower, "gt4", 1, true)
+        or string.find(nameLower, "formula", 1, true)
+        or string.find(nameLower, "retrorace", 1, true)
+        or string.find(nameLower, "modernrace", 1, true)
+        or (isRaceName and treadCoef < 0.35)
     -- Damper is weak evidence: requires race name + not already a clear circuit slick.
     local hasPlainRallyDamper = false
     local isDamperTarmacHint = false
     if not isAsphaltName and not isAsphaltRallyRaceSku then
-        hasPlainRallyDamper = vehicleHasPlainRallyDamper()
+        hasPlainRallyDamper = F.vehicleHasPlainRallyDamper()
         isDamperTarmacHint = isRaceName and not isSlickName
             and not isGravelRallyName and not string.find(nameLower, "gravel", 1, true)
             and hasPlainRallyDamper
@@ -2299,54 +2227,55 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
     -- Vintage before spare: spare slots often contain "tire" and used to win incorrectly.
     local purpose, classifyReason = "street", "street_spectrum"
     if string.find(nameLower, "crawler") or string.find(nameLower, "beadlock") then
-        rawProfile1, rawProfile2, interpFactor = "crawler", "crawler", 0; copyMods(STANDALONE_MODIFIERS.crawler, mods)
+        rawProfile1, rawProfile2, interpFactor = "crawler", "crawler", 0; F.copyMods(STANDALONE_MODIFIERS.crawler, mods)
         purpose, classifyReason = "utility", "standalone_crawler"
     elseif string.find(nameLower, "paddle") or string.find(nameLower, "sand") then
-        rawProfile1, rawProfile2, interpFactor = "paddle", "paddle", 0; copyMods(STANDALONE_MODIFIERS.paddle, mods)
+        rawProfile1, rawProfile2, interpFactor = "paddle", "paddle", 0; F.copyMods(STANDALONE_MODIFIERS.paddle, mods)
         purpose, classifyReason = "utility", "standalone_paddle"
     elseif isRallyAsphaltMount then
-        rawProfile1, rawProfile2, interpFactor = "rally", "rally", 0; copyMods(STANDALONE_MODIFIERS.rally, mods)
+        rawProfile1, rawProfile2, interpFactor = "rally", "rally", 0; F.copyMods(STANDALONE_MODIFIERS.rally, mods)
         purpose, classifyReason = "tarmac_rally", tarmacClassifyReason or "rally_damper"
     elseif isGravelRallyName then
-        rawProfile1, rawProfile2, interpFactor = "rally", "rally", 0; copyMods(STANDALONE_MODIFIERS.rally, mods)
+        rawProfile1, rawProfile2, interpFactor = "rally", "rally", 0; F.copyMods(STANDALONE_MODIFIERS.rally, mods)
         purpose, classifyReason = "gravel", "gravel_name"
     elseif string.find(nameLower, "winter") or string.find(nameLower, "snow") then
-        rawProfile1, rawProfile2, interpFactor = "winter", "winter", 0; copyMods(STANDALONE_MODIFIERS.winter, mods)
+        rawProfile1, rawProfile2, interpFactor = "winter", "winter", 0; F.copyMods(STANDALONE_MODIFIERS.winter, mods)
         purpose, classifyReason = "winter", "standalone_winter"
     elseif string.find(nameLower, "vintage") or string.find(nameLower, "biasply") or string.find(nameLower, "bias_ply") or string.find(nameLower, "whitewall") then
-        rawProfile1, rawProfile2, interpFactor = "vintage", "vintage", 0; copyMods(STANDALONE_MODIFIERS.vintage, mods)
+        rawProfile1, rawProfile2, interpFactor = "vintage", "vintage", 0; F.copyMods(STANDALONE_MODIFIERS.vintage, mods)
         purpose, classifyReason = "street", "standalone_vintage"
     elseif string.find(nameLower, "donut") or string.find(nameLower, "spare") then
-        rawProfile1, rawProfile2, interpFactor = "donut", "donut", 0; copyMods(STANDALONE_MODIFIERS.donut, mods)
+        rawProfile1, rawProfile2, interpFactor = "donut", "donut", 0; F.copyMods(STANDALONE_MODIFIERS.donut, mods)
         purpose, classifyReason = "utility", "standalone_donut"
     elseif string.find(nameLower, "rain") or string.find(nameLower, "wet") or string.find(nameLower, "inter") then
-        rawProfile1, rawProfile2, interpFactor = "rain", "rain", 0; copyMods(STANDALONE_MODIFIERS.rain, mods)
+        rawProfile1, rawProfile2, interpFactor = "rain", "rain", 0; F.copyMods(STANDALONE_MODIFIERS.rain, mods)
         purpose, classifyReason = "wet", "standalone_rain"
     elseif string.find(nameLower, "drag") then
-        rawProfile1, rawProfile2, interpFactor = "drag", "drag", 0; copyMods(STANDALONE_MODIFIERS.drag, mods)
+        rawProfile1, rawProfile2, interpFactor = "drag", "drag", 0; F.copyMods(STANDALONE_MODIFIERS.drag, mods)
         purpose, classifyReason = "drag", "standalone_drag"
     elseif string.find(nameLower, "drift") then
-        rawProfile1, rawProfile2, interpFactor = "drift", "drift", 0; copyMods(STANDALONE_MODIFIERS.drift, mods)
+        rawProfile1, rawProfile2, interpFactor = "drift", "drift", 0; F.copyMods(STANDALONE_MODIFIERS.drift, mods)
         purpose, classifyReason = "drift", "standalone_drift"
     elseif isRaceLikeName and not string.find(nameLower, "gravel", 1, true) then
-        local sc = max(0.50, min(0.80, softnessCoef)) -- Simplified slicks range (Hard/Medium/Soft)
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(SLICK_SPECTRUM_POINTS, "softness", sc, mods)
+        -- Remap BeamNG 0.5/0.8/1.0 soft tiers onto densified 0.50/0.65/0.80 spectrum
+        local sc = F.remapSlickSoftness(softnessCoef)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(SLICK_SPECTRUM_POINTS, "softness", sc, mods)
         purpose, classifyReason = "circuit", "slick_spectrum"
     elseif isCommercialTire then
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(COMMERCIAL_SPECTRUM_POINTS, "tread", max(0.50, min(0.90, treadCoef)), mods)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(COMMERCIAL_SPECTRUM_POINTS, "tread", max(0.50, min(0.90, treadCoef)), mods)
         purpose, classifyReason = "commercial", "commercial_spectrum"
     elseif isVintageTire then
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(VINTAGE_SPECTRUM_POINTS, "tread", max(0.50, min(0.65, treadCoef)), mods)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(VINTAGE_SPECTRUM_POINTS, "tread", max(0.50, min(0.65, treadCoef)), mods)
         purpose, classifyReason = "street", "vintage_spectrum"
     elseif isUtilityTire then
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(UTILITY_SPECTRUM_POINTS, "tread", max(0.50, min(0.95, treadCoef)), mods)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(UTILITY_SPECTRUM_POINTS, "tread", max(0.50, min(0.95, treadCoef)), mods)
         purpose, classifyReason = "utility", "utility_spectrum"
     elseif isUTVTire then
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(ATV_UTV_SPECTRUM_POINTS, "tread", max(0.50, min(0.85, treadCoef)), mods)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(ATV_UTV_SPECTRUM_POINTS, "tread", max(0.50, min(0.85, treadCoef)), mods)
         purpose, classifyReason = "utility", "utv_spectrum"
     else
         -- Spectrum path updated to re-aligned discrete JBeam increments
-        rawProfile1, rawProfile2, interpFactor = interpolateSpectrum(PROFILE_POINTS, "tread", max(0.30, min(1, treadCoef)), mods)
+        rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(PROFILE_POINTS, "tread", max(0.30, min(1, treadCoef)), mods)
         if string.find(nameLower, "gravel", 1, true) and treadCoef > 0.78 then
             purpose, classifyReason = "gravel", "gravel_mt_name"
         else
@@ -2354,8 +2283,8 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
         end
     end
 
-    -- Ensure schema is current before dimensional scaling (legacy key migration + defaults)
-    normalizeProfileMods(mods)
+    -- Fill any missing knobs from DEFAULT_MODS before dimensional scaling
+    F.normalizeProfileMods(mods)
 
     -- DYNAMIC DIMENSIONAL SCALING SYSTEM (Intersects all compiled mods via realistic volumetric ratios)
     local REF_RADIUS, REF_WIDTH, REF_SIDEWALL = 0.315, 0.205, 0.112
@@ -2409,8 +2338,8 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
         descriptor = "Drag"
     elseif string.find(nameLower, "drift") then 
         descriptor = "Drift"
-    elseif string.find(nameLower, "slick") or string.find(nameLower, "race") or treadCoef <= 0.15 then
-        -- Explicit early sorting to identify base-game Slick / Race JBeams
+    elseif isRaceLikeName or treadCoef <= 0.15 then
+        -- Slick / low-tread / strong race tokens (bare "race" + street tread stays continuum)
         descriptor = "Slick"
     elseif isCommercialTire then
         descriptor = (treadCoef > 0.78) and "Mud-Terrain" or "Standard"
@@ -2464,7 +2393,7 @@ getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable
     return rawProfile1, rawProfile2, interpFactor, mods
 end
 
-initTyreData = function()
+F.initTyreData = function()
     if not wheels or not wheels.wheelRotators then return end
     tyreData = {}
     cachedRallyDamper = nil -- re-probe on part reload / re-init
@@ -2478,7 +2407,7 @@ initTyreData = function()
 
     for i, wd in pairs(wheels.wheelRotators) do
         local wheelName = wd.name or "unknown"
-        local tirePartName = getTirePartName(wheelName)
+        local tirePartName = F.getTirePartName(wheelName)
         local treadCoef, softnessCoef = wd.treadCoef or 0.5, wd.softnessCoef or 0.5
         local radius = wd.radius or 0.3
         local width = wd.tireWidth or wd.tyreWidth or wd.width or 0.2
@@ -2486,7 +2415,7 @@ initTyreData = function()
         
         -- Resolve and permanently cache the static profile configuration to save CPU cycles
         local initialMods = {}
-        local p1, p2, factor, mods = getInterpolatedProfile(treadCoef, softnessCoef, tirePartName, initialMods, radius, width, hubRadius)
+        local p1, p2, factor, mods = F.getInterpolatedProfile(treadCoef, softnessCoef, tirePartName, initialMods, radius, width, hubRadius)
         local optTemp = mods and mods.optimalTemp or WORKING_TEMP
         
         -- Slicks: mild blanket preheat. Street: partial ambient→opt soak (sun/garage).
@@ -2498,14 +2427,14 @@ initTyreData = function()
         local coldPSI = max(1.0, wd.pressure or 25.0)
         -- Prefer live pressure-group fill when available (matches stock TPMS / cold set)
         do
-            local nativeCold = getNativeGroupPressurePSI(wd)
+            local nativeCold = F.getNativeGroupPressurePSI(wd)
             if nativeCold then coldPSI = max(1.0, nativeCold) end
         end
         
         -- Axle side from wheel rotator name (FL/FR/RL/RR), not tire part (tire_R_* is rear axle compound)
         local wheelNameLower = string.lower(tostring(wheelName))
         local isFront = not not string.match(wheelNameLower, "^f")
-        local baseFactors = collectBaseWheelFactors(wd)
+        local baseFactors = F.collectBaseWheelFactors(wd)
 
         tyreData[i] = {
             working_temp = optTemp,
@@ -2545,7 +2474,7 @@ end
 
 -- Contact-patch surface normal (world), matching advancedwheeldebug's mapmgr path.
 -- Returns nx,ny,nz or nil. Rejects failed probes that fall back to gravity-up on a bank.
-sampleContactSurfaceNormal = function(wd, pos1, pos2, upVector)
+F.sampleContactSurfaceNormal = function(wd, pos1, pos2, upVector)
     local mm = rawget(_G, "mapmgr")
     if not mm or type(mm.surfaceNormalBelow) ~= "function" then return nil end
     if not obj or type(obj.getPosition) ~= "function" then return nil end
@@ -2591,7 +2520,7 @@ end
 -- "camber" treats bank angle as camber (NASCAR ovals: ~24–30° → grip collapse on asphalt).
 -- Road-relative (advancedwheeldebug-style surfaceNormalBelow) keeps setup camber on bank and
 -- picks up body-roll vs surface; vehicle-frame fallback covers airborne / missing normals.
-calculateWheelAlignment = function(i, wd, invQuat, upVector)
+F.calculateWheelAlignment = function(i, wd, invQuat, upVector)
     if not wd.node1 or not wd.node2 or not obj or not obj.getNodePosition then return 0, 0, 0, 0 end
     local pos1 = obj:getNodePosition(wd.node1)
     local pos2 = obj:getNodePosition(wd.node2)
@@ -2611,7 +2540,7 @@ calculateWheelAlignment = function(i, wd, invQuat, upVector)
     local loadRaw = wd.downForce or 0
     local hasContact = wd.contactMaterialID1 ~= nil and wd.contactMaterialID1 ~= -1
     if hasContact and loadRaw > 0 then
-        local nx, ny, nz = sampleContactSurfaceNormal(wd, pos1, pos2, upVector)
+        local nx, ny, nz = F.sampleContactSurfaceNormal(wd, pos1, pos2, upVector)
         if nx then
             local upDot = max(-0.999, min(0.999, wax * nx + way * ny + waz * nz))
             camberRad = -asin(upDot)
@@ -2654,22 +2583,18 @@ calculateWheelAlignment = function(i, wd, invQuat, upVector)
 end
 
 -- CONSOLIDATED UNIFIED PARAMETER LOOKUP - ELIMINATES FRAGILE SIGNATURE OVERHEAD & LUA STACK COPIES
-CalcTyreWear = function(wheelID, dt, localEnvTemp)
-    local wd = wheels.wheelRotators[wheelID]
-    local w = wheelCache[wheelID]
-    local data = tyreData[wheelID]
-    if not wd or not w or not data then return end
+-- CalcTyreWear scratch: cross-helper state (Lua ~200 local-cap)
+local ctw = {}
 
-    localEnvTemp = localEnvTemp or ENV_TEMP
-    dt = dt or 0.01
-    data.temp = ensureTempNodes(data.temp, localEnvTemp)
+-- CalcTyreWear thermal integration (own local scope for ~200-cap headroom)
+F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
+    do
 
     -- Read cached environmental dynamics (frameTrackTemp set once in updateGFX)
     local groundModel = w.groundModel or DOESNT_EXIST_DATA
     local trackTemp = frameTrackTemp
     local isAirborne = w.isAirborne
     
-    local mods = data.interpolatedMods or DEFAULT_MODS
 
     -- DYNAMIC CLIMATE PROFILE ADAPTATION
     local baseEnv = 21.0
@@ -2712,11 +2637,11 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     -- Stock BeamNG construction + brake thermal factors
     local bf = data.baseFactors
     if not bf then
-        bf = collectBaseWheelFactors(wd)
+        bf = F.collectBaseWheelFactors(wd)
         data.baseFactors = bf
     end
 
-    local brakeSurfaceTemp, brakeCoreTemp = getNativeBrakeTemps(wd, localEnvTemp)
+    local brakeSurfaceTemp, brakeCoreTemp = F.getNativeBrakeTemps(wd, localEnvTemp)
     -- Read-only brake efficiency / glazing (no torque override); tiny soak scale when glazed
     local brakeThermalEff = 1.0
     if type(wd.brakeThermalEfficiency) == "number" then
@@ -2730,8 +2655,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     -- Tuning-menu brake ducts (default closed). Tire-side only — native rotors unchanged.
     -- Air path: skin velCool, carcassCoolCoef, rimCool (+ venting / G / draft / underwater).
     -- Soak path: brake→rim conduction+radiant, rim↔carcass (ductSoakCondFactor).
-    local ductPct = getBrakeDuctPercent(data.isFront)
-    local ductAirCoolFactor, ductSoakCondFactor = ductPercentToFactors(ductPct)
+    local ductPct = F.getBrakeDuctPercent(data.isFront)
+    local ductAirCoolFactor, ductSoakCondFactor = F.ductPercentToFactors(ductPct)
     -- Multiply with stock venting so race vented discs + open ducts stack correctly
     local ventingMult = max(0.35, min(2.0, bf.brakeVentingCoef or 1.0))
     ductAirCoolFactor = ductAirCoolFactor * lerp(1.0, ventingMult, 0.35)
@@ -2772,7 +2697,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
     local tyreWidth = bf.tireWidth or wd.tireWidth or wd.tyreWidth or wd.width or 0.2
     local tyreRadius = (w.dynamicRadius and w.dynamicRadius > 0.05) and w.dynamicRadius or (bf.radius or wd.radius or 0.3)
-    local airspeed = getFreestreamAirspeed()
+    local airspeed = F.getFreestreamAirspeed()
 
     -- PHYSICAL AIRSPEED & ROTATIONAL HEADING COMBINATION MODEL (Forced Convection)
     local safeAirspeed = max(0, airspeed)
@@ -2842,7 +2767,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local tyreWidthCoeff = (3.5 * tyreWidth) * 0.5 + 0.5
 
     -- Pass pressure ratio to warp edge load calculations dynamically based on inflation states
-    local wLeft, wCenter, wRight = CalcBiasWeights(w.combinedBias, pressureRatio)
+    local wLeft, wCenter, wRight = F.CalcBiasWeights(w.combinedBias, pressureRatio)
     -- Mild live lateral load nudge (gy) toward loaded shoulder — not a soft-body node map
     do
         local nudge = max(-1.0, min(1.0, gy)) * (topo.patchLatLoadNudge or 0.05)
@@ -2858,7 +2783,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
     -- Detect surfaces via shared classifier cache (must match CalculateTyreGrip)
     local isRaining = electrics and electrics.values and type(electrics.values.rainState) == "number" and electrics.values.rainState > 0
-    local surfaceTypeHeat, sf = resolveWheelSurface(w, groundModel, isRaining) --luacheck: ignore surfaceTypeHeat
+    local surfaceTypeHeat, sf = F.resolveWheelSurface(w, groundModel, isRaining) --luacheck: ignore surfaceTypeHeat
     local isLooseSurface = sf.loose
     local isIceSurface = sf.ice
     local isMudSurface = sf.mud
@@ -2870,8 +2795,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local isDryPaved = sf.dryPaved
     local gmName = sf.gmName or (groundModel.nameLower or "")
     
-    local avgWeightedTemp = TempRingsToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
-    local avgCarcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
+    local avgWeightedTemp = F.TempRingsToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
+    local avgCarcassTemp = F.TempCarcassToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
     
     local rollingResistance = (mods.rollingRes or 0.8) * (bf.rrFromSidewall or 1.0) * max(0.7, min(1.4, (bf.dragCoef or 5) / 5.0))
     -- topo = THERMAL_TOPOLOGY (module-level alias)
@@ -3048,6 +2973,187 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
 
     -- CLIMATE PLAYABILITY ADAPTATION (reuses baseEnv/tempDiff from above)
     local climateScale = max(0.6, min(1.4, 1.0 + (tempDiff * 0.012)))
+
+
+        -- Persist prepare outputs for node/wear scopes
+        ctw.adjustedChangeRate = adjustedChangeRate
+        ctw.airConductionRate = airConductionRate
+        ctw.airCoolingFactor = airCoolingFactor
+        ctw.airCoolingRate = airCoolingRate
+        ctw.airInertia = airInertia
+        ctw.angularVel = angularVel
+        ctw.avgCarcassTemp = avgCarcassTemp
+        ctw.avgWeightedTemp = avgWeightedTemp
+        ctw.bf = bf
+        ctw.blisterTempRatio = blisterTempRatio
+        ctw.bottomOutSens = bottomOutSens
+        ctw.brakeCoreTemp = brakeCoreTemp
+        ctw.brakeEffSoak = brakeEffSoak
+        ctw.brakeGainRate = brakeGainRate
+        ctw.brakeSurfaceTemp = brakeSurfaceTemp
+        ctw.brakeTorque = brakeTorque
+        ctw.carcassPropScale = carcassPropScale
+        ctw.carcassRate = carcassRate
+        ctw.casing_compliance = casing_compliance
+        ctw.climateScale = climateScale
+        ctw.coldWearMult = coldWearMult
+        ctw.conductanceTreadScale = conductanceTreadScale
+        ctw.contactDepth = contactDepth
+        ctw.coreCoolRate = coreCoolRate
+        ctw.coreVelCoolRate = coreVelCoolRate
+        ctw.cruiseNm = cruiseNm
+        ctw.current_optimal_temp = current_optimal_temp
+        ctw.current_working_temp = current_working_temp
+        ctw.driveHeatGateCarcass = driveHeatGateCarcass
+        ctw.ductPct = ductPct
+        ctw.ductSoakCondFactor = ductSoakCondFactor
+        ctw.dynamicPressurePSI = dynamicPressurePSI
+        ctw.effectiveAirspeed = effectiveAirspeed
+        ctw.estimatedContactArea = estimatedContactArea
+        ctw.excessPropGate = excessPropGate
+        ctw.excessPropGateCarcass = excessPropGateCarcass
+        ctw.excessPropGateEff = excessPropGateEff
+        ctw.flexModifier = flexModifier
+        ctw.g_mag = g_mag
+        ctw.gmName = gmName
+        ctw.grainTempRatio = grainTempRatio
+        ctw.groundModel = groundModel
+        ctw.heatMassScale = heatMassScale
+        ctw.hotWearMult = hotWearMult
+        ctw.isAirborne = isAirborne
+        ctw.isDirtGrassSurface = isDirtGrassSurface
+        ctw.isDryPaved = isDryPaved
+        ctw.isGravelSurface = isGravelSurface
+        ctw.isIceSurface = isIceSurface
+        ctw.isLooseSurface = isLooseSurface
+        ctw.isMudSurface = isMudSurface
+        ctw.isRaining = isRaining
+        ctw.isSandSurface = isSandSurface
+        ctw.isSnowSurface = isSnowSurface
+        ctw.isSportPlusProf = isSportPlusProf
+        ctw.isWetSurface = isWetSurface
+        ctw.jbeamMu = jbeamMu
+        ctw.jbeamSlideMu = jbeamSlideMu
+        ctw.loadRaw = loadRaw
+        ctw.load_kg = load_kg
+        ctw.load_kg_thermal = load_kg_thermal
+        ctw.longSlipEnergy = longSlipEnergy
+        ctw.netTorque = netTorque
+        ctw.patchFrac = patchFrac
+        ctw.patchHeatScale = patchHeatScale
+        ctw.peakWorkFactor = peakWorkFactor
+        ctw.pressureRatio = pressureRatio
+        ctw.propAbs = propAbs
+        ctw.propulsionTorque = propulsionTorque
+        ctw.rawJBeamTread = rawJBeamTread
+        ctw.rimRate = rimRate
+        ctw.rollingResistance = rollingResistance
+        ctw.safeAirspeed = safeAirspeed
+        ctw.sf = sf
+        ctw.sideSlipEnergy = sideSlipEnergy
+        ctw.skinCoreConductance = skinCoreConductance
+        ctw.slipEnergy = slipEnergy
+        ctw.slipHeatRate = slipHeatRate
+        ctw.staticCoolingRate = staticCoolingRate
+        ctw.streetCarcassScale = streetCarcassScale
+        ctw.streetSlipHeatScale = streetSlipHeatScale
+        ctw.surfaceAreaScale = surfaceAreaScale
+        ctw.tempDistWeighted = tempDistWeighted
+        ctw.trackConductivityMult = trackConductivityMult
+        ctw.trackTemp = trackTemp
+        ctw.treadCoef = treadCoef
+        ctw.tyreWidth = tyreWidth
+        ctw.tyreWidthCoeff = tyreWidthCoeff
+        ctw.vehNotParked = vehNotParked
+        ctw.verticalCarcassHeat = verticalCarcassHeat
+        ctw.wCenter = wCenter
+        ctw.wLeft = wLeft
+        ctw.wRight = wRight
+        ctw.wearRate = wearRate
+        ctw.workHeatRate = workHeatRate
+        ctw.currentTempK = currentTempK
+        ctw.initialTempK = initialTempK
+        ctw.warmAbsolutePressurePSI = warmAbsolutePressurePSI
+    end
+
+    -- Restore prepare outputs (prepare locals ended with do-end)
+    local adjustedChangeRate = ctw.adjustedChangeRate
+    local airConductionRate = ctw.airConductionRate
+    local airCoolingFactor = ctw.airCoolingFactor
+    local airCoolingRate = ctw.airCoolingRate
+    local airInertia = ctw.airInertia
+    local angularVel = ctw.angularVel
+    local avgCarcassTemp = ctw.avgCarcassTemp
+    local avgWeightedTemp = ctw.avgWeightedTemp
+    local bf = ctw.bf
+    local brakeCoreTemp = ctw.brakeCoreTemp
+    local brakeEffSoak = ctw.brakeEffSoak
+    local brakeGainRate = ctw.brakeGainRate
+    local brakeSurfaceTemp = ctw.brakeSurfaceTemp
+    local brakeTorque = ctw.brakeTorque
+    local carcassPropScale = ctw.carcassPropScale
+    local carcassRate = ctw.carcassRate
+    local climateScale = ctw.climateScale
+    local conductanceTreadScale = ctw.conductanceTreadScale
+    local contactDepth = ctw.contactDepth
+    local coreCoolRate = ctw.coreCoolRate
+    local coreVelCoolRate = ctw.coreVelCoolRate
+    local cruiseNm = ctw.cruiseNm
+    local current_working_temp = ctw.current_working_temp
+    local driveHeatGateCarcass = ctw.driveHeatGateCarcass
+    local ductPct = ctw.ductPct
+    local ductSoakCondFactor = ctw.ductSoakCondFactor
+    local dynamicPressurePSI = ctw.dynamicPressurePSI
+    local effectiveAirspeed = ctw.effectiveAirspeed
+    local estimatedContactArea = ctw.estimatedContactArea
+    local excessPropGate = ctw.excessPropGate
+    local excessPropGateCarcass = ctw.excessPropGateCarcass
+    local excessPropGateEff = ctw.excessPropGateEff
+    local flexModifier = ctw.flexModifier
+    local g_mag = ctw.g_mag
+    local groundModel = ctw.groundModel
+    local heatMassScale = ctw.heatMassScale
+    local isAirborne = ctw.isAirborne
+    local isDirtGrassSurface = ctw.isDirtGrassSurface
+    local isGravelSurface = ctw.isGravelSurface
+    local isIceSurface = ctw.isIceSurface
+    local isMudSurface = ctw.isMudSurface
+    local isSandSurface = ctw.isSandSurface
+    local isSnowSurface = ctw.isSnowSurface
+    local isSportPlusProf = ctw.isSportPlusProf
+    local isWetSurface = ctw.isWetSurface
+    local jbeamMu = ctw.jbeamMu
+    local jbeamSlideMu = ctw.jbeamSlideMu
+    local load_kg = ctw.load_kg
+    local load_kg_thermal = ctw.load_kg_thermal
+    local longSlipEnergy = ctw.longSlipEnergy
+    local netTorque = ctw.netTorque
+    local patchFrac = ctw.patchFrac
+    local patchHeatScale = ctw.patchHeatScale
+    local peakWorkFactor = ctw.peakWorkFactor
+    local pressureRatio = ctw.pressureRatio
+    local propAbs = ctw.propAbs
+    local rimRate = ctw.rimRate
+    local rollingResistance = ctw.rollingResistance
+    local safeAirspeed = ctw.safeAirspeed
+    local sideSlipEnergy = ctw.sideSlipEnergy
+    local skinCoreConductance = ctw.skinCoreConductance
+    local slipEnergy = ctw.slipEnergy
+    local slipHeatRate = ctw.slipHeatRate
+    local staticCoolingRate = ctw.staticCoolingRate
+    local streetCarcassScale = ctw.streetCarcassScale
+    local streetSlipHeatScale = ctw.streetSlipHeatScale
+    local surfaceAreaScale = ctw.surfaceAreaScale
+    local tempDistWeighted = ctw.tempDistWeighted
+    local trackConductivityMult = ctw.trackConductivityMult
+    local trackTemp = ctw.trackTemp
+    local tyreWidthCoeff = ctw.tyreWidthCoeff
+    local vehNotParked = ctw.vehNotParked
+    local verticalCarcassHeat = ctw.verticalCarcassHeat
+    local wCenter = ctw.wCenter
+    local wLeft = ctw.wLeft
+    local wRight = ctw.wRight
+    local workHeatRate = ctw.workHeatRate
 
     -- Snapshot nodes before coupled updates (reuse scratch — no per-step alloc)
     local skinSnap = scratchSkinSnap
@@ -3278,7 +3384,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         ) * carcassRate * dt
     end
 
-    avgCarcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
+    avgCarcassTemp = F.TempCarcassToAvgTemp(data.temp, w.combinedBias, pressureRatio, localEnvTemp)
 
     -- Rim / brake soak node: rotor heat enters here, then conducts into carcass + cavity air.
     -- brakeMass/diameter already scale rimInertia→rimRate; area + rotorMaterial scale soak gain.
@@ -3353,6 +3459,79 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         - (airSnap - localEnvTemp) * (airConductionRate * 0.08 * ((dynamicPressurePSI + 14.696) / 14.696) * (1.0 + abs(angularVel) * 0.006)) * climateScale
     ) * (1.0 / max(0.05, airInertia)) * dt
 
+
+    -- Bridge locals into ctw scratch for wear helper (Lua local-cap)
+    ctw.avgWeightedTemp = avgWeightedTemp
+    ctw.current_working_temp = current_working_temp
+    ctw.tempDistWeighted = tempDistWeighted
+    ctw.isAirborne = isAirborne
+    ctw.slipEnergy = slipEnergy
+    ctw.sideSlipEnergy = sideSlipEnergy
+    ctw.tyreWidthCoeff = tyreWidthCoeff
+    ctw.brakeTorque = brakeTorque
+    ctw.angularVel = angularVel
+    ctw.wLeft = wLeft
+    ctw.wCenter = wCenter
+    ctw.wRight = wRight
+    ctw.contactDepth = contactDepth
+    ctw.isWetSurface = isWetSurface
+    ctw.isMudSurface = isMudSurface
+    ctw.isSnowSurface = isSnowSurface
+    ctw.isSandSurface = isSandSurface
+    ctw.isGravelSurface = isGravelSurface
+    ctw.isDirtGrassSurface = isDirtGrassSurface
+    ctw.isIceSurface = isIceSurface
+    ctw.vehNotParked = vehNotParked
+end
+
+-- CalcTyreWear wear / damage / pressure (own local scope)
+F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
+    -- Reload bridged thermals state from ctw scratch
+    local avgWeightedTemp = ctw.avgWeightedTemp
+    local current_optimal_temp = ctw.current_optimal_temp
+    local current_working_temp = ctw.current_working_temp
+    local tempDistWeighted = ctw.tempDistWeighted
+    local isAirborne = ctw.isAirborne
+    local loadRaw = ctw.loadRaw
+    local slipEnergy = ctw.slipEnergy
+    local sideSlipEnergy = ctw.sideSlipEnergy
+    local tyreWidthCoeff = ctw.tyreWidthCoeff
+    local propulsionTorque = ctw.propulsionTorque
+    local brakeTorque = ctw.brakeTorque
+    local angularVel = ctw.angularVel
+    local wearRate = ctw.wearRate
+    local coldWearMult = ctw.coldWearMult
+    local hotWearMult = ctw.hotWearMult
+    local bottomOutSens = ctw.bottomOutSens
+    local wLeft = ctw.wLeft
+    local wCenter = ctw.wCenter
+    local wRight = ctw.wRight
+    local casing_compliance = ctw.casing_compliance
+    local contactDepth = ctw.contactDepth
+    local rawJBeamTread = ctw.rawJBeamTread
+    local gmName = ctw.gmName
+    local treadCoef = ctw.treadCoef
+    local grainTempRatio = ctw.grainTempRatio
+    local blisterTempRatio = ctw.blisterTempRatio
+    local tyreWidth = ctw.tyreWidth
+    local isRaining = ctw.isRaining
+    local isWetSurface = ctw.isWetSurface
+    local isDryPaved = ctw.isDryPaved
+    local isLooseSurface = ctw.isLooseSurface
+    local isMudSurface = ctw.isMudSurface
+    local isSnowSurface = ctw.isSnowSurface
+    local isSandSurface = ctw.isSandSurface
+    local isGravelSurface = ctw.isGravelSurface
+    local isDirtGrassSurface = ctw.isDirtGrassSurface
+    local isIceSurface = ctw.isIceSurface
+    local vehNotParked = ctw.vehNotParked
+    local sf = ctw.sf
+    local currentTempK = ctw.currentTempK
+    local initialTempK = ctw.initialTempK
+    local warmAbsolutePressurePSI = ctw.warmAbsolutePressurePSI
+    local groundModel = ctw.groundModel
+    local dynamicPressurePSI = ctw.dynamicPressurePSI
+
     -- HEAT CYCLES: compound hardens (more wear, less grip) — not reduced wear
     if not data.cycleHeated and avgWeightedTemp >= current_optimal_temp * 0.85 then
         data.cycleHeated = true
@@ -3409,7 +3588,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
             end
         end
         
-        wear = tempDistToWearMult(tempDistWeighted) * (slidingWear + (vehNotParked * abs(propulsionTorque * 0.008 - brakeTorque * 0.025) * 0.3 * TORQUE_ENERGY_MULTIPLIER) * 0.08 + angularVel * 0.0005) * (wearRate * cycleWearMultiplier / max(0.7, min(1.3, tyreWidth / 0.2))) * (1.0 + min(0.75, (w.suspStress or 0) * 0.35 * bottomOutSens)) * surfaceWearScale * dt
+        wear = F.tempDistToWearMult(tempDistWeighted) * (slidingWear + (vehNotParked * abs(propulsionTorque * 0.008 - brakeTorque * 0.025) * 0.3 * TORQUE_ENERGY_MULTIPLIER) * 0.08 + angularVel * 0.0005) * (wearRate * cycleWearMultiplier / max(0.7, min(1.3, tyreWidth / 0.2))) * (1.0 + min(0.75, (w.suspStress or 0) * 0.35 * bottomOutSens)) * surfaceWearScale * dt
 
         -- Excess-camber wear: neutral at camberWearMult=1.0 (bit-identical); >1 adds mild shoulder wear
         do
@@ -3535,23 +3714,23 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         -- Informational rate for HUD / diagnostics (does not drive setGroupPressure).
         data.leakRatePa = max(leak, wd.punctureLeakRate or 20000)
     elseif leak > 0 then
-        local newAbs = applyPressureLeakPa(wd, leak, dt)
+        local newAbs = F.applyPressureLeakPa(wd, leak, dt)
         if newAbs then
             data.punctureSeverity = min(1.0, (data.punctureSeverity or 0) + dt * 0.02)
             -- Finalize with native deflate only at BeamNG min pressure
             if newAbs <= 105500 then
-                deflateTireCompat(wheelID)
+                F.deflateTireCompat(wheelID)
             end
         elseif (data.blistering or 0) >= 0.95 and avgWeightedTemp > (data.working_temp * max(1.25, blisterTempRatio - 0.05)) then
             -- Fallback when pressure groups unavailable
-            deflateTireCompat(wheelID)
+            F.deflateTireCompat(wheelID)
         end
     end
 
     data.currentPressurePSI = dynamicPressurePSI
     data.luaPressurePSI = dynamicPressurePSI
     -- Native group gauge (Pa→PSI); optional rate-limited hot write-back for soft-body stiffness
-    local nativePSI = getNativeGroupPressurePSI(wd)
+    local nativePSI = F.getNativeGroupPressurePSI(wd)
     local dPdt = 0
     if nativePSI then
         local prevNative = data.lastNativePSI or nativePSI
@@ -3576,10 +3755,10 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
             and not nativeOwnsSpikeLeak
             and not (w.isBroken or w.isTireDeflated)
             and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)
-            and not isTirePressureInflateActive()
+            and not F.isTirePressureInflateActive()
         then
             local targetAbsPa = warmAbsolutePressurePSI * 6894.757
-            local newAbs = applyHotPressureWriteback(
+            local newAbs = F.applyHotPressureWriteback(
                 wd,
                 targetAbsPa,
                 dt,
@@ -3603,9 +3782,24 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     data.currentBlistering = data.blistering or 0
 end
 
+F.CalcTyreWear = function(wheelID, dt, localEnvTemp)
+    local wd = wheels.wheelRotators[wheelID]
+    local w = wheelCache[wheelID]
+    local data = tyreData[wheelID]
+    if not wd or not w or not data then return end
+
+    localEnvTemp = localEnvTemp or ENV_TEMP
+    dt = dt or 0.01
+    data.temp = F.ensureTempNodes(data.temp, localEnvTemp)
+
+    local mods = data.interpolatedMods or DEFAULT_MODS
+    F.ctwIntegrateThermals(wheelID, dt, localEnvTemp, wd, w, data, mods)
+    F.ctwIntegrateWear(wheelID, dt, localEnvTemp, wd, w, data, mods)
+end
+
 -- COMPRESSED LOOKUP GRIP MATH: Scans pre-calculated static coefficient rows to avoid execution branches
 -- profileLower: already string.lower'd (cached on tyreData); do not re-lower on the hot path.
-getProfileBaselineGrip = function(profileLower, x)
+F.getProfileBaselineGrip = function(profileLower, x)
     local p_lower = profileLower or ""
     local c = nil
     for i = 1, #GRIP_COEFFS do
@@ -3618,7 +3812,7 @@ getProfileBaselineGrip = function(profileLower, x)
     return c[1] + x * ((c[2] or 0) + x * ((c[3] or 0) + x * (c[4] or 0)))
 end
 
-classifySurfaceGrip = function(gmName)
+F.classifySurfaceGrip = function(gmName)
     gmName = string.lower(gmName or "")
 
     -- Base-game keys / aliases first (art/groundmodels.json)
@@ -3674,7 +3868,7 @@ classifySurfaceGrip = function(gmName)
     return "generic"
 end
 
-getSurfaceSanityScale = function(surfaceType, treadCoef, drainage)
+F.getSurfaceSanityScale = function(surfaceType, treadCoef, drainage)
     treadCoef = max(0, min(1, treadCoef or 0.5))
     drainage = max(0, min(1, drainage or 0.5))
 
@@ -3714,7 +3908,7 @@ end
 
 -- Shared surface flags for wear/heat/grip (keeps CalcTyreWear and CalculateTyreGrip aligned)
 -- Fills `out` in place — no allocation when caller reuses a table.
-fillSurfaceFlags = function(out, surfaceType, gmName)
+F.fillSurfaceFlags = function(out, surfaceType, gmName)
     out = out or {}
     out.ice = surfaceType == "ice"
     out.snow = surfaceType == "snow"
@@ -3732,7 +3926,7 @@ fillSurfaceFlags = function(out, surfaceType, gmName)
 end
 
 -- Cache classifySurfaceGrip + rain morph until contact material or rain state changes
-resolveWheelSurface = function(w, groundModel, isRaining)
+F.resolveWheelSurface = function(w, groundModel, isRaining)
     local matId = w.contactMatId
     if matId == nil then matId = -2 end
     local raining = not not isRaining
@@ -3741,7 +3935,7 @@ resolveWheelSurface = function(w, groundModel, isRaining)
     end
 
     local gmName = (groundModel and groundModel.nameLower) or ""
-    local surfaceType = classifySurfaceGrip(gmName)
+    local surfaceType = F.classifySurfaceGrip(gmName)
     if raining then
         if surfaceType == "dry_paved" or surfaceType == "hard_smooth" or surfaceType == "rock" then
             surfaceType = "wet_paved"
@@ -3753,21 +3947,21 @@ resolveWheelSurface = function(w, groundModel, isRaining)
     end
 
     if not w.surfaceFlags then w.surfaceFlags = {} end
-    fillSurfaceFlags(w.surfaceFlags, surfaceType, gmName)
+    F.fillSurfaceFlags(w.surfaceFlags, surfaceType, gmName)
     w.surfaceType = surfaceType
     w.surfCacheMatId = matId
     w.surfCacheRaining = raining
     return surfaceType, w.surfaceFlags
 end
 
-surfaceFlagsFromType = function(surfaceType, gmName)
+F.surfaceFlagsFromType = function(surfaceType, gmName)
     -- Legacy helper: prefer resolveWheelSurface in hot paths
-    return fillSurfaceFlags({}, surfaceType, gmName)
+    return F.fillSurfaceFlags({}, surfaceType, gmName)
 end
 
 -- Profile × surface grip bias (compound character on top of treadCoef sanity scale)
 -- profile1/profile2 should already be lowercased (tyreData.profile1Lower / profile2Lower).
-applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
+F.applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
     local p1 = profile1 or ""
     local p2 = profile2 or ""
     local function has(tag)
@@ -3885,7 +4079,7 @@ applyProfileSurfaceBias = function(tyreGrip, surfaceType, profile1, profile2)
 end
 
 -- CONSOLIDATED UNIFIED PARAMETER LOOKUP - HIGH PERFORMANCE ZERO-ALLOCATION PATH
-CalculateTyreGrip = function(wheelID, localEnvTemp)
+F.CalculateTyreGrip = function(wheelID, localEnvTemp)
     local data = tyreData[wheelID]
     local w = wheelCache[wheelID]
     local wd = wheels.wheelRotators[wheelID]
@@ -3903,7 +4097,7 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     local pOffset = (currentPSI / optP) - 1.0
     local sensitivity = mods.pressureSensitivity or 0.5
 
-    local avgTemp = EffectiveTyreTemp(data.temp, w.combinedBias, currentPSI / optP, localEnvTemp, mods)
+    local avgTemp = F.EffectiveTyreTemp(data.temp, w.combinedBias, currentPSI / optP, localEnvTemp, mods)
     local cond = data.condition or 100
     local x = cond * 0.01
     
@@ -3917,14 +4111,14 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     local profile2Lower = data.profile2Lower or ""
     local interpFactor = data.interpFactor
 
-    local baselineGrip1 = getProfileBaselineGrip(profile1Lower, x)
-    local baselineGrip2 = getProfileBaselineGrip(profile2Lower, x)
+    local baselineGrip1 = F.getProfileBaselineGrip(profile1Lower, x)
+    local baselineGrip2 = F.getProfileBaselineGrip(profile2Lower, x)
     local tyreGrip = lerp(baselineGrip1, baselineGrip2, interpFactor)
 
     -- DYNAMIC SURFACE CLASSIFICATION (cached until contact material / rain changes)
     local groundModel = w.groundModel or DOESNT_EXIST_DATA
     local isRaining = electrics and electrics.values and type(electrics.values.rainState) == "number" and electrics.values.rainState > 0
-    local surfaceType, flags = resolveWheelSurface(w, groundModel, isRaining)
+    local surfaceType, flags = F.resolveWheelSurface(w, groundModel, isRaining)
     local isWetSurface = flags.wet
     local isLooseSurface = flags.loose
     local gmName = flags.gmName or (groundModel.nameLower or "")
@@ -3940,7 +4134,7 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     tyreGrip = tyreGrip * wearPenalty
 
     -- Profile-owned thermal grip curve (ambient does not shift the compound peak)
-    local thermalMultiplier = getProfileThermalGrip(mods, avgTemp, compliance, softnessCoef)
+    local thermalMultiplier = F.getProfileThermalGrip(mods, avgTemp, compliance, softnessCoef)
 
     -- Street: mild cold forgiveness. Race/slick/sport+: sharpen cold cliff (anti high-G trip on cold μ)
     local p1Cold = profile1Lower
@@ -3964,8 +4158,8 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     tyreGrip = tyreGrip * compoundThermalGrip * (mods.gripMultiplier or 1.0)
 
     -- Compound × surface character (AT/MT/winter/slick/etc.)
-    tyreGrip = applyProfileSurfaceBias(tyreGrip, surfaceType, profile1Lower, profile2Lower)
-    local longPressureScale, latPressureScale = CalcPressureGripScales(pOffset, sensitivity, isLooseSurface)
+    tyreGrip = F.applyProfileSurfaceBias(tyreGrip, surfaceType, profile1Lower, profile2Lower)
+    local longPressureScale, latPressureScale = F.CalcPressureGripScales(pOffset, sensitivity, isLooseSurface)
 
     -- Dynamically scales vertical tire load sensitivity by active wheelCount to handle trucks/duallys
     local staticLoad = (vehicleMass * 9.81) / wheelCount
@@ -4003,8 +4197,8 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
         tyreGrip = tyreGrip * (mods.wetGripScale or 1.0)
         -- Wet asphalt must not beat the same compound on dry asphalt (MT/logger wetGripScale overshoot)
         if surfaceType == "wet_paved" then
-            local dryScale = select(1, getSurfaceSanityScale("dry_paved", treadCoef, drainage))
-            local wetScale = select(1, getSurfaceSanityScale("wet_paved", treadCoef, drainage))
+            local dryScale = select(1, F.getSurfaceSanityScale("dry_paved", treadCoef, drainage))
+            local wetScale = select(1, F.getSurfaceSanityScale("wet_paved", treadCoef, drainage))
             local dryMod = mods.dryGripScale or 1.0
             local wetMod = mods.wetGripScale or 1.0
             local dryBias = 1.0
@@ -4092,7 +4286,7 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     end
     tyreGrip = tyreGrip * suspGripModifier
 
-    local surfaceScale, surfaceCap = getSurfaceSanityScale(surfaceType, treadCoef, mods.waterDrainage or 0.5)
+    local surfaceScale, surfaceCap = F.getSurfaceSanityScale(surfaceType, treadCoef, mods.waterDrainage or 0.5)
     local gmStatic = max(0.0, groundModel.staticFrictionCoefficient or 1.0)
     local gmSliding = max(0.0, groundModel.slidingFrictionCoefficient or gmStatic)
     -- FRICTIONLESS / zero-μ pads: collapse grip instead of dividing by tiny μ (cap explosion)
@@ -4164,7 +4358,7 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
     return longGrip, latGrip, tyreGrip
 end
 
-initGuiStream = function()
+F.initGuiStream = function()
     if not wheels or not wheels.wheelRotators then return end
     guiStream.data = {}
     guiStream.envTemp = ENV_TEMP
@@ -4217,10 +4411,10 @@ initGuiStream = function()
 end
 
 -- Physics tick: no spindle force FX (arcade applyForce path removed)
-update = function(_dt)
+F.update = function(_dt)
 end
 
-prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, g_mag, g_lat)
+F.prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, g_mag, g_lat)
     -- P1: count driven wheels for AWD excess layout damp (before CalcTyreWear this frame)
     local nDriven = 0
     local propThresh = THERMAL_TOPOLOGY.drivePropDrivenThreshNm or 40
@@ -4242,9 +4436,9 @@ prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, 
         local data = tyreData[i]
         
         if data then
-            updateWheelSuspension(w, data, wd, dt, invQuat, upVector)
+            F.updateWheelSuspension(w, data, wd, dt, invQuat, upVector)
 
-            local camberDeg, toeDeg, camberRad, toeRad = calculateWheelAlignment(i, wd, invQuat, upVector)
+            local camberDeg, toeDeg, camberRad, toeRad = F.calculateWheelAlignment(i, wd, invQuat, upVector)
             w.camber = camberDeg
             w.toe = toeDeg
             w.camberRad = camberRad
@@ -4260,7 +4454,7 @@ prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, 
             local combinedBias = (-w.camber * 0.12 * (wd.wheelDir or 1)) + gLatBias
             w.combinedBias = combinedBias
 
-            local groundModelName, gm = GetGroundModelData(wd.contactMaterialID1)
+            local groundModelName, gm = F.GetGroundModelData(wd.contactMaterialID1)
             w.groundModel = gm
 
             local loadRaw = wd.downForce or 0
@@ -4333,7 +4527,7 @@ prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed, 
 
 end
 
-runFixedPhysicsSteps = function(dt, localizedEnvTemp)
+F.runFixedPhysicsSteps = function(dt, localizedEnvTemp)
     gfxAccumulator = gfxAccumulator + dt
     if gfxAccumulator > 0.15 then gfxAccumulator = 0.15 end 
     
@@ -4349,9 +4543,9 @@ runFixedPhysicsSteps = function(dt, localizedEnvTemp)
             
             if wheel and w and data then
                 -- Thermals / wear / pressure leak at 100Hz
-                CalcTyreWear(i, FIXED_DT, localizedEnvTemp)
+                F.CalcTyreWear(i, FIXED_DT, localizedEnvTemp)
 
-                local carcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias or 0, 1.0, localizedEnvTemp)
+                local carcassTemp = F.TempCarcassToAvgTemp(data.temp, w.combinedBias or 0, 1.0, localizedEnvTemp)
                 local isSlickFail = string.find(data.profile1Lower or "", "slick", 1, true)
                     or string.find(data.profile2Lower or "", "slick", 1, true)
                 local optFail = data.interpolatedMods and data.interpolatedMods.optimalTemp
@@ -4361,12 +4555,12 @@ runFixedPhysicsSteps = function(dt, localizedEnvTemp)
                 end
                 local cond = data.condition or 100
                 if cond < 0.5 and (data.punctureSeverity or 0) > 0.8 then
-                    deflateTireCompat(i)
+                    F.deflateTireCompat(i)
                 end
 
                 -- Grip + BeamNG friction at 50Hz (every other fixed step)
                 if doGripStep then
-                    local longGrip, latGrip, grip = CalculateTyreGrip(i, localizedEnvTemp)
+                    local longGrip, latGrip, grip = F.CalculateTyreGrip(i, localizedEnvTemp)
                     if longGrip ~= longGrip or latGrip ~= latGrip or longGrip <= 0.001 or latGrip <= 0.001 then
                         longGrip, latGrip, grip = 0.1, 0.1, 0.1
                     end
@@ -4374,9 +4568,9 @@ runFixedPhysicsSteps = function(dt, localizedEnvTemp)
                     tyreGripTable[i] = grip
 
                     if w.isTireDeflated or w.isBroken then
-                        applyWheelFriction(wheel, 1.0, 1.0)
+                        F.applyWheelFriction(wheel, 1.0, 1.0)
                     else
-                        applyWheelFriction(wheel, longGrip, latGrip)
+                        F.applyWheelFriction(wheel, longGrip, latGrip)
                     end
                 end
             end
@@ -4384,10 +4578,10 @@ runFixedPhysicsSteps = function(dt, localizedEnvTemp)
     end
 end
 
-flushGuiStream = function(localizedEnvTemp)
+F.flushGuiStream = function(localizedEnvTemp)
         local totalLoadN = 0
         local topo = THERMAL_TOPOLOGY
-        local airspeed = getFreestreamAirspeed()
+        local airspeed = F.getFreestreamAirspeed()
         local aeroSpeedRange = max(1.0, topo.aeroHeatSpeedFull - topo.aeroHeatSpeedStart)
         local aeroRamp = max(0.0, min(1.0, (airspeed - topo.aeroHeatSpeedStart) / aeroSpeedRange))
         local aeroFracEst = aeroRamp * topo.aeroHeatMaxFrac
@@ -4407,7 +4601,7 @@ flushGuiStream = function(localizedEnvTemp)
                 local grip = data.lastGrip or tyreGripTable[i] or 1
                 local longGrip = data.lastLongGrip or grip
                 local latGrip = data.lastLatGrip or grip
-                local carcassTemp = TempCarcassToAvgTemp(data.temp, w.combinedBias or 0, 1.0, localizedEnvTemp)
+                local carcassTemp = F.TempCarcassToAvgTemp(data.temp, w.combinedBias or 0, 1.0, localizedEnvTemp)
 
                 entry.isBroken = w.isBroken
                 entry.isDetached = w.isBroken
@@ -4440,7 +4634,7 @@ flushGuiStream = function(localizedEnvTemp)
                 entry.stintFade = math.floor((data.stintFade or 0) * 1000) / 10
                 entry.leak = math.floor((data.punctureSeverity or 0) * 100)
                 entry.waterFilm = math.floor(waterFilmDepth * 100)
-                entry.ductPercent = data.ductPercent or getBrakeDuctPercent(data.isFront)
+                entry.ductPercent = data.ductPercent or F.getBrakeDuctPercent(data.isFront)
                 entry.ductAirCoolFactor = math.floor((data.ductAirCoolFactor or 1) * 1000) / 1000
                 entry.ductSoakCondFactor = math.floor((data.ductSoakCondFactor or 1.15) * 1000) / 1000
                 entry.brakeSoakRateCs = math.floor((data.brakeSoakRateCs or 0) * 100) / 100
@@ -4461,7 +4655,7 @@ flushGuiStream = function(localizedEnvTemp)
 
                 local gm = w.groundModel or DOESNT_EXIST_DATA
                 entry.surfaceName = gm.name or "unknown"
-                entry.surfaceType = w.surfaceType or classifySurfaceGrip(gm.nameLower or gm.name or "")
+                entry.surfaceType = w.surfaceType or F.classifySurfaceGrip(gm.nameLower or gm.name or "")
                 entry.muStatic = math.floor((gm.staticFrictionCoefficient or 1) * 1000) / 1000
                 entry.muSlide = math.floor((gm.slidingFrictionCoefficient or entry.muStatic) * 1000) / 1000
                 entry.rough = math.floor((tonumber(gm.rough) or 0) * 1000) / 1000
@@ -4481,14 +4675,14 @@ flushGuiStream = function(localizedEnvTemp)
 
                 if not entry.temp then entry.temp = { 0, 0, 0, 0, 0, 0, 0, 0 } end
                 if data.temp and not w.isBroken then
-                    data.temp = ensureTempNodes(data.temp, localizedEnvTemp)
+                    data.temp = F.ensureTempNodes(data.temp, localizedEnvTemp)
                     for ti = 1, TEMP_NODE_COUNT do
                         entry.temp[ti] = math.floor((data.temp[ti] or localizedEnvTemp) * 10) / 10
                     end
                     entry.carcassAvg = math.floor(carcassTemp * 10) / 10
                     entry.rimTemp = math.floor((data.temp[7] or localizedEnvTemp) * 10) / 10
                     entry.airTemp = math.floor((data.temp[8] or localizedEnvTemp) * 10) / 10
-                    local bSurf, bCore = getNativeBrakeTemps(wd, localizedEnvTemp)
+                    local bSurf, bCore = F.getNativeBrakeTemps(wd, localizedEnvTemp)
                     entry.brakeSurface = math.floor(bSurf * 10) / 10
                     entry.brakeCore = math.floor(bCore * 10) / 10
                     entry.brakeThermalEfficiency = math.floor((data.brakeThermalEfficiency or 1) * 1000) / 1000
@@ -4513,7 +4707,7 @@ flushGuiStream = function(localizedEnvTemp)
                 end
 
                 local optTemp = data.working_temp or WORKING_TEMP
-                local avgT = EffectiveTyreTemp(data.temp, w.combinedBias, entry.pressure / (interpolatedMods and interpolatedMods.optimalPressure or 25), localizedEnvTemp, interpolatedMods)
+                local avgT = F.EffectiveTyreTemp(data.temp, w.combinedBias, entry.pressure / (interpolatedMods and interpolatedMods.optimalPressure or 25), localizedEnvTemp, interpolatedMods)
                 local tempRatio = avgT / (optTemp > 0 and optTemp or 1)
                 if tempRatio < 0.80 then
                     entry.tempCategory = "Cold"
@@ -4537,7 +4731,7 @@ flushGuiStream = function(localizedEnvTemp)
 end
 
 
-getTelemetryIo = function()
+F.getTelemetryIo = function()
     local okIo, ioLib = pcall(function() return io end)
     if okIo and ioLib and type(ioLib.open) == "function" then
         return ioLib
@@ -4546,7 +4740,7 @@ getTelemetryIo = function()
 end
 
 -- Write header once per path; skip open/read/check on every sample.
-ensureTelemetryHeader = function(ioLib, path)
+F.ensureTelemetryHeader = function(ioLib, path)
     if telem.headerReady or not ioLib or not path then return end
     local exists = false
     local rf = ioLib.open(path, "r")
@@ -4567,7 +4761,7 @@ ensureTelemetryHeader = function(ioLib, path)
     end
 end
 
-clearTelemetryCsvBuffer = function()
+F.clearTelemetryCsvBuffer = function()
     for i = 1, telem.csvBufCount do
         telem.csvBuffer[i] = nil
     end
@@ -4575,8 +4769,8 @@ clearTelemetryCsvBuffer = function()
 end
 
 -- Batch-append buffered lines in one open/write/close. Safe to call often (no-op if empty).
-flushTelemetryBuffer = function(ioLib)
-    ioLib = ioLib or getTelemetryIo()
+F.flushTelemetryBuffer = function(ioLib)
+    ioLib = ioLib or F.getTelemetryIo()
     if not ioLib or not telem.path then
         telem.lastFlushClock = os.clock()
         return
@@ -4585,17 +4779,17 @@ flushTelemetryBuffer = function(ioLib)
         telem.lastFlushClock = os.clock()
         return
     end
-    ensureTelemetryHeader(ioLib, telem.path)
+    F.ensureTelemetryHeader(ioLib, telem.path)
     local f = ioLib.open(telem.path, "a")
     if f then
         f:write(table.concat(telem.csvBuffer, "", 1, telem.csvBufCount))
         f:close()
     end
-    clearTelemetryCsvBuffer()
+    F.clearTelemetryCsvBuffer()
     telem.lastFlushClock = os.clock()
 end
 
-telemetryBufferNeedsFlush = function()
+F.telemetryBufferNeedsFlush = function()
     if telem.csvBufCount <= 0 then return false end
     if telem.csvBufCount >= telem.flushMaxLines then return true end
     local now = os.clock()
@@ -4606,8 +4800,8 @@ telemetryBufferNeedsFlush = function()
     return (now - telem.lastFlushClock) >= telem.flushWallSec
 end
 
-writeTelemetryArmMarker = function(path)
-    local ioLib = getTelemetryIo()
+F.writeTelemetryArmMarker = function(path)
+    local ioLib = F.getTelemetryIo()
     if not ioLib or not path then return end
     local f = ioLib.open(telem.armMarker, "w")
     if f then
@@ -4616,18 +4810,18 @@ writeTelemetryArmMarker = function(path)
     end
 end
 
-clearTelemetryArmMarker = function()
+F.clearTelemetryArmMarker = function()
     pcall(function()
         os.remove(telem.armMarker)
     end)
 end
 
 -- Flush pending samples first so #RESET stays chronologically after them.
-appendTelemetryResetMarker = function(ioLib, path, reason)
-    ioLib = ioLib or getTelemetryIo()
+F.appendTelemetryResetMarker = function(ioLib, path, reason)
+    ioLib = ioLib or F.getTelemetryIo()
     if not ioLib or not path then return end
-    flushTelemetryBuffer(ioLib)
-    ensureTelemetryHeader(ioLib, path)
+    F.flushTelemetryBuffer(ioLib)
+    F.ensureTelemetryHeader(ioLib, path)
     local f = ioLib.open(path, "a")
     if f then
         f:write(string.format("#RESET,%.3f,%s\n", os.clock(), tostring(reason or "reset")))
@@ -4636,8 +4830,8 @@ appendTelemetryResetMarker = function(ioLib, path, reason)
     telem.lastFlushClock = os.clock()
 end
 
-restoreTelemetryAfterReload = function(reason)
-    local ioLib = getTelemetryIo()
+F.restoreTelemetryAfterReload = function(reason)
+    local ioLib = F.getTelemetryIo()
     if not ioLib then return end
     local mf = ioLib.open(telem.armMarker, "r")
     if not mf then return end
@@ -4647,18 +4841,18 @@ restoreTelemetryAfterReload = function(reason)
     telem.path = path
     telem.headerReady = false
     telem.csvEnabled = true
-    ensureTelemetryHeader(ioLib, path)
-    appendTelemetryResetMarker(ioLib, path, reason or "vehicle_reload")
+    F.ensureTelemetryHeader(ioLib, path)
+    F.appendTelemetryResetMarker(ioLib, path, reason or "vehicle_reload")
 end
 
-writeTelemetryIfEnabled = function(dt)
+F.writeTelemetryIfEnabled = function(dt)
     -- Optional CSV telemetry (disabled by default). Samples go to an in-memory buffer;
     -- disk I/O only on flush (safety timer / line cap / disable / reset / explicit).
     if not telem.csvEnabled then return end
     telem.timer = telem.timer + dt
     if telem.timer < telem.interval then
-        if telemetryBufferNeedsFlush() then
-            flushTelemetryBuffer()
+        if F.telemetryBufferNeedsFlush() then
+            F.flushTelemetryBuffer()
         end
         return
     end
@@ -4668,15 +4862,15 @@ writeTelemetryIfEnabled = function(dt)
     end
     -- Ensure header once while armed (not every sample).
     if not telem.headerReady then
-        local ioLib = getTelemetryIo()
+        local ioLib = F.getTelemetryIo()
         if ioLib then
-            ensureTelemetryHeader(ioLib, telem.path)
+            F.ensureTelemetryHeader(ioLib, telem.path)
         end
     end
     local tNow = (electrics and electrics.values and electrics.values.timer) or 0
     local wall = os.clock()
     for wheelID, data in pairs(tyreData) do
-        data.temp = ensureTempNodes(data.temp, ENV_TEMP)
+        data.temp = F.ensureTempNodes(data.temp, ENV_TEMP)
         local grip = data.lastGrip or tyreGripTable[wheelID] or 0
         local longG = data.lastLongGrip or grip
         local latG = data.lastLatGrip or grip
@@ -4691,15 +4885,15 @@ writeTelemetryIfEnabled = function(dt)
             data.clog or 0, data.graining or 0, data.blistering or 0,
             data.heatCycles or 0, data.stintFade or 0, data.punctureSeverity or 0, waterFilmDepth)
     end
-    if telemetryBufferNeedsFlush() then
-        flushTelemetryBuffer()
+    if F.telemetryBufferNeedsFlush() then
+        F.flushTelemetryBuffer()
     end
 end
 
-updateGFX = function(dt)
+F.updateGFX = function(dt)
     if not wheels or not wheels.wheelRotators then return end
-    if not next(wheelIndexMap) then initGuiStream() end
-    if not next(tyreData) then initTyreData() end
+    if not next(wheelIndexMap) then F.initGuiStream() end
+    if not next(tyreData) then F.initTyreData() end
 
     -- Prefer GE mailbox when present (even if unchanged this frame). Previously we only
     -- marked envReceived on mailbox *change*, so native getEnvTemperature ran every frame
@@ -4711,7 +4905,7 @@ updateGFX = function(dt)
             envFromMailbox = true
             if env ~= lastEnvMailbox then
                 lastEnvMailbox = env
-                local rawEnv = sanitizeEnvTemp(env)
+                local rawEnv = F.sanitizeEnvTemp(env)
                 local blended = ENV_TEMP + (rawEnv - ENV_TEMP) * min(1.0, dt * ENV_SMOOTH_RATE)
                 local maxStep = ENV_MAX_DELTA_PER_SEC * dt
                 local delta = blended - ENV_TEMP
@@ -4755,19 +4949,19 @@ updateGFX = function(dt)
                 local myId = (obj.getID and obj:getID()) or objectId
                 local mine = decoded[myId] or decoded[tostring(myId)]
                 if type(mine) == "table" then
-                    setDraftWake(mine.wake, mine.side, mine.push, mine.airTempDelta)
+                    F.setDraftWake(mine.wake, mine.side, mine.push, mine.airTempDelta)
                 end
             end
         end
     end
 
-    decayDraftWake(dt)
+    F.decayDraftWake(dt)
 
     if not envFromMailbox and obj and type(obj.getEnvTemperature) == "function" then
         local nativeKelvin = obj:getEnvTemperature()
         if nativeKelvin and nativeKelvin > 0 then
             local nativeCelsius = nativeKelvin - 273.15
-            local rawEnv = sanitizeEnvTemp(nativeCelsius)
+            local rawEnv = F.sanitizeEnvTemp(nativeCelsius)
             local blended = ENV_TEMP + (rawEnv - ENV_TEMP) * min(1.0, dt * ENV_SMOOTH_RATE)
             local maxStep = ENV_MAX_DELTA_PER_SEC * dt
             local delta = blended - ENV_TEMP
@@ -4810,7 +5004,7 @@ updateGFX = function(dt)
     end
 
     -- Sample track surface once per GFX frame (physics + UI share this)
-    frameTrackTemp = getTrackTemp(localizedEnvTemp, trackEnv.timeOfDay, trackEnv.cloudCover)
+    frameTrackTemp = F.getTrackTemp(localizedEnvTemp, trackEnv.timeOfDay, trackEnv.cloudCover)
     
     local upVector = (obj and obj.getDirectionVectorUp) and obj:getDirectionVectorUp() or nil
     local frontVector = (obj and obj.getDirectionVector) and obj:getDirectionVector() or nil
@@ -4820,21 +5014,21 @@ updateGFX = function(dt)
         if ok and q then invQuat = q:inversed() end
     end
 
-    local airspeed = getFreestreamAirspeed()
+    local airspeed = F.getFreestreamAirspeed()
 
     local gx_gfx = (sensors and (sensors.gx2 or sensors.gx) or 0) / 9.80665
     local gy_gfx = (sensors and (sensors.gy2 or sensors.gy) or 0) / 9.80665
     local g_mag = sqrt(gx_gfx * gx_gfx + gy_gfx * gy_gfx)
 
-    prepareWheelFrame(dt, localizedEnvTemp, invQuat, upVector, airspeed, g_mag, gy_gfx)
+    F.prepareWheelFrame(dt, localizedEnvTemp, invQuat, upVector, airspeed, g_mag, gy_gfx)
 
-    runFixedPhysicsSteps(dt, localizedEnvTemp)
+    F.runFixedPhysicsSteps(dt, localizedEnvTemp)
     
     if DEBUG_THERMALS then
         local logParts = {}
         for wheelID, data in pairs(tyreData) do
-            local avg = TempRingsToAvgTemp(data.temp, 0, 1.0, localizedEnvTemp)
-            local carc = TempCarcassToAvgTemp(data.temp, 0, 1.0, localizedEnvTemp)
+            local avg = F.TempRingsToAvgTemp(data.temp, 0, 1.0, localizedEnvTemp)
+            local carc = F.TempCarcassToAvgTemp(data.temp, 0, 1.0, localizedEnvTemp)
             local wName = wheelCache[wheelID] and wheelCache[wheelID].name or tostring(wheelID)
             table.insert(logParts, string.format("%s: Skin=%.1f Carc=%.1f Rim=%.1f Air=%.1f (Opt=%.1f)", wName, avg, carc, data.temp[7] or 0, data.temp[8] or 0, data.working_temp or 0))
         end
@@ -4861,7 +5055,7 @@ updateGFX = function(dt)
                 guiStream.elevationM = math.floor(pos.z * 10) / 10
             end
         end
-        flushGuiStream(localizedEnvTemp)
+        F.flushGuiStream(localizedEnvTemp)
 
         -- 0.39+: queueStream feeds StreamsManager / streamsUpdate. Prefer it alone so apps
         -- do not process the same payload twice (queueStream + trigger). Older builds keep trigger.
@@ -4873,10 +5067,10 @@ updateGFX = function(dt)
         end
     end
 
-    writeTelemetryIfEnabled(dt)
+    F.writeTelemetryIfEnabled(dt)
 end
 
-onInit = function()
+F.onInit = function()
     local t0 = (os and os.clock and os.clock()) or 0
     local ok, err = pcall(function()
         print("luukstyrethermalsandwear vehicle extension onInit")
@@ -4932,14 +5126,14 @@ onInit = function()
         draft.convectionMult, draft.airTempEffective = 1.0, 0
         baseBrakeCoolings = {}
 
-        initTyreData()
-        initGuiStream()
+        F.initTyreData()
+        F.initGuiStream()
         -- Soft reset keeps locals; full vehicle reload re-runs module — restore from arm marker
         if not telem.csvEnabled then
-            restoreTelemetryAfterReload("onInit")
+            F.restoreTelemetryAfterReload("onInit")
         elseif telem.csvEnabled and telem.path then
             -- Flush any pending samples before #RESET so stint data is never lost
-            appendTelemetryResetMarker(nil, telem.path, "onReset")
+            F.appendTelemetryResetMarker(nil, telem.path, "onReset")
         end
     end)
     if not ok then
@@ -4961,23 +5155,23 @@ onInit = function()
     end
 end
 
-onReset = function()
-    onInit()
+F.onReset = function()
+    F.onInit()
 end
 
 -- Vehicle deserialize / hard reload: flush if somehow still buffered, then restore arm.
-onDeserialized = function(_data)
-    flushTelemetryBuffer()
+F.onDeserialized = function(_data)
+    F.flushTelemetryBuffer()
     if not telem.csvEnabled then
-        restoreTelemetryAfterReload("onDeserialized")
+        F.restoreTelemetryAfterReload("onDeserialized")
     elseif telem.csvEnabled and telem.path then
-        appendTelemetryResetMarker(nil, telem.path, "onDeserialized")
+        F.appendTelemetryResetMarker(nil, telem.path, "onDeserialized")
     end
 end
 
 -- 0.39 prefers onExtensionUnloaded over deprecated onUnload
-onExtensionUnloaded = function()
-    flushTelemetryBuffer()
+F.onExtensionUnloaded = function()
+    F.flushTelemetryBuffer()
     draft.wake, draft.side, draft.push = 0, 0, 0
     draft.airTempDelta, draft.coolingWake = 0, 0
     draft.inferredWake = 0
@@ -4985,22 +5179,22 @@ onExtensionUnloaded = function()
     draft.lastMailbox = nil
 end
 
-onSettingsChanged = function()
+F.onSettingsChanged = function()
 end
 
-M.onSettingsChanged = onSettingsChanged
-M.onInit = onInit
-M.onReset = onReset
-M.onDeserialized = onDeserialized
-M.onExtensionUnloaded = onExtensionUnloaded
-M.update = update
-M.updateGFX = updateGFX
-M.setGroundModels = setGroundModels
-M.setDraftWake = setDraftWake
+M.onSettingsChanged = F.onSettingsChanged
+M.onInit = F.onInit
+M.onReset = F.onReset
+M.onDeserialized = F.onDeserialized
+M.onExtensionUnloaded = F.onExtensionUnloaded
+M.update = F.update
+M.updateGFX = F.updateGFX
+M.setGroundModels = F.setGroundModels
+M.setDraftWake = F.setDraftWake
 M.hasNativeInterAero = function() return draft.hasNativeInterAero end
 M.getInferredWake = function() return draft.inferredWake end
 M.flushTelemetryCsv = function()
-    flushTelemetryBuffer()
+    F.flushTelemetryBuffer()
 end
 M.setTelemetryCsv = function(enabled, path, intervalSec)
         local wasEnabled = telem.csvEnabled
@@ -5009,7 +5203,7 @@ M.setTelemetryCsv = function(enabled, path, intervalSec)
         if path and type(path) == "string" and #path > 0 then
             if telem.path and telem.path ~= path and telem.csvBufCount > 0 then
                 -- Path change: flush old file before switching
-                flushTelemetryBuffer()
+                F.flushTelemetryBuffer()
             end
             if telem.path ~= path then
                 telem.headerReady = false
@@ -5021,19 +5215,19 @@ M.setTelemetryCsv = function(enabled, path, intervalSec)
         end
         if not telem.csvEnabled then
             -- Disarm: flush so no samples are stranded in RAM
-            flushTelemetryBuffer()
+            F.flushTelemetryBuffer()
             telem.timer = 0
-            clearTelemetryArmMarker()
+            F.clearTelemetryArmMarker()
             return
         end
         if telem.path then
-            writeTelemetryArmMarker(telem.path)
+            F.writeTelemetryArmMarker(telem.path)
         end
         -- Header once on arm (or path change); not every sample / heartbeat re-arm
         if (not wasEnabled) or (prevPath ~= telem.path) or (not telem.headerReady) then
-            local ioLib = getTelemetryIo()
+            local ioLib = F.getTelemetryIo()
             if ioLib and telem.path then
-                ensureTelemetryHeader(ioLib, telem.path)
+                F.ensureTelemetryHeader(ioLib, telem.path)
             end
         end
         if telem.lastFlushClock <= 0 then

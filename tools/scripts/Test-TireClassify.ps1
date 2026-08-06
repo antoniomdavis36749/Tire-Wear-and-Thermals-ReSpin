@@ -1,5 +1,5 @@
 # Unit check: purpose + compound descriptor + classifyReason routing
-# Mirrors getInterpolatedProfile + vehicleHasPlainRallyDamper in
+# Mirrors getInterpolatedProfile + vehicleHasPlainRallyDamper + remapSlickSoftness in
 # lua/vehicle/extensions/auto/luukstyrethermalsandwear.lua
 $ErrorActionPreference = 'Stop'
 $outDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'output'
@@ -8,7 +8,7 @@ $out = Join-Path $outDir 'tire-classify-test.txt'
 $sb = New-Object System.Text.StringBuilder
 function Out([string]$s) { [void]$sb.AppendLine($s); Write-Host $s }
 
-# Plain rally coilover/strut only — not suspension/spring/shock/damp, not strut_bar,
+# Plain rally coilover/strut only - not suspension/spring/shock/damp, not strut_bar,
 # not track/race/gravel/lights. Empty strings are ignored (no slot-key fallback).
 function Test-HasPlainRallyDamper([string[]]$parts) {
   foreach ($raw in $parts) {
@@ -24,6 +24,25 @@ function Test-HasPlainRallyDamper([string[]]$parts) {
   return $false
 }
 
+# Mirrors F.remapSlickSoftness - BeamNG 0.5/0.8/1.0 -> densified 0.50/0.65/0.80
+function Get-RemapSlickSoftness([double]$softnessCoef) {
+  $s = $softnessCoef
+  if ($s -ne $s) { $s = 0.5 }
+  if ($s -ge 0.99) { return 0.80 }
+  if ([math]::Abs($s - 0.8) -le 0.012) { return 0.65 }
+  if ($s -ge 0.50 -and $s -le 0.80) { return $s }
+  if ($s -lt 0.50) { return 0.50 }
+  return 0.65 + (($s - 0.80) / 0.19) * 0.15
+}
+
+function Get-SlickBand([double]$sc) {
+  if ($sc -le 0.5375) { return 'hard' }
+  if ($sc -le 0.6125) { return 'hard-mid' }
+  if ($sc -le 0.6875) { return 'medium' }
+  if ($sc -le 0.7625) { return 'medium-soft' }
+  return 'soft'
+}
+
 # Returns hashtable: descriptor, purpose, classifyReason
 function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
   $nameLower = $tireName.ToLowerInvariant()
@@ -34,8 +53,12 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
   $isGravelRallyName = ($nameLower -like '*rally*') -and -not $isAsphaltName
   $isSlickName = ($nameLower -like '*slick*')
   $isRaceName = ($nameLower -like '*race*')
-  $isRaceOrSlickName = $isSlickName -or $isRaceName
-  $isRaceLikeName = $isRaceOrSlickName -or ($treadCoef -le 0.12)
+  # Bare "race" alone does not force slick when tread is clearly street (>=~0.35)
+  $isStrongRace = ($nameLower -like '*gt3*') -or ($nameLower -like '*gt4*') `
+    -or ($nameLower -like '*formula*') -or ($nameLower -like '*retrorace*') `
+    -or ($nameLower -like '*modernrace*')
+  $isRaceLikeName = $isSlickName -or ($treadCoef -le 0.12) -or $isStrongRace `
+    -or ($isRaceName -and ($treadCoef -lt 0.35))
 
   $isDamperTarmacHint = $false
   if (-not $isAsphaltName -and -not $isAsphaltRallyRaceSku) {
@@ -92,7 +115,7 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'street'; $classifyReason = 'street_spectrum'; $descriptor = 'Crawler'
   }
 
-  # Street-spectrum MT + gravel name → gravel purpose (mirrors Lua gravel_mt_name)
+  # Street-spectrum MT + gravel name -> gravel purpose (mirrors Lua gravel_mt_name)
   if ($classifyReason -eq 'street_spectrum' -and ($nameLower -like '*gravel*') -and ($treadCoef -gt 0.78)) {
     $purpose = 'gravel'; $classifyReason = 'gravel_mt_name'
   }
@@ -169,7 +192,7 @@ $cases = @(
     parts=@()
     expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
 
-  # Explicit asphalt / tarmac tire names → tarmac_rally (hardware optional)
+  # Explicit asphalt / tarmac tire names -> tarmac_rally (hardware optional)
   @{ name='Scintilla rally (*_asphalt)'; tire='tire_F_245_40_18_asphalt'; tread=0.40
     parts=@('scintilla_coilover_F_rally')
     expectDesc='Rally'; expectPurpose='tarmac_rally'; expectReason='asphalt_name' }
@@ -228,7 +251,7 @@ $cases = @(
     parts=@()
     expectDesc='Vintage'; expectPurpose='street'; expectReason='vintage_spectrum' }
 
-  # Negatives: cosmetic / empty slots must not remap race → tarmac_rally
+  # Negatives: cosmetic / empty slots must not remap race -> tarmac_rally
   @{ name='Race + skin_rally only'; tire='tire_F_265_40_17_race'; tread=0.0
     parts=@('bolide_skin_rally','tire_F_265_40_17_race')
     expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
@@ -240,6 +263,29 @@ $cases = @(
     expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
   @{ name='Race + strut_bar only'; tire='tire_F_195_50_15_race'; tread=0.0
     parts=@('covet_strut_bar_F','tire_F_195_50_15_race')
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+
+  # --- Tweak 2: bare "race" + street tread stays continuum; strong tokens / slick / tread0 still slick ---
+  @{ name='estr34 race street tread (not slick)'; tire='estr34_tires_18x10_race'; tread=0.5
+    parts=@()
+    expectDesc='Sport'; expectPurpose='street'; expectReason='street_spectrum' }
+  @{ name='race name + tread0 still slick'; tire='estr34_tires_18x10_race'; tread=0.0
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='slick token + street tread still slick'; tire='estr34_tires_18x10_slick'; tread=0.5
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='bastion_gt4 modernrace tread0'; tire='bastion_gt4_modernrace'; tread=0.0
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='modernrace + street tread still slick (strong token)'; tire='bastion_modernrace_tire'; tread=0.5
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='picnic f4 race tread0'; tire='picnic_f4_race'; tread=0.0
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='sunstorm *_race tread0'; tire='sunstorm_tire_race'; tread=0.0
+    parts=@()
     expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
 )
 
@@ -261,11 +307,44 @@ foreach ($c in $cases) {
   }
 }
 
+# --- Tweak 1: slick softnessCoef remap soft-sim ---
+Out ''
+Out '=== Slick softnessCoef remap (BeamNG 0.5/0.8/1.0 -> densified) ==='
+$softCases = @(
+  @{ name='soft=1.0 -> soft end'; soft=1.0; expectSc=0.80; expectBand='soft'
+    beforeNote='clamp 0.80 soft_slick (collapsed with all soft>=0.80)' }
+  @{ name='soft=0.8 -> medium'; soft=0.8; expectSc=0.65; expectBand='medium'
+    beforeNote='clamp 0.80 soft_slick (wrong - common med tier)' }
+  @{ name='soft=0.5 -> hard'; soft=0.5; expectSc=0.50; expectBand='hard'
+    beforeNote='clamp 0.50 hard_slick (unchanged)' }
+  @{ name='soft=0 -> hard floor'; soft=0.0; expectSc=0.50; expectBand='hard'
+    beforeNote='clamp 0.50 hard floor' }
+  @{ name='soft=0.575 midpoint preserved'; soft=0.575; expectSc=0.575; expectBand='hard-mid'
+    beforeNote='clamp 0.575 densified mid' }
+  @{ name='soft=0.725 midpoint preserved'; soft=0.725; expectSc=0.725; expectBand='medium-soft'
+    beforeNote='clamp 0.725 densified mid' }
+  @{ name='soft=1.2 -> soft end'; soft=1.2; expectSc=0.80; expectBand='soft'
+    beforeNote='clamp 0.80 soft_slick' }
+)
+$softFail = 0
+foreach ($c in $softCases) {
+  $legacy = [math]::Max(0.50, [math]::Min(0.80, [double]$c.soft))
+  $sc = Get-RemapSlickSoftness ([double]$c.soft)
+  $band = Get-SlickBand $sc
+  $ok = ([math]::Abs($sc - [double]$c.expectSc) -lt 1e-9) -and ($band -eq $c.expectBand)
+  if (-not $ok) { $softFail++ }
+  $mark = if ($ok) { 'PASS' } else { 'FAIL' }
+  Out ("{0}: {1}" -f $mark, $c.name)
+  Out ("       before clamp={0:N3} ({1})" -f $legacy, $c.beforeNote)
+  Out ("       after  remap={0:N3} band={1}  want sc={2:N3} band={3}" -f $sc, $band, $c.expectSc, $c.expectBand)
+}
+$fail += $softFail
+
 Out ''
 if ($fail -eq 0) {
-  Out ("OVERALL: PASS ({0}/{0})" -f $cases.Count)
+  Out ("OVERALL: PASS ({0} classify + {1} soft-remap)" -f $cases.Count, $softCases.Count)
 } else {
-  Out ("OVERALL: FAIL ($fail/$($cases.Count) failed)")
+  Out ("OVERALL: FAIL ($fail failed)")
 }
 
 # Light schema check: compound-character knobs present with neutral defaults
@@ -302,6 +381,9 @@ if (Test-Path $luaPath) {
     -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.90')
   if (-not $softOk) { $charFail++ }
   Out ("{0}: soft-cap packs still present (street 0.78 + vintage 0.90)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
+  $remapOk = ($lua -match 'remapSlickSoftness') -and ($lua -match 'modernrace')
+  if (-not $remapOk) { $charFail++ }
+  Out ("{0}: remapSlickSoftness + strong race tokens present" -f ($(if ($remapOk) { 'PASS' } else { 'FAIL' })))
 } else {
   Out "SKIP character knob schema (lua not found at $luaPath)"
 }
