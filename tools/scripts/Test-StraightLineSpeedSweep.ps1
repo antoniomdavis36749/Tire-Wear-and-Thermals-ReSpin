@@ -1,4 +1,4 @@
-# Straight-line cruise speed sweep soft-sim (25–300 mph).
+﻿# Straight-line cruise speed sweep soft-sim (25â€“300 mph).
 # Edge-case probe: RR/hyst + residual cruise slip vs v^0.8 convection at high V.
 # Mirrors CalcTyreWear post-fix knobs from luukstyrethermalsandwear.lua
 # (spawn grace, skinCore scale/floor, env clamp, cruise RR soft-cap, aero heat discount,
@@ -24,11 +24,11 @@ $topo = @{
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
   flexWarmSpeed0 = 2.0; flexWarmSpeed1 = 20.0; flexWarmG0 = 0.28
-  drivePropCruiseNm = 250.0; drivePropExcessFullNm = 520.0
-  drivePropSkinCoef = 0.066
-  drivePropHystBase = 5e-8; drivePropHystExcess = 6e-7
-  drivePropFlexGateStart = 0.12; drivePropFlexExcess = 0.00054
-  drivePropSlipWorkMult = 1.28
+  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
+  drivePropSkinCoef = 0.048
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
+  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
+  drivePropSlipWorkMult = 1.14
   drivePropSlickScale = 0.50; drivePropSlickCarcassScale = 0.30
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   aeroHeatScale = 0.55; aeroHeatSpeedStart = 15.0; aeroHeatSpeedFull = 52.0; aeroHeatMaxFrac = 0.48
@@ -51,16 +51,16 @@ $compounds = @(
   @{
     name = 'street'
     isSlick = $false
-    tOpt = 65.0; slipHeat = 8.925; workHeat = 5.1; rollingRes = 0.8
+    tOpt = 65.0; slipHeat = 7.9; workHeat = 4.8; rollingRes = 0.8
     treadInertia = 0.46; carcassInertia = 0.75; react = 1.35
     skinCore = 0.068; airCool = 0.0275; staticCool = 0.08
     coreCool = 0.0385; coreVelCool = 0.0088; trackCondMult = 1.0
     treadCoef = 0.5
     tyreWidthM = 0.225; tyreRadius = 0.32; pressurePsi = 32.0
     staticLoadN = 3800.0
-    # Mild passenger aero: ~0 at low V → ~500 N/wheel @ 300 mph
+    # Mild passenger aero: ~0 at low V â†’ ~500 N/wheel @ 300 mph
     aeroPeakN = 500.0
-    driveSlipHeatMin = 0.40; driveSlipPropMin = 0.62; driveHighVCarcassScale = 0.28
+    driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
   }
   @{
     name = 'medium_slick'
@@ -69,10 +69,10 @@ $compounds = @(
     treadInertia = 0.399; carcassInertia = 0.646; react = 1.42
     skinCore = 0.104; airCool = 0.020; staticCool = 0.076
     coreCool = 0.028; coreVelCool = 0.0064; trackCondMult = 1.15
-    treadCoef = 0.0   # slick continuum → conductanceTreadScale ≈ 2.0
+    treadCoef = 0.0   # slick continuum â†’ conductanceTreadScale â‰ˆ 2.0
     tyreWidthM = 0.275; tyreRadius = 0.33; pressurePsi = 27.0
     staticLoadN = 3400.0
-    # Race wing aero: ~0 low → ~2200 N/wheel @ 300 mph
+    # Race wing aero: ~0 low â†’ ~2200 N/wheel @ 300 mph
     aeroPeakN = 2200.0
     driveSlipHeatMin = 1.0; driveSlipPropMin = 1.0; driveHighVCarcassScale = 1.0
   }
@@ -97,7 +97,7 @@ $speedsMph = @(25, 40, 60, 80, 100, 120, 150, 180, 200, 250, 300)
 # Straight-line residual cruise slip (live soft-sat path still sees tiny longComp)
 $CRUISE_SLIP = 0.025
 $CRUISE_G = 0.06
-# Propulsion to hold speed vs aero/RR (Nm/wheel). Opens excess gate at high V — intentional edge case.
+# Propulsion to hold speed vs aero/RR (Nm/wheel). Opens excess gate at high V â€” intentional edge case.
 function Get-CruisePropNm([double]$vMs) {
   return 40.0 + 0.038 * $vMs * $vMs
 }
@@ -108,7 +108,7 @@ function Simulate-Cruise {
     [double]$mph,
     [double]$dur = 210.0,          # 3.5 min settle window
     [double]$eqRate = 0.015,       # |dSkin/dt| + |dCore/dt| threshold
-    [double]$eqHold = 4.0          # seconds below threshold → declare settled
+    [double]$eqHold = 4.0          # seconds below threshold â†’ declare settled
   )
 
   $dt = 0.01
@@ -167,7 +167,7 @@ function Simulate-Cruise {
   $combinedAir = $airspeed + $omega * $tyreRadius * 0.35
   $effAir = $combinedAir / (1.0 + $combinedAir / 220.0)
 
-  # Climate adapt (env = 22 → mild)
+  # Climate adapt (env = 22 â†’ mild)
   $tempDiff = $env - 21.0
   $heatAdapt = Clamp (1.0 - $tempDiff * 0.008) 0.85 1.25
   $coolAdapt = Clamp (1.0 + $tempDiff * 0.010) 0.75 1.30
@@ -282,7 +282,7 @@ function Simulate-Cruise {
       ([double]$topo.drivePropHystExcess - [double]$topo.drivePropHystBase) * $excessCarcass
     $hyst = $hyst + ($propAbs * $dhgCarcass * $angHeat * $hystCoef * [double]$comp.rollingRes) / $heatMassScale
 
-    # Flex warm: cruise g/slip gate ≈ 0 on pure straight (flexWarmG0=0.28, slip*1.8 tiny)
+    # Flex warm: cruise g/slip gate â‰ˆ 0 on pure straight (flexWarmG0=0.28, slip*1.8 tiny)
     $flexWarm = 0.0
     $flexGate = (Clamp (($loadKg - [double]$topo.flexWarmLoad0) /
         [math]::Max(1.0, [double]$topo.flexWarmLoad1 - [double]$topo.flexWarmLoad0)) 0 1) *
@@ -397,7 +397,7 @@ Out ("Ambient={0:n1}C  track={1:n1}C (tod={2} cloud={3})" -f $ENV_C, $TRACK_C, $
 Out 'Settle: up to 210s or |dT/dt| sum < 0.015 C/s for 4s (after spawn grace)'
 Out 'Knobs: skinCoreScale=1.85 floor=0.070  carcassCoolVel/Static=0.28/0.20  hystSkinShare=0.18'
 Out '        aeroHeatScale=0.55 maxFrac=0.48  vFull=52m/s  spawnGrace=14s'
-Out '        streetCarcass damp: 78-112 m/s -> scale 0.28 (non-slick excess-prop carcass)'
+Out '        streetCarcass damp: 78-112 m/s -> scale 0.65 (non-slick excess-prop carcass)'
 Out 'Prop: Nm/wheel = 40 + 0.038*v^2  (aero/RR hold; excess gate opens at high V)'
 Out ''
 
@@ -465,8 +465,8 @@ foreach ($compName in @('street', 'medium_slick')) {
   $skinMax = ($rows | Measure-Object -Property endSkin -Maximum).Maximum
   $coreMax = ($rows | Measure-Object -Property endCore -Maximum).Maximum
 
-  Out ("  NaN/Inf: {0}" -f $(if ($nanAny) { 'YES — FAIL' } else { 'none' }))
-  Out ("  hit 400C cap: {0}" -f $(if ($capAny) { 'YES — RUNAWAY' } else { 'no' }))
+  Out ("  NaN/Inf: {0}" -f $(if ($nanAny) { 'YES â€” FAIL' } else { 'none' }))
+  Out ("  hit 400C cap: {0}" -f $(if ($capAny) { 'YES â€” RUNAWAY' } else { 'no' }))
   Out ("  cool-to-ambient @>=60mph: {0} points" -f $coolAmb)
   Out ("  max gap (core-skin): {0}C" -f $gapMax)
   Out ("  max end skin/core: {0} / {1} C" -f $skinMax, $coreMax)
@@ -486,7 +486,7 @@ foreach ($compName in @('street', 'medium_slick')) {
       [math]::Round($r300.endCore - $r200.endCore, 1))
   }
 
-  # Plausibility verdict for 100–300 band
+  # Plausibility verdict for 100â€“300 band
   $band = @($rows | Where-Object { $_.mph -ge 100 -and $_.mph -le 300 })
   $runaway = $false
   $overcool = $false
@@ -505,7 +505,7 @@ foreach ($compName in @('street', 'medium_slick')) {
   if ($nanAny) { $verdict = 'BROKEN'; $notes += 'NaN/Inf' }
   elseif ($runaway) { $verdict = 'RUNAWAY'; $notes += 'temps>=180 or cap' }
   elseif ($steep) { $verdict = 'SUSPECT'; $notes += ("+{0}C skin 100->300mph" -f [math]::Round($rise100_300, 1)) }
-  elseif ($overcool) { $verdict = 'OVERCOOL'; $notes += 'skin≈ambient at cruise' }
+  elseif ($overcool) { $verdict = 'OVERCOOL'; $notes += 'skinâ‰ˆambient at cruise' }
   elseif ($gapExplode) { $verdict = 'SUSPECT'; $notes += 'gap>=40C' }
   else {
     $notes += ("skin rise 100->300 = +{0}C (mild/ok)" -f [math]::Round($rise100_300, 1))

@@ -1,4 +1,4 @@
-# Soft-sim: Belasco GT4 race path — SLICK spectrum, FRONT vs REAR (RWD)
+﻿# Soft-sim: Belasco GT4 race path â€” SLICK spectrum, FRONT vs REAR (RWD)
 # Source: SLICK_SPECTRUM_POINTS + THERMAL_TOPOLOGY drivePropSlick* scales
 # sport / sport_plus PROFILE_POINTS untouched.
 # WC stint pass: cooler hotlap + slower condition so ~1.5 laps is not catastrophic.
@@ -37,15 +37,15 @@ $SOFTSIM_CORNER_HEAT = 0.62
 $SOFTSIM_DRIVE_HEAT_FULL = 18.5
 $SOFTSIM_CARCASS_DRIVE_FULL = 9.5
 # Live THERMAL_TOPOLOGY (AFTER)
-$DRIVE_PROP_SLICK_SCALE = 0.42
-$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.22
+$DRIVE_PROP_SLICK_SCALE = 0.48
+$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.26
 # Prior split scales (BEFORE this pass)
 $PRIOR_SKIN_SCALE = 0.50
 $PRIOR_CARCASS_SCALE = 0.30
 $SOFTSIM_RR_MULT = 0.55
 # Coast-axle warm-up folded into flexWarmGain (live 0.00125); soft-sim uses flex bump on fronts
 $SOFTSIM_HYST_SKIN = 0.21
-$SOFTSIM_FLEX_FRONT = 1.30  # ~flexWarmGain 0.00108→0.00125 + former undrivenRr 1.18
+$SOFTSIM_FLEX_FRONT = 1.30  # ~flexWarmGain 0.00108â†’0.00125 + former undrivenRr 1.18
 
 function ThermalGrip([hashtable]$prof, [double]$temp) {
   $soft = [double]$prof.softness
@@ -142,7 +142,7 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
       $effGateSkin = $driveGate * $slickSkinScale
       $effGateCarcass = $driveGate * $slickCarcassScale
       $slipWorkBoost = 1.0 + (1.28 - 1.0) * $effGateSkin
-      $driveSkin = (0.066 * $SOFTSIM_DRIVE_HEAT_FULL * [double]$prof.workHeat * 0.28) * $effGateSkin
+      $driveSkin = (0.048 * $SOFTSIM_DRIVE_HEAT_FULL * [double]$prof.workHeat * 0.28) * $effGateSkin
       $raw = ($raw * $slipWorkBoost) + $driveSkin
     }
 
@@ -258,7 +258,7 @@ function EmitAxle([System.Text.StringBuilder]$sb, $r, [string]$label) {
 }
 
 $sb = New-Object System.Text.StringBuilder
-[void]$sb.AppendLine('SOFT-SIM: Belasco GT4 / medium_slick — FRONT vs REAR (RWD drive heat)')
+[void]$sb.AppendLine('SOFT-SIM: Belasco GT4 / medium_slick â€” FRONT vs REAR (RWD drive heat)')
 [void]$sb.AppendLine(("lap~95s, cornerHeat={0}, driveHeatFull={1}, carcassDriveFull={2}" -f `
   $SOFTSIM_CORNER_HEAT, $SOFTSIM_DRIVE_HEAT_FULL, $SOFTSIM_CARCASS_DRIVE_FULL))
 [void]$sb.AppendLine(("AFTER drivePropSlickScale={0} drivePropSlickCarcassScale={1}" -f `
@@ -290,9 +290,9 @@ EmitAxle $sb $afterR 'REAR'
 $bF1 = $beforeF.rows[0]; $bR1 = $beforeR.rows[0]
 $aF1 = $afterF.rows[0]; $aR1 = $afterR.rows[0]
 $bR10 = $beforeR.rows[9]; $aR10 = $afterR.rows[9]
-$aR2 = $afterR.rows[1]  # ~1.5–2 lap checkpoint
+$aR2 = $afterR.rows[1]  # ~1.5â€“2 lap checkpoint
 
-[void]$sb.AppendLine('======== SUMMARY F vs R — skin + carcass ========')
+[void]$sb.AppendLine('======== SUMMARY F vs R â€” skin + carcass ========')
 [void]$sb.AppendLine(('BEFORE  F skin={0:n1}/{1:n1} car={2:n1}/{3:n1} | R skin={4:n1}/{5:n1} car={6:n1}/{7:n1}' -f `
   $bF1.avg, $bF1.peak, $bF1.coreAvg, $bF1.corePeak,
   $bR1.avg, $bR1.peak, $bR1.coreAvg, $bR1.corePeak))
@@ -330,7 +330,7 @@ Expect ($aR1.coreAvg -lt ($bR1.coreAvg - 3.0)) ("AFTER rear carcass cooler than 
 Expect (($aR1.coreAvg - $aF1.coreAvg) -lt 22.0) ("AFTER R-F carcass gap <22C (got {0:n1})" -f ($aR1.coreAvg - $aF1.coreAvg))
 Expect ($aR1.corePeak -lt 130) ("AFTER rear carcass peak <130C (got {0})" -f $aR1.corePeak)
 
-# Stint life: 1.5–2 laps must not be catastrophic; 10 laps still usable
+# Stint life: 1.5â€“2 laps must not be catastrophic; 10 laps still usable
 Expect ($aR2.cond -ge 97.0) ("AFTER rear cond @lap2 >=97% (got {0})" -f $aR2.cond)
 Expect ($aR2.blister -lt 5.0) ("AFTER rear blister @lap2 <5% (got {0})" -f $aR2.blister)
 Expect ($aR10.cond -ge 90.0) ("AFTER rear cond @lap10 >=90% (got {0})" -f $aR10.cond)

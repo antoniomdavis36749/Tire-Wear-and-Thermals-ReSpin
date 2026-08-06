@@ -8,7 +8,7 @@
 #   Stationary burnout      --- airspeed---1.5, must still cook (soft-cap off)
 #   RWD drift               --- high g + side slip, soft-cap off
 #   Slick                    --- soft-cap off (floors 1.0)
-#   sport_plus               --- milder profile floors (0.72/0.82)
+#   sport_plus               --- milder profile floors (0.88/0.92)
 #
 # Refs: Test-StraightLineSpeedSweep.ps1, Test-BurnoutHeat.ps1
 $ErrorActionPreference = 'Stop'
@@ -31,12 +31,12 @@ function Smooth01([double]$t) {
 $topo = @{
   patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
   freeBeltCoolMult = 1.32
-  drivePropCruiseNm = 250.0; drivePropExcessFullNm = 520.0
-  drivePropSkinCoef = 0.066
-  drivePropHystBase = 5e-8; drivePropHystExcess = 6e-7
-  drivePropFlexGateStart = 0.12; drivePropFlexExcess = 0.00054
-  drivePropSlipWorkMult = 1.28
-  drivePropSlickScale = 0.42; drivePropSlickCarcassScale = 0.22
+  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
+  drivePropSkinCoef = 0.048
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
+  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
+  drivePropSlipWorkMult = 1.14
+  drivePropSlickScale = 0.48; drivePropSlickCarcassScale = 0.26
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
@@ -62,23 +62,23 @@ $TRACK_C = 36.0
 $street = @{
   name = 'street'
   isSlick = $false; isSportPlus = $false
-  tOpt = 65.0; slipHeat = 8.925; workHeat = 5.1; rollingRes = 0.8
+  tOpt = 65.0; slipHeat = 7.9; workHeat = 4.8; rollingRes = 0.8
   treadInertia = 0.46; carcassInertia = 0.75; react = 1.35
   skinCore = 0.068; airCool = 0.0275; staticCool = 0.08
   coreCool = 0.0385; coreVelCool = 0.0088; trackCondMult = 1.0
   treadCoef = 0.5
   tyreWidthM = 0.225; tyreRadius = 0.32; pressurePsi = 32.0
-  driveSlipHeatMin = 0.40; driveSlipPropMin = 0.62; driveHighVCarcassScale = 0.28
+  driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
 }
 $sportPlus = @{
   name = 'sport_plus'
   isSlick = $false; isSportPlus = $true
-  tOpt = 76.0; slipHeat = 8.2; workHeat = 3.8; rollingRes = 0.70
+  tOpt = 76.0; slipHeat = 7.75; workHeat = 3.6; rollingRes = 0.70
   treadInertia = 0.441; carcassInertia = 0.714; react = 1.3
   skinCore = 0.088; airCool = 0.029; staticCool = 0.095
   coreCool = 0.038; coreVelCool = 0.0095; trackCondMult = 1.15
   treadCoef = 0.30
-  driveSlipHeatMin = 0.72; driveSlipPropMin = 0.82; driveHighVCarcassScale = 0.28
+  driveSlipHeatMin = 0.88; driveSlipPropMin = 0.92; driveHighVCarcassScale = 0.70
   tyreWidthM = 0.265; tyreRadius = 0.33; pressurePsi = 30.0
 }
 $slick = @{
@@ -396,7 +396,7 @@ function Out([string]$s) { [void]$sb.AppendLine($s) }
 
 Out '=== FWD / RWD drive-slip heat soft-sim ==='
 Out ('Generated: {0:yyyy-MM-dd HH:mm}' -f (Get-Date))
-Out 'Live knobs: topo enable ramps + profile driveSlipHeatMin/PropMin (street 0.40/0.62, sport+ 0.72/0.82)'
+Out 'Live knobs: topo enable ramps + profile driveSlipHeatMin/PropMin (street 0.78/0.86, sport+ 0.88/0.92)'
 Out ('FWD slipE from lastSlip=20 -> {0:n3}; RWD lastSlip=9 -> {1:n3}; burnout lastSlip=20 -> {2:n3}' -f `
   $fwdSlip, $rwdSlip, $burnSlip)
 Out ''
@@ -451,8 +451,8 @@ $sl = $paired | Where-Object { $_.name -like 'medium_slick*' } | Select-Object -
 $rwd = $paired | Where-Object { $_.name -like 'RWD street hard accel*' } | Select-Object -First 1
 
 $fail = 0
-if ($fwd -and (($fwd.before.peakSkin - $fwd.after.peakSkin) -lt 8.0)) {
-  Out ' FAIL: FWD rolling spin not cooled enough (expect >=8C peak relief).'; $fail++
+if ($fwd -and (($fwd.before.peakSkin - $fwd.after.peakSkin) -lt 2.5)) {
+  Out ' FAIL: FWD rolling spin not cooled enough (expect >=2.5C peak relief after Pass 5 milder soft-cap).'; $fail++
 } else {
   Out (' OK: FWD rolling spin peak {0:n1} -> {1:n1}C (relief {2:n1}C)' -f `
     $fwd.before.peakSkin, $fwd.after.peakSkin, ($fwd.before.peakSkin - $fwd.after.peakSkin))
@@ -467,8 +467,8 @@ if ($drift -and ([math]::Abs($drift.after.peakSkin - $drift.before.peakSkin) -gt
 } else {
   Out (' OK: drift unchanged (peak {0:n1}C, heatScale={1:n3})' -f $drift.after.peakSkin, $drift.after.streetHeat)
 }
-if ($sp -and ($sp.after.streetHeat -ge 0.999 -or $sp.after.streetHeat -lt 0.65 -or $sp.after.streetHeat -gt 0.92)) {
-  Out ' FAIL: sport_plus should use milder soft-cap (heatSc ~0.65-0.92).'; $fail++
+if ($sp -and ($sp.after.streetHeat -ge 0.999 -or $sp.after.streetHeat -lt 0.80 -or $sp.after.streetHeat -gt 0.98)) {
+  Out ' FAIL: sport_plus should use milder soft-cap (heatSc ~0.80-0.98).'; $fail++
 } else {
   Out (" OK: sport_plus milder soft-cap heatSc={0:n3}" -f $sp.after.streetHeat)
 }
@@ -477,8 +477,8 @@ if ($sl -and ([math]::Abs($sl.after.peakSkin - $sl.before.peakSkin) -gt 0.5)) {
 } else {
   Out ' OK: slick excluded'
 }
-if ($fwd -and ($fwd.after.peakSkin -gt 105.0)) {
-  Out ' WARN: FWD after peak still >105C - consider lower HeatMin.'
+if ($fwd -and ($fwd.after.peakSkin -gt 120.0)) {
+  Out ' WARN: FWD after peak still >120C - consider further root heat cut.'
 } elseif ($fwd -and $rwd) {
   Out (' OK: FWD after peak {0:n1}C (street opt~65); RWD mild-slip {1:n1}C' -f `
     $fwd.after.peakSkin, $rwd.after.peakSkin)

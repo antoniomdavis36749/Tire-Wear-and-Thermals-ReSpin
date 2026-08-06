@@ -97,22 +97,27 @@ local THERMAL_TOPOLOGY = {
     -- Pass 4 (small ~10–20% bump; not another pass-3 jump):
     --   cruiseNm 280→250, skin 0.058→0.066, hystExcess 5e-7→6e-7,
     --   flexExcess 0.00048→0.00054 + gate 0.15→0.12, slip/work ×1.22→×1.28.
-    drivePropCruiseNm = 250,   -- |prop| floor (Nm/wheel); below → excess gate shut (was 280)
-    drivePropExcessFullNm = 520,  -- span above cruise to excessGate=1 (unchanged from pass 3)
-    drivePropSkinCoef = 0.066, -- skin netTorque prop scale (was 0.058; brake stays 0.025)
+    -- Pass 5 (soft-cap debt paydown): cut root excess drive heat so street soft-cap floors
+    --   can move toward 1.0. Walks back Pass 4 + partial Pass 3 (not a full Pass-2 restore).
+    --   cruiseNm 250→310, excessFull 520→560, skin 0.066→0.048, hystExcess 6e-7→3.8e-7,
+    --   flexExcess 0.00054→0.00040 + gate 0.12→0.18, slip/work ×1.28→×1.14.
+    drivePropCruiseNm = 310,   -- |prop| floor (Nm/wheel); below → excess gate shut (was 250)
+    drivePropExcessFullNm = 560,  -- span above cruise to excessGate=1 (was 520)
+    drivePropSkinCoef = 0.048, -- skin netTorque prop scale (was 0.066; brake stays 0.025)
     drivePropHystBase = 5e-8,  -- torque hysteresis at excessGate=0
-    drivePropHystExcess = 6e-7, -- torque hysteresis at excessGate=1 (was 5e-7)
-    drivePropFlexGateStart = 0.12, -- excessFlex begins above this gate (was 0.15)
-    drivePropFlexExcess = 0.00054, -- carcass flex add when excessGate>FlexGateStart (was 0.00048)
-    drivePropSlipWorkMult = 1.28, -- skin slip/work scale at excessGate=1 (1=off; driven via prop)
+    drivePropHystExcess = 3.8e-7, -- torque hysteresis at excessGate=1 (was 6e-7)
+    drivePropFlexGateStart = 0.18, -- excessFlex begins above this gate (was 0.12)
+    drivePropFlexExcess = 0.00040, -- carcass flex add when excessGate>FlexGateStart (was 0.00054)
+    drivePropSlipWorkMult = 1.14, -- skin slip/work scale at excessGate=1 (1=off; driven via prop)
     -- Slick/race spectrum only: Pass 3/4 excess drive heat was tuned for sport_plus (Scintilla).
     -- GT4/RWD slicks overcooked driven rears while fronts stayed fine — scale excess only
     -- (sport_plus / street keep 1.0). Burnout slipVelBoost unchanged.
     -- Split: skin (slip/work + netTorque) vs carcass (hyst excess + flex excess + prop-linked RR).
     -- WC GT4: rears still overcooked + condition crashed ~1.5 laps — further slick-only cut.
+    -- Pass 5: lightly raise slick scales to offset shared skin/excess cut (keep GT4 stint feel).
     -- sport_plus / street keep 1.0; burnout slipVelBoost unchanged.
-    drivePropSlickScale = 0.42,           -- skin excess gate (was 0.50)
-    drivePropSlickCarcassScale = 0.22,    -- carcass excess/RR under prop (was 0.30)
+    drivePropSlickScale = 0.48,           -- skin excess gate (was 0.42; Pass 5 shared-cut offset)
+    drivePropSlickCarcassScale = 0.26,    -- carcass excess/RR under prop (was 0.22)
     -- Street/non-slick high-V + residual-slip soft-cap ENABLE gates (magnitudes on profiles):
     -- driveHighVCarcassScale / driveSlipHeatMin / driveSlipPropMin live on mods tables.
     -- Phase 5: purposeAllowsStreetSoftcap(purpose) must also pass (street/wet/winter/
@@ -252,12 +257,12 @@ local scratchCarcassWeights = { 0, 0, 0 }
 
 --[[
   ========================================================================
-  TIRE PROFILE SCHEMA (mods table) — 42 knobs + runtime descriptor
+  TIRE PROFILE SCHEMA (mods table) — 49 knobs + runtime descriptor
   Every profile table must include all of these; normalizeProfileMods()
   backfills any missing keys from DEFAULT_MODS.
 
   ARCHITECTURE (Phase 5 — gates stay gates)
-    Profiles  = rubber physics: spectra / standalones / the 42 knobs
+    Profiles  = rubber physics: spectra / standalones / the 49 knobs
                 (PROFILE_POINTS, SLICK_*, UTILITY_*, COMMERCIAL_*, ATV_UTV_*,
                  VINTAGE_*, STANDALONE_MODIFIERS). Own heat/grip/wear + soft-cap
                 *magnitudes* (driveSlipHeatMin / driveSlipPropMin /
@@ -310,6 +315,8 @@ local scratchCarcassWeights = { 0, 0, 0 }
     coldWidth           °C Gaussian width below plateau (cold roll-off).
     hotWidth            °C Gaussian width above plateau (hot cliff).
     gripFloor           Minimum thermal multiplier at extreme temps (0–1).
+    coldGripPower       Plateau-Gaussian cold-side exponent (shape; widths stay coldWidth).
+    hotGripPower        Plateau-Gaussian hot-side exponent (shape; widths stay hotWidth).
 
   HEAT GENERATION
     slipHeatRate        Skin heat from sliding / slip energy.
@@ -392,12 +399,18 @@ local scratchCarcassWeights = { 0, 0, 0 }
     hotWearMult         Wear multiplier when above opt.
     grainTempRatio      Graining starts below opt × this (e.g. 0.75).
     blisterTempRatio    Blistering starts above opt × this (e.g. 1.55).
+    grainRate           Cold-scrub grain accumulation rate (onset stays grainTempRatio).
+    blisterRate         Overheat blister accumulation rate (onset stays blisterTempRatio).
+    flatSpotRate        Lockup flat-spot accumulation scale (heal stays global).
+    stintFadeRate       Hot-stint fade + heat-cycle wear/grip kinetics scale (1.0 = today).
+    camberWearMult      Excess-camber wear scale only (grip camber stays camberSensitivity).
+                        At 1.0 bit-identical to pre-knob wear; >1 adds mild shoulder wear.
 
   Runtime-only (not in DEFAULT_MODS tables):
     descriptor          Compound-facing UI label set by getInterpolatedProfile().
     purpose             Duty/use id (circuit, tarmac_rally, gravel, street, …).
     classifyReason      Why purpose/compound routed (asphalt_name, race_sku, …).
-    dutyMods            Active topology/runtime gate ids (not the 42 knobs):
+    dutyMods            Active topology/runtime gate ids (not the 49 knobs):
                         fwd_slip_softcap, sport_plus_slip_softcap, street_high_v_damp,
                         awd_prop_gate, undriven_warmup, brake_tire_soak, duct_tire_side,
                         soft_sink_damp — only while applying after purpose enable filter;
@@ -406,6 +419,7 @@ local scratchCarcassWeights = { 0, 0, 0 }
 ]]
 -- PHYSICAL FALLBACK DEFAULTS (Used to protect custom modded profiles missing keys)
 -- Soft-cap magnitudes default OFF (1.0); street/sport_plus packs stamped onto spectra below.
+-- Compound-character knobs default to pre-expansion hardcoded constants (neutral feel).
 local DEFAULT_MODS = {
     adhesion = 0.45, airConductionRate = 0.0135, airCoolingRate = 0.0275, brakeGainRate = 0.9,
     casingCompliance = 0.6, coreCoolRate = 0.0385, coreVelCoolRate = 0.0088, skinCoreConductance = 0.068,
@@ -414,18 +428,24 @@ local DEFAULT_MODS = {
     staticCoolingRate = 0.08, slipHeatRate = 8.925, workHeatRate = 5.1, wearRate = 0.0005,
     treadInertia = 0.46, carcassInertia = 0.75, airThermalInertia = 0.22, thermalReactionRate = 1.35,
     tempPlateau = 15, coldWidth = 55, hotWidth = 55, gripFloor = 0.24,
+    coldGripPower = 1.35, hotGripPower = 2.0,
     coldWearMult = 1.8, hotWearMult = 3.5, grainTempRatio = 0.75, blisterTempRatio = 1.55,
+    grainRate = 0.00042, blisterRate = 0.00028, flatSpotRate = 0.025,
+    stintFadeRate = 1.0, camberWearMult = 1.0,
     waterDrainage = 0.8, wetGripScale = 1.0, dryGripScale = 1.0, trackConductivityMult = 1.0,
     camberSensitivity = 1.0, bottomOutSensitivity = 1.0, scrubSensitivity = 1.0,
     -- Phase 4: duty soft-cap magnitudes (1.0 = gate may enable but scale stays unity)
     driveSlipHeatMin = 1.0, driveSlipPropMin = 1.0, driveHighVCarcassScale = 1.0
 }
 
--- Named soft-cap packs (preserve pre-Phase-4 topo feel). Stamped onto spectra/standalones.
+-- Named soft-cap packs. Stamped onto spectra/standalones.
 -- Phase 5: packs are magnitudes only; purposeAllowsStreetSoftcap() selects enable.
-local DRIVE_SOFTCAP_STREET = { driveSlipHeatMin = 0.40, driveSlipPropMin = 0.62, driveHighVCarcassScale = 0.28 }
-local DRIVE_SOFTCAP_SPORT_PLUS = { driveSlipHeatMin = 0.72, driveSlipPropMin = 0.82, driveHighVCarcassScale = 0.28 }
-local DRIVE_SOFTCAP_SPORT_MID = { driveSlipHeatMin = 0.56, driveSlipPropMin = 0.72, driveHighVCarcassScale = 0.28 }
+-- Pass 5: floors moved toward 1.0 after root drive-heat cut (debt paydown; enable rules unchanged).
+local DRIVE_SOFTCAP_STREET = { driveSlipHeatMin = 0.78, driveSlipPropMin = 0.86, driveHighVCarcassScale = 0.65 }
+local DRIVE_SOFTCAP_SPORT_PLUS = { driveSlipHeatMin = 0.88, driveSlipPropMin = 0.92, driveHighVCarcassScale = 0.70 }
+local DRIVE_SOFTCAP_SPORT_MID = { driveSlipHeatMin = 0.85, driveSlipPropMin = 0.90, driveHighVCarcassScale = 0.68 }
+-- Vintage/bias-ply: gentler than street — historical rubber shouldn't need FWD soft-cap crutch.
+local DRIVE_SOFTCAP_VINTAGE = { driveSlipHeatMin = 0.90, driveSlipPropMin = 0.94, driveHighVCarcassScale = 0.78 }
 local DRIVE_SOFTCAP_OFF = { driveSlipHeatMin = 1.0, driveSlipPropMin = 1.0, driveHighVCarcassScale = 1.0 }
 -- Purpose → soft-cap ENABLE pack (not a second profile table).
 local STREET_SOFTCAP_PURPOSES = {
@@ -446,6 +466,64 @@ local function stampSpectrumDriveSoftcap(spectrum, packOrFn)
             local pack = packOrFn
             if type(packOrFn) == "function" then pack = packOrFn(pt.profile) end
             stampDriveSoftcap(pt.mods, pack or DRIVE_SOFTCAP_STREET)
+        end
+    end
+end
+
+-- Compound-character packs (neutral = today's hardcoded rates/powers). Soft-caps stay separate.
+-- Street/utility/winter/rain stay NEUTRAL so soft-sims keep absolute feel; race/sport climb.
+local CHARACTER_NEUTRAL = {
+    coldGripPower = 1.35, hotGripPower = 2.0,
+    grainRate = 0.00042, blisterRate = 0.00028,
+    flatSpotRate = 0.025, stintFadeRate = 1.0, camberWearMult = 1.0,
+}
+local CHARACTER_SPORT_MID = {
+    coldGripPower = 1.33, hotGripPower = 2.06,
+    grainRate = 0.00043, blisterRate = 0.00030,
+    flatSpotRate = 0.026, stintFadeRate = 1.08, camberWearMult = 1.06,
+}
+local CHARACTER_SPORT_PLUS = {
+    coldGripPower = 1.32, hotGripPower = 2.12,
+    grainRate = 0.00045, blisterRate = 0.00033,
+    flatSpotRate = 0.027, stintFadeRate = 1.15, camberWearMult = 1.10,
+}
+local CHARACTER_SLICK_HARD = {
+    coldGripPower = 1.40, hotGripPower = 2.15,
+    grainRate = 0.00038, blisterRate = 0.00033,
+    flatSpotRate = 0.028, stintFadeRate = 1.18, camberWearMult = 1.12,
+}
+local CHARACTER_SLICK_MED = {
+    coldGripPower = 1.38, hotGripPower = 2.20,
+    grainRate = 0.00044, blisterRate = 0.00036,
+    flatSpotRate = 0.028, stintFadeRate = 1.25, camberWearMult = 1.15,
+}
+local CHARACTER_SLICK_SOFT = {
+    coldGripPower = 1.36, hotGripPower = 2.28,
+    grainRate = 0.00050, blisterRate = 0.00040,
+    flatSpotRate = 0.030, stintFadeRate = 1.35, camberWearMult = 1.18,
+}
+local CHARACTER_DRAG = {
+    coldGripPower = 1.32, hotGripPower = 2.10,
+    grainRate = 0.00040, blisterRate = 0.00034,
+    flatSpotRate = 0.032, stintFadeRate = 1.12, camberWearMult = 1.08,
+}
+local CHARACTER_DRIFT = {
+    coldGripPower = 1.35, hotGripPower = 2.05,
+    grainRate = 0.00048, blisterRate = 0.00030,
+    flatSpotRate = 0.028, stintFadeRate = 1.10, camberWearMult = 1.05,
+}
+local function stampCharacterKnobs(mods, pack)
+    if type(mods) ~= "table" or type(pack) ~= "table" then return end
+    for k, v in pairs(pack) do mods[k] = v end
+end
+local function stampSpectrumCharacter(spectrum, packOrFn)
+    if type(spectrum) ~= "table" then return end
+    for i = 1, #spectrum do
+        local pt = spectrum[i]
+        if pt and pt.mods then
+            local pack = packOrFn
+            if type(packOrFn) == "function" then pack = packOrFn(pt.profile, pt) end
+            stampCharacterKnobs(pt.mods, pack or CHARACTER_NEUTRAL)
         end
     end
 end
@@ -509,12 +587,14 @@ local STANDALONE_MODIFIERS = {
         bottomOutSensitivity = 1, scrubSensitivity = 1.3
     },
     vintage = {
+        -- Pass 5: cooler historical rubber (lower slip/work heat, more RR + thermal mass).
+        -- Flavor via thermal window / RR / wear — gripMultiplier held (no μ dump).
         adhesion = 0.28, airConductionRate = 0.0135, airCoolingRate = 0.02375, brakeGainRate = 0.6,
         casingCompliance = 0.6, coreCoolRate = 0.0385, coreVelCoolRate = 0.0088, skinCoreConductance = 0.08,
         gripMultiplier = 0.94, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.042,
-        optimalPressure = 30, optimalTemp = 58, pressureSensitivity = 0.45, rollingRes = 0.78,
-        staticCoolingRate = 0.08, slipHeatRate = 7.35, workHeatRate = 7.2, wearRate = 0.0004,
-        treadInertia = 0.42, carcassInertia = 0.68, thermalReactionRate = 1.2, tempPlateau = 16,
+        optimalPressure = 30, optimalTemp = 58, pressureSensitivity = 0.45, rollingRes = 0.90,
+        staticCoolingRate = 0.08, slipHeatRate = 6.6, workHeatRate = 5.6, wearRate = 0.0004,
+        treadInertia = 0.48, carcassInertia = 0.78, thermalReactionRate = 1.2, tempPlateau = 16,
         coldWidth = 58, hotWidth = 55, gripFloor = 0.26, coldWearMult = 1.65,
         hotWearMult = 2.96, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.5,
         wetGripScale = 0.975, dryGripScale = 1, trackConductivityMult = 1, camberSensitivity = 0.5,
@@ -661,11 +741,12 @@ local PROFILE_POINTS = {
     { tread = 0.30, profile = "sport_plus", mods = {
         -- v7: tiny mechanical μ bump after Scintilla Belasco v6 retest ("a bit more grip").
         -- gm+dry only; lat held 0.97 (not tippier); loadSens unchanged; ~+2% μ at treadCoef 0.4 blend.
+        -- Pass 5: modest slip/work cut (~5%); keep race character.
         adhesion = 0.52, airConductionRate = 0.015, airCoolingRate = 0.029, brakeGainRate = 1.35,
         casingCompliance = 0.45, coreCoolRate = 0.038, coreVelCoolRate = 0.0095, skinCoreConductance = 0.088,
         gripMultiplier = 1.02, longGripMult = 1.0, latGripMult = 0.97, loadSensitivity = 0.078,
         optimalPressure = 31, optimalTemp = 76, pressureSensitivity = 0.75, rollingRes = 0.70,
-        staticCoolingRate = 0.095, slipHeatRate = 8.2, workHeatRate = 3.8, wearRate = 0.0006,
+        staticCoolingRate = 0.095, slipHeatRate = 7.75, workHeatRate = 3.6, wearRate = 0.0006,
         treadInertia = 0.441, carcassInertia = 0.714, thermalReactionRate = 1.3, tempPlateau = 14,
         coldWidth = 52, hotWidth = 50, gripFloor = 0.24, coldWearMult = 1.908,
         hotWearMult = 4.44, grainTempRatio = 0.78, blisterTempRatio = 1.50, waterDrainage = 0.58,
@@ -674,11 +755,12 @@ local PROFILE_POINTS = {
     } },
     { tread = 0.40, profile = "sport_tour", mods = {
         -- Mid sport_plus↔sport (common JBeam tread ~0.35–0.45 semislick / track-day street).
+        -- Pass 5: modest slip/work cut (~6%).
         adhesion = 0.47, airConductionRate = 0.015, airCoolingRate = 0.0265, brakeGainRate = 1.275,
         casingCompliance = 0.475, coreCoolRate = 0.0365, coreVelCoolRate = 0.00875, skinCoreConductance = 0.082,
         gripMultiplier = 1.01, longGripMult = 1.0, latGripMult = 0.985, loadSensitivity = 0.057,
         optimalPressure = 32, optimalTemp = 71, pressureSensitivity = 0.65, rollingRes = 0.76,
-        staticCoolingRate = 0.084, slipHeatRate = 8.7, workHeatRate = 4.55, wearRate = 0.000525,
+        staticCoolingRate = 0.084, slipHeatRate = 8.15, workHeatRate = 4.25, wearRate = 0.000525,
         treadInertia = 0.462, carcassInertia = 0.748, thermalReactionRate = 1.25, tempPlateau = 16,
         coldWidth = 63, hotWidth = 52.5, gripFloor = 0.29, coldWearMult = 1.869,
         hotWearMult = 3.71, grainTempRatio = 0.765, blisterTempRatio = 1.525, waterDrainage = 0.65,
@@ -688,11 +770,12 @@ local PROFILE_POINTS = {
     { tread = 0.50, profile = "sport", mods = {
         -- v6: medium mechanical μ bump (mirror sport_plus v6→v7 step; Kingsnake continuum ~0.50).
         -- gm+dry +0.02; lat held 1.0 (felt good); loadSens eased slightly; blend@0.4 still coherent.
+        -- Pass 5: modest slip/work cut (~7%).
         adhesion = 0.42, airConductionRate = 0.015, airCoolingRate = 0.024, brakeGainRate = 1.2,
         casingCompliance = 0.5, coreCoolRate = 0.035, coreVelCoolRate = 0.008, skinCoreConductance = 0.076,
         gripMultiplier = 1.00, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.036,
         optimalPressure = 33, optimalTemp = 66, pressureSensitivity = 0.55, rollingRes = 0.82,
-        staticCoolingRate = 0.073, slipHeatRate = 9.2, workHeatRate = 5.3, wearRate = 0.00045,
+        staticCoolingRate = 0.073, slipHeatRate = 8.55, workHeatRate = 4.95, wearRate = 0.00045,
         treadInertia = 0.483, carcassInertia = 0.782, thermalReactionRate = 1.2, tempPlateau = 18,
         coldWidth = 74, hotWidth = 55, gripFloor = 0.34, coldWearMult = 1.83,
         hotWearMult = 2.98, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.72,
@@ -701,11 +784,12 @@ local PROFILE_POINTS = {
     } },
     { tread = 0.60, profile = "standard", mods = {
         -- Mid sport↔standard (common passenger treadCoef ~0.55–0.65).
+        -- Pass 5: modest slip/work cut (~6%).
         adhesion = 0.41, airConductionRate = 0.01425, airCoolingRate = 0.02575, brakeGainRate = 1.05,
         casingCompliance = 0.55, coreCoolRate = 0.03675, coreVelCoolRate = 0.0084, skinCoreConductance = 0.072,
         gripMultiplier = 1.00, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.0355,
         optimalPressure = 33, optimalTemp = 63, pressureSensitivity = 0.50, rollingRes = 0.82,
-        staticCoolingRate = 0.0765, slipHeatRate = 8.8, workHeatRate = 5.2, wearRate = 0.000475,
+        staticCoolingRate = 0.0765, slipHeatRate = 8.25, workHeatRate = 4.85, wearRate = 0.000475,
         treadInertia = 0.4935, carcassInertia = 0.799, thermalReactionRate = 1.225, tempPlateau = 17,
         coldWidth = 66, hotWidth = 55, gripFloor = 0.30, coldWearMult = 1.80,
         hotWearMult = 2.99, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.76,
@@ -715,11 +799,12 @@ local PROFILE_POINTS = {
     { tread = 0.70, profile = "standard", mods = {
         -- Modest overall μ bump (~+4% gm): street default; asphalt>loose gap via applyProfileSurfaceBias
         -- (street-family dry*1.02 / gravel|dirt*0.90 / mud*0.86) — not another global gm change.
+        -- Pass 5: modest slip/work cut (~6%).
         adhesion = 0.4, airConductionRate = 0.0135, airCoolingRate = 0.0275, brakeGainRate = 0.9,
         casingCompliance = 0.6, coreCoolRate = 0.0385, coreVelCoolRate = 0.0088, skinCoreConductance = 0.068,
         gripMultiplier = 1.00, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.035,
         optimalPressure = 33, optimalTemp = 60, pressureSensitivity = 0.45, rollingRes = 0.82,
-        staticCoolingRate = 0.08, slipHeatRate = 8.4, workHeatRate = 5.1, wearRate = 0.0005,
+        staticCoolingRate = 0.08, slipHeatRate = 7.9, workHeatRate = 4.8, wearRate = 0.0005,
         treadInertia = 0.504, carcassInertia = 0.816, thermalReactionRate = 1.25, tempPlateau = 16,
         coldWidth = 58, hotWidth = 55, gripFloor = 0.26, coldWearMult = 1.77,
         hotWearMult = 3, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.8,
@@ -1025,14 +1110,15 @@ local ATV_UTV_SPECTRUM_POINTS = {
 }
 
 -- CONTINUOUS RETRO SPECTRUM: Flexible Cross-Ply Bias overlays up to Classic Radial Belts
+-- Pass 5: lower race-like heat gen, more RR + thermal mass (historical rubber; no gm dump).
 local VINTAGE_SPECTRUM_POINTS = {
     { tread = 0.50, profile = "vintage_biasply_vintage", mods = {
         adhesion = 0.28, airConductionRate = 0.0135, airCoolingRate = 0.02375, brakeGainRate = 0.6,
         casingCompliance = 0.65, coreCoolRate = 0.0385, coreVelCoolRate = 0.0088, skinCoreConductance = 0.08,
         gripMultiplier = 0.92, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.042,
-        optimalPressure = 24, optimalTemp = 56, pressureSensitivity = 0.45, rollingRes = 0.78,
-        staticCoolingRate = 0.08, slipHeatRate = 7.35, workHeatRate = 7.2, wearRate = 0.0004,
-        treadInertia = 0.42, carcassInertia = 0.68, thermalReactionRate = 1.2, tempPlateau = 16,
+        optimalPressure = 24, optimalTemp = 56, pressureSensitivity = 0.45, rollingRes = 0.94,
+        staticCoolingRate = 0.08, slipHeatRate = 6.5, workHeatRate = 5.7, wearRate = 0.0004,
+        treadInertia = 0.50, carcassInertia = 0.82, thermalReactionRate = 1.15, tempPlateau = 16,
         coldWidth = 58, hotWidth = 55, gripFloor = 0.26, coldWearMult = 1.65,
         hotWearMult = 2.96, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.5,
         wetGripScale = 0.975, dryGripScale = 1, trackConductivityMult = 1, camberSensitivity = 0.5,
@@ -1042,9 +1128,9 @@ local VINTAGE_SPECTRUM_POINTS = {
         adhesion = 0.315, airConductionRate = 0.013875, airCoolingRate = 0.025, brakeGainRate = 0.675,
         casingCompliance = 0.60, coreCoolRate = 0.03765, coreVelCoolRate = 0.0086, skinCoreConductance = 0.076,
         gripMultiplier = 0.945, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.04,
-        optimalPressure = 27, optimalTemp = 58, pressureSensitivity = 0.435, rollingRes = 0.82,
-        staticCoolingRate = 0.08, slipHeatRate = 7.875, workHeatRate = 6.3, wearRate = 0.000475,
-        treadInertia = 0.441, carcassInertia = 0.714, thermalReactionRate = 1.275, tempPlateau = 16,
+        optimalPressure = 27, optimalTemp = 58, pressureSensitivity = 0.435, rollingRes = 0.91,
+        staticCoolingRate = 0.08, slipHeatRate = 6.9, workHeatRate = 5.45, wearRate = 0.000475,
+        treadInertia = 0.49, carcassInertia = 0.80, thermalReactionRate = 1.22, tempPlateau = 16,
         coldWidth = 58, hotWidth = 55, gripFloor = 0.26, coldWearMult = 1.68,
         hotWearMult = 2.99, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.6,
         wetGripScale = 1.0, dryGripScale = 1, trackConductivityMult = 1, camberSensitivity = 0.6,
@@ -1054,9 +1140,9 @@ local VINTAGE_SPECTRUM_POINTS = {
         adhesion = 0.35, airConductionRate = 0.01425, airCoolingRate = 0.02625, brakeGainRate = 0.75,
         casingCompliance = 0.55, coreCoolRate = 0.0368, coreVelCoolRate = 0.0084, skinCoreConductance = 0.072,
         gripMultiplier = 0.97, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.038,
-        optimalPressure = 30, optimalTemp = 60, pressureSensitivity = 0.42, rollingRes = 0.86,
-        staticCoolingRate = 0.08, slipHeatRate = 8.4, workHeatRate = 5.4, wearRate = 0.00055,
-        treadInertia = 0.462, carcassInertia = 0.748, thermalReactionRate = 1.35, tempPlateau = 16,
+        optimalPressure = 30, optimalTemp = 60, pressureSensitivity = 0.42, rollingRes = 0.88,
+        staticCoolingRate = 0.08, slipHeatRate = 7.4, workHeatRate = 5.05, wearRate = 0.00055,
+        treadInertia = 0.48, carcassInertia = 0.78, thermalReactionRate = 1.28, tempPlateau = 16,
         coldWidth = 58, hotWidth = 55, gripFloor = 0.26, coldWearMult = 1.71,
         hotWearMult = 3.02, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.7,
         wetGripScale = 1.025, dryGripScale = 1, trackConductivityMult = 1, camberSensitivity = 0.7,
@@ -1065,7 +1151,7 @@ local VINTAGE_SPECTRUM_POINTS = {
 }
 
 -- Phase 4/5: stamp duty soft-cap magnitudes onto spectra / street-like standalones.
--- sport_plus milder; sport_tour mid; slick OFF; drag/drift/rally keep DEFAULT 1.0
+-- sport_plus milder; sport_tour mid; vintage gentler pack; slick OFF; drag/drift/rally keep DEFAULT 1.0
 -- (specialty / purpose-gated — Phase 5 enable pack skips circuit/drag/drift/tarmac_rally/gravel).
 stampSpectrumDriveSoftcap(PROFILE_POINTS, function(name)
     if name == "sport_plus" then return DRIVE_SOFTCAP_SPORT_PLUS end
@@ -1076,17 +1162,53 @@ stampSpectrumDriveSoftcap(SLICK_SPECTRUM_POINTS, DRIVE_SOFTCAP_OFF)
 stampSpectrumDriveSoftcap(UTILITY_SPECTRUM_POINTS, DRIVE_SOFTCAP_STREET)
 stampSpectrumDriveSoftcap(COMMERCIAL_SPECTRUM_POINTS, DRIVE_SOFTCAP_STREET)
 stampSpectrumDriveSoftcap(ATV_UTV_SPECTRUM_POINTS, DRIVE_SOFTCAP_STREET)
-stampSpectrumDriveSoftcap(VINTAGE_SPECTRUM_POINTS, DRIVE_SOFTCAP_STREET)
+stampSpectrumDriveSoftcap(VINTAGE_SPECTRUM_POINTS, DRIVE_SOFTCAP_VINTAGE)
 do
     -- Street-like duties only. Rally/drag/drift intentionally omit — purpose gate is the
     -- enable pack; magnitudes stay OFF so soft-sims don't depend on purpose alone for those.
+    -- Vintage standalone uses gentler VINTAGE pack (not aggressive street debt floors).
     local streetLike = {
-        vintage = true, crawler = true, paddle = true, truck = true, truck_offroad = true,
+        crawler = true, paddle = true, truck = true, truck_offroad = true,
         heavy_duty = true, light_truck_std = true, light_truck_hd = true, winter = true,
         donut = true, rain = true,
     }
     for name, mods in pairs(STANDALONE_MODIFIERS) do
-        if streetLike[name] then stampDriveSoftcap(mods, DRIVE_SOFTCAP_STREET) end
+        if name == "vintage" then
+            stampDriveSoftcap(mods, DRIVE_SOFTCAP_VINTAGE)
+        elseif streetLike[name] then
+            stampDriveSoftcap(mods, DRIVE_SOFTCAP_STREET)
+        end
+    end
+end
+
+-- Compound-character stamps (after soft-caps). Street continuum = NEUTRAL (today's constants);
+-- sport/slick climb blister/stint/hot cliff; winter/rain stay NEUTRAL (wet behavior intact).
+stampSpectrumCharacter(PROFILE_POINTS, function(name)
+    if name == "sport_plus" then return CHARACTER_SPORT_PLUS end
+    if name == "sport_tour" then return CHARACTER_SPORT_MID end
+    if name == "sport" then return CHARACTER_SPORT_MID end
+    return CHARACTER_NEUTRAL
+end)
+stampSpectrumCharacter(SLICK_SPECTRUM_POINTS, function(name, pt)
+    local soft = (pt and pt.softness) or 0.65
+    if soft >= 0.75 or name == "soft_slick" then return CHARACTER_SLICK_SOFT end
+    if soft >= 0.62 or name == "medium_slick" then return CHARACTER_SLICK_MED end
+    return CHARACTER_SLICK_HARD
+end)
+stampSpectrumCharacter(UTILITY_SPECTRUM_POINTS, CHARACTER_NEUTRAL)
+stampSpectrumCharacter(COMMERCIAL_SPECTRUM_POINTS, CHARACTER_NEUTRAL)
+stampSpectrumCharacter(ATV_UTV_SPECTRUM_POINTS, CHARACTER_NEUTRAL)
+stampSpectrumCharacter(VINTAGE_SPECTRUM_POINTS, CHARACTER_NEUTRAL)
+do
+    for name, mods in pairs(STANDALONE_MODIFIERS) do
+        if name == "drag" then
+            stampCharacterKnobs(mods, CHARACTER_DRAG)
+        elseif name == "drift" then
+            stampCharacterKnobs(mods, CHARACTER_DRIFT)
+        else
+            -- winter / rain / rally / utility / vintage / … keep absolute neutral feel
+            stampCharacterKnobs(mods, CHARACTER_NEUTRAL)
+        end
     end
 end
 
@@ -1341,8 +1463,10 @@ getProfileThermalGrip = function(mods, temp, compliance, softness)
     local diff = abs(temp - tOpt)
     local excess = max(0.0, diff - plateau)
     local width = (temp < tOpt) and wCold or wHot
-    -- Cold: gentler roll-off (1.35); hot: keep sharper cliff (2.0) for overheat
-    local power = (temp < tOpt) and 1.35 or 2.0
+    -- Cold/hot exponents are profile knobs (defaults = pre-expansion 1.35 / 2.0)
+    local power = (temp < tOpt)
+        and (mods.coldGripPower or DEFAULT_MODS.coldGripPower or 1.35)
+        or (mods.hotGripPower or DEFAULT_MODS.hotGripPower or 2.0)
     local decay = exp(-((excess / max(1.0, width)) ^ power))
     return floor + (1.0 - floor) * decay
 end
@@ -2786,8 +2910,8 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local isSportPlusProf = not not (string.find(p1Lower, "sport_plus", 1, true) or string.find(p2Lower, "sport_plus", 1, true)
         or string.find(p1Lower, "sport_tour", 1, true) or string.find(p2Lower, "sport_tour", 1, true))
     if string.find(p1Lower, "slick", 1, true) or string.find(p2Lower, "slick", 1, true) then
-        slickDriveScale = topo.drivePropSlickScale or 0.42
-        slickCarcassScale = topo.drivePropSlickCarcassScale or 0.22
+        slickDriveScale = topo.drivePropSlickScale or 0.48
+        slickCarcassScale = topo.drivePropSlickCarcassScale or 0.26
     end
     -- Street/non-slick high-V: damp carcass excess when freestream opens prop-hold cook.
     -- Magnitude from profile driveHighVCarcassScale; Phase 5 purpose selects enable pack.
@@ -3244,16 +3368,18 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         data.coolTimer = 0
     end
 
-    -- Stint fade: time spent near/above optimal window
+    -- Stint fade: time spent near/above optimal window (stintFadeRate scales kinetics)
+    local stintFadeRate = mods.stintFadeRate or DEFAULT_MODS.stintFadeRate or 1.0
     if avgWeightedTemp >= current_optimal_temp * 0.90 then
-        data.hotStintTime = (data.hotStintTime or 0) + dt
+        data.hotStintTime = (data.hotStintTime or 0) + dt * stintFadeRate
     elseif avgWeightedTemp < current_optimal_temp * 0.70 then
         data.hotStintTime = max(0, (data.hotStintTime or 0) - dt * 0.15)
     end
-    -- ~0–12% grip loss over a long hot stint (~20 min at peak)
+    -- ~0–12% grip loss over a long hot stint (~20 min at peak @ rate 1.0)
     data.stintFade = min(0.12, (data.hotStintTime or 0) / 10000)
 
-    local cycleWearMultiplier = 1.0 + (data.heatCycles or 0) * 0.06 -- hardened compound wears faster
+    -- Heat-cycle wear gain folded into stintFadeRate (compound stint character)
+    local cycleWearMultiplier = 1.0 + (data.heatCycles or 0) * (0.06 * stintFadeRate)
     
     local wear = 0
     local zoneWearDelta = { 0, 0, 0 }
@@ -3285,6 +3411,15 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         
         wear = tempDistToWearMult(tempDistWeighted) * (slidingWear + (vehNotParked * abs(propulsionTorque * 0.008 - brakeTorque * 0.025) * 0.3 * TORQUE_ENERGY_MULTIPLIER) * 0.08 + angularVel * 0.0005) * (wearRate * cycleWearMultiplier / max(0.7, min(1.3, tyreWidth / 0.2))) * (1.0 + min(0.75, (w.suspStress or 0) * 0.35 * bottomOutSens)) * surfaceWearScale * dt
 
+        -- Excess-camber wear: neutral at camberWearMult=1.0 (bit-identical); >1 adds mild shoulder wear
+        do
+            local cwm = mods.camberWearMult or DEFAULT_MODS.camberWearMult or 1.0
+            if abs(cwm - 1.0) > 1e-6 then
+                local excessCam = max(0, abs(w.camber or 0) - (2.5 + casing_compliance * 3.5))
+                wear = wear * max(0.85, 1.0 + excessCam * excessCam * 0.012 * (cwm - 1.0))
+            end
+        end
+
         -- Per-zone wear follows load bias weights (outer/middle/inner)
         zoneWearDelta[1] = wear * wLeft * 3
         zoneWearDelta[2] = wear * wCenter * 3
@@ -3301,7 +3436,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     
     -- Lockup flat spot: accumulates; heals extremely slowly (cosmetic smoothing only)
     if not isAirborne and (angularVel < 0.5) and (slipEnergy > 0.35) and (groundModel.staticFrictionCoefficient or 1.0) >= 0.85 then
-        data.flatSpot = min(1.0, (data.flatSpot or 0) + (0.025 * scaleWearModifier * (slipEnergy / 0.35) * max(0.1, min(2.5, loadRaw / max(1, (vehicleMass * 9.81) / wheelCount)))) * dt)
+        data.flatSpot = min(1.0, (data.flatSpot or 0) + ((mods.flatSpotRate or DEFAULT_MODS.flatSpotRate or 0.025) * scaleWearModifier * (slipEnergy / 0.35) * max(0.1, min(2.5, loadRaw / max(1, (vehicleMass * 9.81) / wheelCount)))) * dt)
     end
     if data.flatSpot and data.flatSpot > 0 and abs(angularVel) > 1.0 and loadRaw > 100 then
         -- Real flats barely heal; tiny decay only for numerical stability
@@ -3348,7 +3483,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
         coldSeverity = min(1.6, (grainColdLimit - avgWeightedTemp) / max(10.0, grainColdLimit * 0.28))
     end
     if coldSeverity > 0 and latGrainWork > grainSlipThresh and not isAirborne and (isDryPaved or isWetSurface) then
-        grain = grain + 0.00042 * scaleWearModifier * coldSeverity * min(2.8, latGrainWork / grainSlipThresh) * (isWetSurface and 0.55 or 1.0) * dt
+        grain = grain + (mods.grainRate or DEFAULT_MODS.grainRate or 0.00042) * scaleWearModifier * coldSeverity * min(2.8, latGrainWork / grainSlipThresh) * (isWetSurface and 0.55 or 1.0) * dt
     else
         local grainDecay = 0
         local warmFloor = current_working_temp * max(0.82, grainTempRatio + 0.06)
@@ -3367,7 +3502,7 @@ CalcTyreWear = function(wheelID, dt, localEnvTemp)
     local blister = data.blistering or 0
     local blisterStart = current_working_temp * blisterTempRatio
     if avgWeightedTemp > blisterStart and slipEnergy > 0.32 and not isAirborne then
-        blister = blister + 0.00028 * scaleWearModifier
+        blister = blister + (mods.blisterRate or DEFAULT_MODS.blisterRate or 0.00028) * scaleWearModifier
             * min(2.0, (avgWeightedTemp - blisterStart) / max(12.0, current_working_temp * 0.18))
             * min(2.2, slipEnergy / 0.32) * dt
     end
@@ -3921,7 +4056,8 @@ CalculateTyreGrip = function(wheelID, localEnvTemp)
         tyreGrip = tyreGrip * (1.0 - (blisterGrip - 0.08) * 0.32)
     end
     if (data.heatCycles or 0) > 0 then
-        tyreGrip = tyreGrip * (1.0 - min(0.15, data.heatCycles * 0.02)) -- hardened compound loses grip
+        local stintFadeRateGrip = mods.stintFadeRate or DEFAULT_MODS.stintFadeRate or 1.0
+        tyreGrip = tyreGrip * (1.0 - min(0.15, data.heatCycles * 0.02 * stintFadeRateGrip)) -- hardened compound loses grip
     end
     if (data.stintFade or 0) > 0 then
         tyreGrip = tyreGrip * (1.0 - data.stintFade)

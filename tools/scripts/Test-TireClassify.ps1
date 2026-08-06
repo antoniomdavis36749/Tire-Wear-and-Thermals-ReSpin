@@ -69,6 +69,11 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'drift'; $classifyReason = 'standalone_drift'; $descriptor = 'Drift'
   } elseif ($nameLower -match 'rain|wet|inter') {
     $purpose = 'wet'; $classifyReason = 'standalone_rain'; $descriptor = 'Wet'
+  } elseif ($nameLower -match 'vintage|biasply|bias_ply|whitewall') {
+    # Standalone vintage before spare/street continuum (mirrors Lua)
+    $purpose = 'street'; $classifyReason = 'standalone_vintage'; $descriptor = 'Vintage'
+  } elseif ($nameLower -match 'classic_radial') {
+    $purpose = 'street'; $classifyReason = 'vintage_spectrum'; $descriptor = 'Vintage'
   } elseif ($isRaceLikeName -and ($nameLower -notlike '*gravel*')) {
     $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
   } elseif ($treadCoef -le 0.20) {
@@ -209,6 +214,20 @@ $cases = @(
     parts=@()
     expectDesc='Mud-Terrain'; expectPurpose='gravel'; expectReason='gravel_mt_name' }
 
+  # Vintage / bias-ply / whitewall (street purpose; not sport+ soft-cap debt path)
+  @{ name='Vintage standalone name'; tire='tire_F_185_80_15_vintage'; tread=0.55
+    parts=@()
+    expectDesc='Vintage'; expectPurpose='street'; expectReason='standalone_vintage' }
+  @{ name='Bias-ply name'; tire='tire_R_6_50_16_biasply'; tread=0.50
+    parts=@()
+    expectDesc='Vintage'; expectPurpose='street'; expectReason='standalone_vintage' }
+  @{ name='Whitewall name'; tire='tire_F_205_75_14_whitewall'; tread=0.60
+    parts=@()
+    expectDesc='Vintage'; expectPurpose='street'; expectReason='standalone_vintage' }
+  @{ name='Classic radial vintage'; tire='tire_F_195_70_14_classic_radial'; tread=0.65
+    parts=@()
+    expectDesc='Vintage'; expectPurpose='street'; expectReason='vintage_spectrum' }
+
   # Negatives: cosmetic / empty slots must not remap race → tarmac_rally
   @{ name='Race + skin_rally only'; tire='tire_F_265_40_17_race'; tread=0.0
     parts=@('bolide_skin_rally','tire_F_265_40_17_race')
@@ -249,6 +268,44 @@ if ($fail -eq 0) {
   Out ("OVERALL: FAIL ($fail/$($cases.Count) failed)")
 }
 
+# Light schema check: compound-character knobs present with neutral defaults
+$luaPath = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'lua\vehicle\extensions\auto\luukstyrethermalsandwear.lua'
+if (-not (Test-Path $luaPath)) {
+  $luaPath = Join-Path (Split-Path $PSScriptRoot -Parent) '..\lua\vehicle\extensions\auto\luukstyrethermalsandwear.lua'
+}
+$luaPath = [IO.Path]::GetFullPath($luaPath)
+$charFail = 0
+if (Test-Path $luaPath) {
+  Out ''
+  Out '=== Compound-character knobs (schema) ==='
+  $lua = [IO.File]::ReadAllText($luaPath)
+  $need = @(
+    @{ k='coldGripPower'; v='1.35' },
+    @{ k='hotGripPower'; v='2.0' },
+    @{ k='grainRate'; v='0.00042' },
+    @{ k='blisterRate'; v='0.00028' },
+    @{ k='flatSpotRate'; v='0.025' },
+    @{ k='stintFadeRate'; v='1.0' },
+    @{ k='camberWearMult'; v='1.0' }
+  )
+  foreach ($n in $need) {
+    $pat = "$($n.k)\s*=\s*$([regex]::Escape($n.v))"
+    $ok = $lua -match $pat
+    if (-not $ok) { $charFail++ }
+    Out ("{0}: DEFAULT {1}={2}" -f ($(if ($ok) { 'PASS' } else { 'FAIL' }), $n.k, $n.v))
+  }
+  $stampOk = ($lua -match 'CHARACTER_SLICK_SOFT') -and ($lua -match 'stampSpectrumCharacter') -and ($lua -match '49 knobs')
+  if (-not $stampOk) { $charFail++ }
+  Out ("{0}: CHARACTER packs + 49-knob schema comment" -f ($(if ($stampOk) { 'PASS' } else { 'FAIL' })))
+  # Soft-cap magnitudes present (Pass 5 floors toward 1.0); vintage pack distinct
+  $softOk = ($lua -match 'driveSlipHeatMin\s*=\s*0\.78') -and ($lua -match 'DRIVE_SOFTCAP_SPORT_PLUS') `
+    -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.90')
+  if (-not $softOk) { $charFail++ }
+  Out ("{0}: soft-cap packs still present (street 0.78 + vintage 0.90)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
+} else {
+  Out "SKIP character knob schema (lua not found at $luaPath)"
+}
+
 [System.IO.File]::WriteAllText($out, $sb.ToString())
 Write-Host "Wrote $out"
-if ($fail -gt 0) { exit 1 }
+if (($fail + $charFail) -gt 0) { exit 1 }

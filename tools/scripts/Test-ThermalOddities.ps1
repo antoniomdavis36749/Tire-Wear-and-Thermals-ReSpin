@@ -1,4 +1,4 @@
-# Thermal oddities soft-sim - reproduces spawn cool/rewarm, elevation env swings,
+﻿# Thermal oddities soft-sim - reproduces spawn cool/rewarm, elevation env swings,
 # and carcass>>skin gap. Mirrors CalcTyreWear / initTyreData / updateGFX env path.
 # Source: lua/vehicle/extensions/auto/luukstyrethermalsandwear.lua
 $ErrorActionPreference = 'Stop'
@@ -37,7 +37,7 @@ $THERMAL_BOUNDARY = 0.002
 $RUBBER_EMISSIVITY = 0.94
 $STEFAN = 5.670374e-8
 $FREE_BELT_COOL = 1.32
-# Live Phase B THERMAL_TOPOLOGY (was 0.09 / 0.140 pre–Phase-B)
+# Live Phase B THERMAL_TOPOLOGY (was 0.09 / 0.140 preâ€“Phase-B)
 $PATCH_FRAC_MIN = 0.035
 $PATCH_FRAC_HEAT_MIN = 0.025
 $PATCH_FRAC_MAX = 0.22
@@ -238,7 +238,7 @@ function Simulate-Thermal {
       $convScale = Lerp 0.35 1.0 $u
     }
 
-    # P4: mild solar→skin
+    # P4: mild solarâ†’skin
     $solarAngle = [math]::Max(0.0, [math]::Cos(($tod - 0.5) * 2.0 * [math]::PI))
     $solarSkin = $solarAngle * (1.0 - (Clamp $cloud 0 1) * 0.85) * 0.026 / (1.0 + $curAir * 0.05)
 
@@ -251,7 +251,7 @@ function Simulate-Thermal {
     if (($curSlip -lt 0.06) -and ($curG -lt 0.28)) {
       $driveHeatGate = $driveHeatGate * 0.15
     }
-    $netTorque = $vehNotParked * [math]::Abs($curProp * 0.066 * $driveHeatGate) * 0.075 * $rollingRes * $flexModifier
+    $netTorque = $vehNotParked * [math]::Abs($curProp * 0.048 * $driveHeatGate) * 0.075 * $rollingRes * $flexModifier
 
     $raw = ($seh * 0.05 + $netTorque * 0.002) * 3.0 * $wt
     $surfMu = 1.05
@@ -475,7 +475,7 @@ Check 'loaded_gap_reduced' (
 Check 'loaded_gap_bounded' (($gapF20 -gt -8.0) -and ($gapF20 -lt 18.0)) `
   ("FIXED gap@20={0}C (want -8 < gap < 18; live patchFrac/hystSkin may skin-lead)" -f ([math]::Round($gapF20, 2)))
 
-# ---- P4: midday park solar→skin vs night; rain evaporative cool ----
+# ---- P4: midday park solarâ†’skin vs night; rain evaporative cool ----
 Out ""
 Out "=== D) MIDDAY PARK solar->skin (60s parked, FIXED) vs night park ==="
 $parkMotion = {
