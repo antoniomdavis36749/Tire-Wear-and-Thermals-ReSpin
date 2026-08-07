@@ -56,6 +56,9 @@ function Get-DutyMods([hashtable]$s) {
   $loadKg = [double]$s.loadKg
   $contactDepth = [double]$s.contactDepth
   $rough = [double]$s.rough
+  $defaultDepth = if ($null -ne $s.defaultDepth) { [double]$s.defaultDepth } else { 0.0 }
+  $fluidDensity = if ($null -ne $s.fluidDensity) { [double]$s.fluidDensity } else { 0.0 }
+  $strength = if ($null -ne $s.strength) { [double]$s.strength } else { 1.0 }
   $ductPct = [double]$s.ductPct
   $brakeSurfDelta = [double]$s.brakeSurfDelta
   $brakeSoakPower = [double]$s.brakeSoakPower
@@ -126,7 +129,10 @@ function Get-DutyMods([hashtable]$s) {
   }
   if ($brakeSoakPower -gt 0.015 -and $brakeSurfDelta -gt 10) { $ids.Add('brake_tire_soak') }
   if ($ductPct -gt ($DUCT_DEFAULT_PCT + 4)) { $ids.Add('duct_tire_side') }
-  if (-not $isAirborne -and ($contactDepth -gt 0.015 -or $rough -gt 0.15)) { $ids.Add('soft_sink_damp') }
+  if (-not $isAirborne -and ($contactDepth -gt 0.015 -or $rough -gt 0.15 `
+      -or $defaultDepth -gt 0.008 -or $fluidDensity -gt 40 -or $strength -lt 0.88)) {
+    $ids.Add('soft_sink_damp')
+  }
 
   return ($ids -join ',')
 }
@@ -198,6 +204,13 @@ if (Assert-Duty 'duct tire-side' $s 'duct_tire_side') { $pass++ } else { $fail++
 # Soft sink / rough
 $s = @{} + $base; $s.contactDepth = 0.03; $s.propNm = 0; $s.loadKg = 50
 if (Assert-Duty 'soft-sink damp' $s 'soft_sink_damp') { $pass++ } else { $fail++ }
+
+# Path A1: soft GM fields alone (asphalt depth/rough quiet)
+$s = @{} + $base; $s.contactDepth = 0.0; $s.rough = 0.0; $s.defaultDepth = 0.04; $s.propNm = 0; $s.loadKg = 50
+if (Assert-Duty 'soft-sink via GM defaultDepth' $s 'soft_sink_damp') { $pass++ } else { $fail++ }
+
+$s = @{} + $base; $s.contactDepth = 0.0; $s.rough = 0.0; $s.fluidDensity = 800; $s.propNm = 0; $s.loadKg = 50
+if (Assert-Duty 'soft-sink via GM fluidDensity' $s 'soft_sink_damp') { $pass++ } else { $fail++ }
 
 # Combined: FWD soft-cap + soft sink
 $s = @{} + $base; $s.airspeed = 18.0; $s.slip = 0.40; $s.gMag = 0.20; $s.propNm = 400; $s.contactDepth = 0.025

@@ -19,7 +19,7 @@ function Smooth01([double]$t) {
 }
 
 $topo = @{
-  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
+  patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
   drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
   drivePropSkinCoef = 0.048
@@ -394,7 +394,7 @@ function Out([string]$s) { [void]$sb.AppendLine($s); Write-Host $s }
 
 Out '=== Drive-heat MATRIX soft-sim (compound x layout x scenario) ==='
 Out ("Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm')")
-Out 'Live knobs: patchFrac 0.035/0.070 heatMin 0.025; driveStreetSlip*; drivePropCruiseNm=310'
+Out 'Live knobs: patchFrac 0.032/0.068 heatMin 0.022; driveStreetSlip*; drivePropCruiseNm=310'
 Out ''
 Out (" {0,-14} {1,-4} {2,-8} {3,7} {4,7} {5,7} {6,7} {7,6} {8,9}" -f `
   'compound', 'lay', 'scen', 'peakSk', 'endSk', 'peakCo', 'heatSc', 'eng', 'flag')

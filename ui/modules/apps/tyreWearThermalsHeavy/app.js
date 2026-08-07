@@ -157,7 +157,7 @@ angular.module("beamng.apps")
                     </style>
 
                     <div class="tth-header">
-                        <span class="tth-title">TYRE TELEMETRY (HEAVY / TEST)</span>
+                        <span class="tth-title">TYRE TELEMETRY (PITWALL)</span>
                         <span class="tth-header-meta">
                             Env {{ (envTemp||0).toFixed(2) }}°C · Track {{ (trackTemp||0).toFixed(2) }}°C · Rain {{ (rainState||0).toFixed(2) }}% · Film {{ (waterFilm||0).toFixed(2) }}%
                         </span>

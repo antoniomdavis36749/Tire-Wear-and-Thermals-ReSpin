@@ -20,7 +20,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # ---- Live THERMAL_TOPOLOGY + post-fix globals (match StraightLineSpeedSweep) ----
 $topo = @{
-  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
+  patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
@@ -37,6 +37,9 @@ $topo = @{
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
   hystSkinShare = 0.18
   softSinkHeatCoef = 1.2; softSinkRoughCoef = 0.35; softSinkHeatFloor = 0.72
+  softSinkDefaultDepthCoef = 2.2; softSinkStrengthRef = 1.0; softSinkStrengthCoef = 0.40
+  softSinkFluidCoef = 0.0007; softSinkStribeckRef = 1.0; softSinkStribeckCoef = 0.035
+  gmConductionDefaultDepthCoef = 2.5; gmConductionStrengthCoef = 0.30; gmConductionFluidCoef = 0.0005
 }
 $SPAWN_CONV_GRACE_S = 14.0
 $STREET_PREHEAT_BLEND = 0.34

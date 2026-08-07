@@ -13,7 +13,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # Live THERMAL_TOPOLOGY
 $topo = @{
-  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
+  patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
   drivePropCruiseNm = 650.0; drivePropExcessFullNm = 1100.0
   drivePropSkinCoef = 0.021

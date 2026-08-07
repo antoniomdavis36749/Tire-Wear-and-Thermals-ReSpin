@@ -34,7 +34,7 @@ Player zip should contain only runtime content. Dev tooling must not ship.
 
 - [x] Document exclude list (this file + packer)
 - [x] Stop loading `tyreWestCoastLapTest` for players
-- [ ] Decide: ship **Heavy** UI app (diagnostics) or keep Medium/Light only
+- [ ] Decide: ship **Pitwall** UI app (full engineer) or keep Crew/Classic only
 - [x] Optional: omit `tyreWestCoastLapTest.lua` from release zip (packer excludes it; file remains in git for tools)
 
 ## C. Identity & metadata (new Repo resource)

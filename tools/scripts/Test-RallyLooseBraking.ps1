@@ -21,7 +21,7 @@ function Clamp([double]$v, [double]$lo, [double]$hi) {
 
 # ---- Live THERMAL_TOPOLOGY + post-fix globals (match RallyLooseSpeedSweep) ----
 $topo = @{
-  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
+  patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
@@ -37,8 +37,11 @@ $topo = @{
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
   hystSkinShare = 0.18
-  slipVelBoostStart = 8.0; slipVelBoostFull = 24.0; slipVelBoostMax = 9.0
+  softVelBoostStart = 8.0; slipVelBoostFull = 24.0; slipVelBoostMax = 9.0
   softSinkHeatCoef = 1.2; softSinkRoughCoef = 0.35; softSinkHeatFloor = 0.72
+  softSinkDefaultDepthCoef = 2.2; softSinkStrengthRef = 1.0; softSinkStrengthCoef = 0.40
+  softSinkFluidCoef = 0.0007; softSinkStribeckRef = 1.0; softSinkStribeckCoef = 0.035
+  gmConductionDefaultDepthCoef = 2.5; gmConductionStrengthCoef = 0.30; gmConductionFluidCoef = 0.0005
 }
 $SPAWN_CONV_GRACE_S = 14.0
 $STREET_PREHEAT_BLEND = 0.34
@@ -98,6 +101,7 @@ $surfaces = @(
     beamMu = 0.75
     condFactor = 0.55; surfTempBlend = 0.55
     contactDepth = 0.025; rough = 0.30
+    defaultDepth = 0.020; strength = 0.85; fluidDensity = 0.0
     cruiseSlip = 0.065; cruiseG = 0.12
     brakeSlip = 0.22; brakeG = 0.62; brakeNm = 1100.0; lastSlipMs = 6.5
     # dry gravel: self-clean path (not wet pack)
@@ -109,6 +113,7 @@ $surfaces = @(
     beamMu = 0.70
     condFactor = 0.55; surfTempBlend = 0.55
     contactDepth = 0.035; rough = 0.40
+    defaultDepth = 0.030; strength = 0.75; fluidDensity = 0.0
     cruiseSlip = 0.075; cruiseG = 0.14
     brakeSlip = 0.28; brakeG = 0.55; brakeNm = 980.0; lastSlipMs = 8.5
     packsClog = $true; isMud = $false; isGravel = $false; isDirt = $true
@@ -119,6 +124,7 @@ $surfaces = @(
     beamMu = 0.50
     condFactor = 0.45; surfTempBlend = 0.0
     contactDepth = 0.060; rough = 0.50
+    defaultDepth = 0.050; strength = 0.55; fluidDensity = 900.0
     cruiseSlip = 0.110; cruiseG = 0.16
     brakeSlip = 0.38; brakeG = 0.38; brakeNm = 720.0; lastSlipMs = 12.0
     packsClog = $true; isMud = $true; isGravel = $false; isDirt = $false
@@ -182,6 +188,9 @@ function Simulate-BrakeStop {
   $pressurePa = [double]$comp.pressurePsi * 6894.76
   $contactDepth = [double]$surf.contactDepth
   $rough = [double]$surf.rough
+  $gmDefaultDepth = if ($null -ne $surf.defaultDepth) { [double]$surf.defaultDepth } else { 0.0 }
+  $gmStrength = if ($null -ne $surf.strength) { [double]$surf.strength } else { 1.0 }
+  $gmFluid = if ($null -ne $surf.fluidDensity) { [double]$surf.fluidDensity } else { 0.0 }
   $brakeGain = [double]$comp.brakeGain
   $wearRate = [double]$comp.wearRate
   $tread = [double]$comp.treadCoef
@@ -400,9 +409,12 @@ function Simulate-BrakeStop {
     if ($tempDist -gt 1.1) { $thermFric = [math]::Max(0.30, 1.0 - ($tempDist - 1.1) * 0.6) }
     $gain = ($raw / $heatMassScale) * $thermFric * $patchHeatScale *
       (1.0 + ([double]$topo.drivePropSlipWorkMult - 1.0) * $excessSkin)
-    # Phase D soft-sink frictional damp (conduction has separate denom)
+    # Phase D + Path A1 soft-sink frictional damp (conduction has separate denom)
+    $softExtra = [math]::Max(0.0, $gmDefaultDepth) * [double]$topo.softSinkDefaultDepthCoef `
+      + [math]::Max(0.0, 1.0 - $gmStrength / [math]::Max(0.2, [double]$topo.softSinkStrengthRef)) * [double]$topo.softSinkStrengthCoef `
+      + [math]::Max(0.0, $gmFluid) * [double]$topo.softSinkFluidCoef
     $sinkDamp = 1.0 / (1.0 + [math]::Max(0.0, $contactDepth) * [double]$topo.softSinkHeatCoef +
-      $rough * [double]$topo.softSinkRoughCoef)
+      $rough * [double]$topo.softSinkRoughCoef + $softExtra)
     $gain = $gain * [math]::Max([double]$topo.softSinkHeatFloor, $sinkDamp)
 
     # lockup floor (ABS keeps omega mostly above thresh; near-stop may dip)
@@ -421,7 +433,10 @@ function Simulate-BrakeStop {
     $rad = ($RUBBER_EMISSIVITY * $STEFAN * ([math]::Pow($tK, 4) - [math]::Pow($eK, 4))) * 0.0001
 
     $contactRes = 1.0 / (1.0 + $slip * 0.1)
-    $depthRoughDenom = 1.0 + [math]::Max(0.0, $contactDepth) * 4.0 + $rough * 0.5
+    $condExtra = [math]::Max(0.0, $gmDefaultDepth) * [double]$topo.gmConductionDefaultDepthCoef `
+      + [math]::Max(0.0, 1.0 - $gmStrength / [math]::Max(0.2, [double]$topo.softSinkStrengthRef)) * [double]$topo.gmConductionStrengthCoef `
+      + [math]::Max(0.0, $gmFluid) * [double]$topo.gmConductionFluidCoef
+    $depthRoughDenom = 1.0 + [math]::Max(0.0, $contactDepth) * 4.0 + $rough * 0.5 + $condExtra
     $condRate = ($surfaceConductivity * $estArea * ($skin - $surfTemp) / $THERMAL_BOUNDARY) *
       $contactRes / $depthRoughDenom
     $surfCond = (Clamp ($condRate * 0.003) -25 110) * $wt

@@ -1,25 +1,25 @@
 {
-  "name": "Tyre Wear & Thermals Crew",
+  "name": "Tyre Wear & Thermals Driver",
   "author": "lucky4luuk, Zesty_Maple98 (ReSpin)",
   "version": "0.2.0",
-  "directive": "tyreWearThermalsMedium",
-  "domElement": "<tyre-wear-thermals-medium></tyre-wear-thermals-medium>",
+  "directive": "tyreWearThermalsDriver",
+  "domElement": "<tyre-wear-thermals-driver></tyre-wear-thermals-driver>",
   "types": [
     "ui.apps.categories.debug",
     "ui.apps.categories.vehicle_info",
     "ui.apps.categories.info",
     "ui.apps.categories.racing"
   ],
-  "description": "Crew mid telemetry: skin/carcass maps, grip, pressure, and surface damage modes.",
+  "description": "ReSpin driver view: condition, grip, pressure, surface heat, and damage modes.",
   "category": "Telemetry",
   "isAuxiliary": false,
   "interactive": "yes",
   "css": {
     "left": "0px",
     "top": "0px",
-    "width": "380px",
-    "height": "520px",
-    "min-width": "300px",
-    "min-height": "280px"
+    "width": "340px",
+    "height": "400px",
+    "min-width": "280px",
+    "min-height": "240px"
   }
 }

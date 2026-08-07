@@ -35,7 +35,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 • Compound-aware behaviour (street → sport → race / slick spectrum)
 • Pressure, load, and surface effects on grip
 • Brake cooling duct sliders (Tuning → Brakes; saved in .pc configs)
-• UI apps: Light / Medium / Heavy tyre telemetry
+• UI apps: Driver / Classic / Crew / Pitwall tyre telemetry
 • Multiplayer-compatible vehicle extension
 • BeamNG 0.39-aware pack-air / draft coexistence (no dependency on extra draft mods)
 
@@ -43,7 +43,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 [B]How to use[/B]
 1. Install / enable the mod (disable any older thermals-and-wear unpack if present).
 2. Spawn a vehicle.
-3. Apps menu → add [B]Tyre Wear & Thermals[/B] (Light, Medium, or Heavy).
+3. Apps menu → add [B]Tyre Wear & Thermals[/B] (Driver, Classic, Crew, or Pitwall).
 4. Optional: Tuning → Brakes → Front/Rear duct opening (1% = closed, 100% = fully open).
 
 [HR][/HR]
@@ -54,7 +54,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 [B]Known limitations (Alpha)[/B]
 • Balance is still being refined across compounds and surfaces
 • UI layout can be imperfect on vehicles with more than four wheels
-• Heavy app is a diagnostics view (more data, denser UI)
+• Pitwall app is a full-engineer diagnostics view (more data, denser UI)
 
 [HR][/HR]
 [B]Links[/B]
@@ -73,10 +73,10 @@ GNU Affero General Public License v3 — see the [I]license[/I] file in the pack
 
 Aim for **≥2** clear images on the listing:
 
-1. **UI + car** — Medium or Light app visible while driving (temps / wear readable)
+1. **UI + car** — Crew or Classic app visible while driving (temps / wear readable)
 2. **Tuning ducts** — Brakes category showing Front/Rear duct sliders
 3. Optional: **before/after heat** — inner/center/outer rings after a hard lap
-4. Optional: **Heavy diagnostics** — if you ship that app
+4. Optional: **Pitwall diagnostics** — if you ship that app
 
 Keep the current `mod_info/TWTRS_RESPIN/icon.jpg` or replace with a cleaner square icon when you have one.
 

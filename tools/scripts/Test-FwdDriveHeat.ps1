@@ -29,7 +29,7 @@ function Smooth01([double]$t) {
 
 # ---- Live THERMAL_TOPOLOGY (post street-slip soft-cap) ----
 $topo = @{
-  patchFracMin = 0.035; patchFracHeatMin = 0.025; patchFracMax = 0.22; patchFracRef = 0.070
+  patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
   drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
   drivePropSkinCoef = 0.048

@@ -1,6 +1,6 @@
 {
-  "name": "Tyre Wear & Thermals Heavy",
-  "description": "ReSpin diagnostics: 8-node temps, elevation/env, pressure ratio, drive heat gate, surface μ, suspension, slip.",
+  "name": "Tyre Wear & Thermals Pitwall",
+  "description": "Pitwall full-engineer view: 8-node temps, elevation/env, pressure ratio, drive heat gate, surface μ, suspension, slip.",
   "author": "lucky4luuk, Zesty_Maple98 (ReSpin)",
   "version": "0.2.0",
   "directive": "tyreWearThermalsHeavy",

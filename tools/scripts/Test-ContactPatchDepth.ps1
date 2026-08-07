@@ -222,6 +222,116 @@ if ($radiantCoef -gt 0 -and $radiantCoef -lt 1e-9) {
 }
 [void]$sb.AppendLine('NOTE: hystSkinShare is bulk (not × patchHeatScale). freeBelt uses geometric patchFrac.')
 [void]$sb.AppendLine('NOTE: banks lean on camber/gy (Test-BankedCamber); soft sink is conduction+damp.')
+
+# --- Path A3 util nudge (peakForce / downForceRaw) ---
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('--- Path A3 util nudge (peak vs smoothed vs raw) ---')
+$utilBase = Get-PatchThermal -LoadRawN 4500 -LoadUtilN 4500 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -PeakForceN 5400 -Topo $topo
+$utilSpike = Get-PatchThermal -LoadRawN 4500 -LoadUtilN 5000 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -PeakForceN 6750 -Topo $topo
+$utilLagged = Get-PatchThermal -LoadRawN 4500 -LoadUtilN 4500 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -PeakForceN 6750 -Topo $topo
+[void]$sb.AppendLine(('  util base:   peakWork={0:N3} nudge={1:N3} hs={2:N3}' -f `
+  $utilBase.PeakWorkFactor, $utilBase.UtilNudge, $utilBase.PatchHeatScale))
+[void]$sb.AppendLine(('  util spike:  peakWork={0:N3} nudge={1:N3} hs={2:N3} (raw denom)' -f `
+  $utilSpike.PeakWorkFactor, $utilSpike.UtilNudge, $utilSpike.PatchHeatScale))
+[void]$sb.AppendLine(('  util lagged: peakWork={0:N3} nudge={1:N3} hs={2:N3} (smoothed denom)' -f `
+  $utilLagged.PeakWorkFactor, $utilLagged.UtilNudge, $utilLagged.PatchHeatScale))
+if ($utilSpike.PatchHeatScale -gt $utilBase.PatchHeatScale -and $utilSpike.UtilNudge -gt $utilBase.UtilNudge) {
+  [void]$sb.AppendLine('PASS: util spike raises heatScale via peakForce/downForceRaw')
+  $pass++
+} else {
+  [void]$sb.AppendLine('FAIL: util spike did not raise heatScale')
+  $fail++
+}
+if ($utilLagged.UtilNudge -gt $utilSpike.UtilNudge) {
+  [void]$sb.AppendLine('PASS: raw denom damps lagged-load util inflation vs smoothed denom')
+  $pass++
+} else {
+  [void]$sb.AppendLine('FAIL: raw denom did not damp lagged util vs smoothed')
+  $fail++
+}
+if ($topo.patchUtilBlend -ge 0.18 -and $topo.patchUtilBlend -le 0.24) {
+  [void]$sb.AppendLine(('PASS: patchUtilBlend={0} in Path A3 band' -f $topo.patchUtilBlend))
+  $pass++
+} else {
+  [void]$sb.AppendLine(('FAIL: patchUtilBlend={0} unexpected' -f $topo.patchUtilBlend))
+  $fail++
+}
+
+# --- Path A4 dynamicRadius clamp ---
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('--- Path A4 dynamicRadius vs static ---')
+$rStatic = Get-PatchThermal -LoadRawN 4500 -DynamicPressurePSI 26 `
+  -TyreWidthM $tyreWidth -TyreRadiusM 0.32 -StaticRadiusM 0.32 -DynamicRadiusM 0.32 -Topo $topo -NoUtilNudge
+$rDefl = Get-PatchThermal -LoadRawN 4500 -DynamicPressurePSI 26 `
+  -TyreWidthM $tyreWidth -TyreRadiusM 0.32 -StaticRadiusM 0.32 -DynamicRadiusM 0.22 -Topo $topo -NoUtilNudge
+$rAbsurd = Get-PatchRadiusM -StaticRadiusM 0.32 -DynamicRadiusM 0.10 -Topo $topo
+[void]$sb.AppendLine(('  static R: frac={0:N4} hs={1:N3} r={2:N3}' -f $rStatic.PatchFrac, $rStatic.PatchHeatScale, $rStatic.PatchRadiusM))
+[void]$sb.AppendLine(('  deflated: frac={0:N4} hs={1:N3} r={2:N3}' -f $rDefl.PatchFrac, $rDefl.PatchHeatScale, $rDefl.PatchRadiusM))
+[void]$sb.AppendLine(('  absurd clamp: dyn 0.10 -> {0:N3} (minFrac floor)' -f $rAbsurd))
+if ($rDefl.PatchFrac -gt $rStatic.PatchFrac -and $rDefl.PatchRadiusM -lt $rStatic.PatchRadiusM) {
+  [void]$sb.AppendLine('PASS: smaller dynR raises patchFrac (honest deflation length)')
+  $pass++
+} else {
+  [void]$sb.AppendLine('FAIL: dynR did not raise patchFrac')
+  $fail++
+}
+$expectMinR = 0.32 * $topo.patchDynRadiusMinFrac
+if ([math]::Abs($rAbsurd - $expectMinR) -lt 0.002) {
+  [void]$sb.AppendLine('PASS: absurd deflation clamped to minFrac')
+  $pass++
+} else {
+  [void]$sb.AppendLine(('FAIL: absurd dynR not clamped (got {0} want {1})' -f $rAbsurd, $expectMinR))
+  $fail++
+}
+
+# --- Path A1 GM soft fields (asphalt dry ≈ identity) ---
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('--- Path A1 GM soft/wet extras ---')
+$asphaltGm = Get-PatchThermal -LoadRawN 4500 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -ContactDepthM 0.005 -Rough 0.05 `
+  -DefaultDepth 0 -Strength 1.0 -FluidDensity 0 -StribeckVelocity 1.0 -Topo $topo
+$mudGm = Get-PatchThermal -LoadRawN 4500 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -ContactDepthM 0.050 -Rough 0.40 `
+  -DefaultDepth 0.04 -Strength 0.55 -FluidDensity 900 -StribeckVelocity 0.6 -Topo $topo
+[void]$sb.AppendLine(('  asphalt: softExtra={0:N3} condExtra={1:N3} damp={2:N3}' -f `
+  $asphaltGm.SoftGmExtra, $asphaltGm.CondGmExtra, $asphaltGm.SoftSinkDamp))
+[void]$sb.AppendLine(('  mud/wet: softExtra={0:N3} condExtra={1:N3} damp={2:N3}' -f `
+  $mudGm.SoftGmExtra, $mudGm.CondGmExtra, $mudGm.SoftSinkDamp))
+if ($asphaltGm.SoftGmExtra -lt 0.05 -and $asphaltGm.CondGmExtra -lt 0.05) {
+  [void]$sb.AppendLine('PASS: asphalt dry GM extras near zero')
+  $pass++
+} else {
+  [void]$sb.AppendLine('FAIL: asphalt dry GM extras not near zero')
+  $fail++
+}
+if ($mudGm.SoftGmExtra -gt $asphaltGm.SoftGmExtra + 0.3 -and $mudGm.SoftSinkDamp -lt $asphaltGm.SoftSinkDamp) {
+  [void]$sb.AppendLine('PASS: soft/wet GM extras damp heat vs asphalt')
+  $pass++
+} else {
+  [void]$sb.AppendLine('FAIL: soft/wet GM extras not differentiating')
+  $fail++
+}
+
+# --- Path A2 dual rough blend ---
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('--- Path A2 dual contact rough blend ---')
+$dual = Get-PatchThermal -LoadRawN 4500 -DynamicPressurePSI 32 `
+  -TyreWidthM $tyreWidth -TyreRadiusM $tyreRadius -ContactDepthM 0.01 `
+  -Rough 0.05 -Rough2 0.55 -DualBlend $topo.dualContactBlend -Topo $topo
+[void]$sb.AppendLine(('  dual roughEff={0:N3} asphalt/kerb blend={1}' -f `
+  $dual.RoughEff, $topo.dualContactBlend))
+$expectRough = 0.05 * (1.0 - $topo.dualContactBlend) + 0.55 * $topo.dualContactBlend
+if ([math]::Abs($dual.RoughEff - $expectRough) -lt 0.01) {
+  [void]$sb.AppendLine('PASS: dual-mat rough blend matches weight')
+  $pass++
+} else {
+  [void]$sb.AppendLine(('FAIL: dual roughEff {0} != expect {1}' -f $dual.RoughEff, $expectRough))
+  $fail++
+}
+
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine(('RESULT: {0} pass / {1} fail' -f $pass, $fail))
 if ($fail -gt 0) { [void]$sb.AppendLine('VERDICT: FAIL') } else { [void]$sb.AppendLine('VERDICT: PASS') }

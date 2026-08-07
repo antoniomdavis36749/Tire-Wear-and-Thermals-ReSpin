@@ -1,7 +1,7 @@
 angular.module("beamng.apps")
     .directive("tyreWearThermals", ["$injector", function ($injector) {
         return {
-            template: '<canvas class="twt-simple-canvas" width="220" height="220" style="width:100%;height:100%;display:block;box-sizing:border-box;"></canvas>',
+            template: '<canvas width="220" height="220"></canvas>',
             replace: true,
             restrict: "EA",
             link: function (scope, element, attrs) {
@@ -13,8 +13,6 @@ angular.module("beamng.apps")
                 }
 
                 scope.$on("$destroy", function () {
-                    stopRaf();
-                    document.removeEventListener("visibilitychange", onVisibilityChange);
                     if (StreamsManager) {
                         StreamsManager.remove(streamsList);
                     }
@@ -23,168 +21,10 @@ angular.module("beamng.apps")
                 var c = element[0];
                 var ctx = c.getContext("2d");
 
-                // Client-side smooth motion: Lua stays ~30 Hz; RAF lerps display toward targets.
-                var LERP_K = 12;
-                var LERP_EPS = 0.05;
-                var rafId = null;
-                var lastRafTs = 0;
-                var rafRunning = false;
-                var targetWheels = [];
-                var displayWheels = [];
-                var needsRedraw = false;
-
-                function fitCanvas(width, height) {
-                    var w = Math.max(1, Math.floor(width || c.clientWidth || 220));
-                    var h = Math.max(1, Math.floor(height || c.clientHeight || 220));
-                    if (c.width !== w || c.height !== h) {
-                        c.width = w;
-                        c.height = h;
-                        needsRedraw = true;
-                    }
-                }
-
                 scope.$on('app:resized', function (event, data) {
-                    fitCanvas(data && data.width, data && data.height);
-                    if (displayWheels.length) {
-                        renderDisplay();
-                    }
+                    c.width = data.width || 220;
+                    c.height = data.height || 220;
                 });
-
-                function lerpNum(cur, tgt, alpha) {
-                    if (tgt === undefined || tgt === null) return cur;
-                    if (cur === undefined || cur === null) return tgt;
-                    var next = cur + (tgt - cur) * alpha;
-                    return Math.abs(tgt - next) < LERP_EPS ? tgt : next;
-                }
-
-                function copyTemps(src) {
-                    var t = src || [];
-                    var out = [];
-                    for (var i = 0; i < 8; i++) {
-                        out[i] = t[i] || 0;
-                    }
-                    return out;
-                }
-
-                function makeWheelState(src) {
-                    return {
-                        name: src.name || "unknown",
-                        temp: copyTemps(src.temp),
-                        working_temp: src.working_temp,
-                        condition: src.condition !== undefined ? src.condition : 100,
-                        camber: src.camber || 0,
-                        pressure: src.pressure !== undefined ? src.pressure : 25,
-                        initialPressure: src.initialPressure || 25,
-                        surfaceDamage: src.surfaceDamage || 0,
-                        flatspot: src.flatspot || 0
-                    };
-                }
-
-                function snapWheel(dst, src) {
-                    dst.name = src.name || "unknown";
-                    dst.working_temp = src.working_temp;
-                    dst.initialPressure = src.initialPressure || 25;
-                    dst.condition = src.condition !== undefined ? src.condition : 100;
-                    dst.camber = src.camber || 0;
-                    dst.pressure = src.pressure !== undefined ? src.pressure : 25;
-                    dst.surfaceDamage = src.surfaceDamage || 0;
-                    dst.flatspot = src.flatspot || 0;
-                    dst.temp = copyTemps(src.temp);
-                }
-
-                function stopRaf() {
-                    if (rafId !== null) {
-                        cancelAnimationFrame(rafId);
-                        rafId = null;
-                    }
-                    rafRunning = false;
-                    lastRafTs = 0;
-                }
-
-                function isAppVisible() {
-                    if (document.hidden) return false;
-                    if (!c) return false;
-                    return !!(c.offsetWidth || c.offsetHeight || c.getClientRects().length);
-                }
-
-                function startRaf() {
-                    if (rafRunning || !isAppVisible()) return;
-                    rafRunning = true;
-                    lastRafTs = 0;
-                    rafId = requestAnimationFrame(rafTick);
-                }
-
-                function lerpWheels(alpha) {
-                    var moved = false;
-                    var n = Math.min(targetWheels.length, displayWheels.length);
-                    for (var i = 0; i < n; i++) {
-                        var d = displayWheels[i];
-                        var t = targetWheels[i];
-                        var prev;
-
-                        prev = d.condition;
-                        d.condition = lerpNum(d.condition, t.condition, alpha);
-                        if (d.condition !== prev) moved = true;
-
-                        prev = d.camber;
-                        d.camber = lerpNum(d.camber, t.camber, alpha);
-                        if (d.camber !== prev) moved = true;
-
-                        prev = d.pressure;
-                        d.pressure = lerpNum(d.pressure, t.pressure, alpha);
-                        if (d.pressure !== prev) moved = true;
-
-                        prev = d.surfaceDamage;
-                        d.surfaceDamage = lerpNum(d.surfaceDamage, t.surfaceDamage, alpha);
-                        if (d.surfaceDamage !== prev) moved = true;
-
-                        prev = d.flatspot;
-                        d.flatspot = lerpNum(d.flatspot, t.flatspot, alpha);
-                        if (d.flatspot !== prev) moved = true;
-
-                        for (var ti = 0; ti < 8; ti++) {
-                            prev = d.temp[ti];
-                            d.temp[ti] = lerpNum(d.temp[ti], t.temp[ti], alpha);
-                            if (d.temp[ti] !== prev) moved = true;
-                        }
-
-                        // Non-visual / discrete: keep in sync without lerp
-                        d.name = t.name;
-                        d.working_temp = t.working_temp;
-                        d.initialPressure = t.initialPressure;
-                    }
-                    return moved;
-                }
-
-                function rafTick(ts) {
-                    if (!rafRunning) return;
-                    if (!isAppVisible()) {
-                        stopRaf();
-                        return;
-                    }
-                    var dt = lastRafTs ? Math.min(0.05, (ts - lastRafTs) / 1000) : (1 / 60);
-                    lastRafTs = ts;
-                    var alpha = Math.min(1, LERP_K * dt);
-                    var moved = lerpWheels(alpha);
-                    if (moved || needsRedraw) {
-                        needsRedraw = false;
-                        renderDisplay();
-                    }
-                    if (moved) {
-                        rafId = requestAnimationFrame(rafTick);
-                    } else {
-                        stopRaf();
-                    }
-                }
-
-                function onVisibilityChange() {
-                    if (!isAppVisible()) {
-                        stopRaf();
-                    } else if (targetWheels.length) {
-                        startRaf();
-                    }
-                }
-                document.addEventListener("visibilitychange", onVisibilityChange);
 
                 // Standard border-radius drawing utility
                 function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
@@ -312,7 +152,7 @@ angular.module("beamng.apps")
                     ctx.fillStyle = "#ffffff";
                     var headerSize = Math.max(Math.min(colW / 12.0, 10.0), 7.0);
                     ctx.font = 'bold ' + headerSize + 'pt "Lucida Console", Monaco, monospace';
-                    var headerText = name.toUpperCase() + " | " + Number(condition).toFixed(2) + "%";
+                    var headerText = name.toUpperCase() + " | " + Math.ceil(condition) + "%";
                     ctx.fillText(headerText, cx, y + headerH * 0.72);
 
                     // 2. Draw Tyre Tread Rings
@@ -355,7 +195,7 @@ angular.module("beamng.apps")
                         ctx.fillStyle = "#ffffff";
                         var font_size = Math.max(Math.min(colW / 16.0 * 2.6, 11.0), 7.0);
                         ctx.font = 'bold ' + font_size + 'pt "Lucida Console", Monaco, monospace';
-                        ctx.fillText(Number(tempVal).toFixed(2), x + sectionXOffset + (sectionWidth / 2), treadY + treadH / 2 + (font_size / 2.2));
+                        ctx.fillText("" + Math.floor(tempVal), x + sectionXOffset + (sectionWidth / 2), treadY + treadH / 2 + (font_size / 2.2));
                     }
 
                     // 3. Draw Camber Triangle Indicators (bound-clamped within the tread width)
@@ -393,56 +233,33 @@ angular.module("beamng.apps")
                         ctx.fillStyle = "#ffaa44";
                     }
 
-                    var footerText = warningTag + Number(pres).toFixed(2) + " PSI";
+                    var footerText = warningTag + Math.round(pres) + " PSI";
                     ctx.fillText(footerText, cx, y + rowH - footerH * 0.25);
                 }
 
-                function renderDisplay() {
-                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                function renderData(dataStream) {
+                    if (!dataStream || !dataStream.data) return;
+
+                    ctx.setTransform(1, 0, 0, 1, 0, 0); 
                     ctx.clearRect(0, 0, c.width, c.height);
                     ctx.textAlign = 'center';
 
-                    var wheelCount = displayWheels.length;
+                    var wheelCount = dataStream.data.length;
                     for (var i = 0; i < wheelCount; i++) {
-                        var d = displayWheels[i];
+                        var d = dataStream.data[i];
                         if (d) {
                             drawWheelData(d, i, wheelCount);
                         }
                     }
                 }
 
-                function ingestStream(dataStream) {
-                    if (!dataStream || !dataStream.data) return;
-
-                    var src = dataStream.data;
-                    var count = src.length;
-                    var structural = (targetWheels.length !== count);
-
-                    if (structural) {
-                        targetWheels = [];
-                        displayWheels = [];
-                        for (var i = 0; i < count; i++) {
-                            var state = makeWheelState(src[i] || {});
-                            targetWheels.push(state);
-                            displayWheels.push(makeWheelState(src[i] || {}));
-                        }
-                        needsRedraw = true;
-                        renderDisplay();
-                    } else {
-                        for (var j = 0; j < count; j++) {
-                            snapWheel(targetWheels[j], src[j] || {});
-                        }
-                    }
-                    startRaf();
-                }
-
                 scope.$on("TyreWearThermals", function (event, dataStream) {
-                    ingestStream(dataStream);
+                    renderData(dataStream);
                 });
 
                 scope.$on("streamsUpdate", function (event, streams) {
                     if (streams && streams.TyreWearThermals) {
-                        ingestStream(streams.TyreWearThermals);
+                        renderData(streams.TyreWearThermals);
                     }
                 });
             }

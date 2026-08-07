@@ -71,10 +71,11 @@ local THERMAL_TOPOLOGY = {
     -- P0-1: slip/work/torque heat deposits on patch-resident arc; free belt cools more
     -- Phase B: street Hertz F/P often yields rawFrac≈0.04–0.07; old Min=0.09 glued heatScale.
     -- Heat uses softer floor (patchFracHeatMin); free-belt/display keep patchFracMin.
-    patchFracMin = 0.035,      -- geometric/cool floor (was 0.09; unsticks street load motion)
-    patchFracHeatMin = 0.025,  -- softer floor for patchHeatScale only
+    -- Path A5: freer floors after A3/A4; street Hertz≈0.045 → heatScale≈0.66 (still ~0.64 band)
+    patchFracMin = 0.032,      -- geometric/cool floor (was 0.035)
+    patchFracHeatMin = 0.022,  -- softer floor for patchHeatScale only (was 0.025)
     patchFracMax = 0.22,       -- high-downforce / deep-defl ceiling
-    patchFracRef = 0.070,      -- was 0.140; re-norm so street≈0.045 → heatScale≈0.64 (parity)
+    patchFracRef = 0.068,      -- was 0.070; slight re-norm with freer heat floor
     patchHeatEmaTau = 0.10,    -- s; light EMA on patchHeatScale (depth EMA alone insufficient)
     freeBeltCoolMult = 1.32,   -- convection boost as freeFrac → 1
     -- P0-2: gated flex/hysteresis into carcass (cruise RR soft-cap still owns straights)
@@ -199,12 +200,32 @@ local THERMAL_TOPOLOGY = {
     patchHertzDeflBlend = 0.35,      -- max weight of deflection proxy vs Hertz F/P area
     patchDeflWidthFrac = 0.55,       -- effective width fraction of chord×width deflection area
     patchLatLoadNudge = 0.05,        -- mild live lateral (gy) nudge on L/R ring weights
-    -- Phase C: mild peakForce/load utilization nudge on patch heat (corner work already uses peakWorkFactor)
-    patchUtilBlend = 0.12,           -- 0=off; blend peakWorkFactor into patchHeatScale
+    -- Path A3: peakForce / downForceRaw util → patchHeatScale (smoothed load keeps Hertz stable;
+    --   contactDepth + patchHeatScale EMA still kill kerb jitter). Prefer raw load as util denom.
+    patchUtilBlend = 0.20,           -- was 0.12; stronger useful coupling (not raw peak noise)
+    patchUtilPeakLo = 0.82,          -- util clamp floor (was hardcoded 0.85)
+    patchUtilPeakHi = 1.40,          -- util clamp ceil (was 1.35)
+    -- Path A4: patch length prefers dynamicRadius vs static; clamp absurd deflation
+    patchDynRadiusMinFrac = 0.55,    -- dynR floor as fraction of static radius
+    patchDynRadiusMaxFrac = 1.06,    -- dynR ceil vs static (rare grow / squat)
     -- Phase D: soft sink / rough — conduction denom already; optional frictional heat damp
     softSinkHeatCoef = 1.2,          -- frictionalGain /= (1 + depth×coef + rough×roughCoef)
     softSinkRoughCoef = 0.35,
     softSinkHeatFloor = 0.72,        -- min damp mult (keep some heat on deep gravel)
+    -- Path A1: wire unused GM fields into soft-sink / conduction (asphalt dry ≈ no-op:
+    --   strength≈1, defaultDepth≈0, fluidDensity≈0, stribeck≈1). Soft/rough/wet diverge.
+    softSinkDefaultDepthCoef = 2.2,  -- +GM defaultDepth into soft-sink heat denom
+    softSinkStrengthRef = 1.0,       -- strength below ref → extra soft plough damp
+    softSinkStrengthCoef = 0.40,
+    softSinkFluidCoef = 0.0007,      -- fluidDensity (water~1000) → wet fluid heat damp
+    softSinkStribeckRef = 1.0,       -- lower stribeckVelocity → mild sticky/wet damp
+    softSinkStribeckCoef = 0.035,
+    gmConductionDefaultDepthCoef = 2.5, -- +defaultDepth into track conduction denom
+    gmConductionStrengthCoef = 0.30,
+    gmConductionFluidCoef = 0.0005,
+    -- Path A2: dual contactMaterialID2 blend (kerb+asphalt). Spike mat 32 excluded.
+    dualContactBlend = 0.32,         -- secondary mat weight on μ/rough/soft GM fields
+    dualContactWearBump = 0.18,      -- max wear bump when secondary is rougher
     brakeSurfSoak = 0.022,           -- was 0.016; P3 trail-brake rim feel (tire-side only)
     brakeCoreSoak = 0.0032,          -- was 0.0025; lag path still ≪ surf
     brakeEffSoakFloor = 0.92,        -- glazed/low-efficiency floor on soak scale (η soft only)
@@ -352,8 +373,13 @@ local scratchCarcassWeights = { 0, 0, 0 }
     patchFracMin/Max/Ref  Contact-patch circumferential share + heat normalize.
     patchFracHeatMin      Softer floor for patchHeatScale (load/PSI/depth can move).
     patchHeatEmaTau       Light EMA on patchHeatScale after raw compute.
-    patchUtilBlend        Mild peakForce/load blend into patchHeatScale.
+    patchUtilBlend        peakForce/downForceRaw util blend into patchHeatScale (A3).
+    patchUtilPeakLo/Hi    Util clamp band for peakWorkFactorEarly.
+    patchDynRadiusMin/MaxFrac  dynamicRadius clamp vs static for patch length (A4).
     softSinkHeat*/Rough*  Soft-surface frictional heat damp (conduction separate).
+    softSinkDefaultDepth*/Strength*/Fluid*/Stribeck*  Path A1 GM soft/wet into soft-sink.
+    gmConduction*         Path A1 GM soft/wet into track conduction denom.
+    dualContactBlend/WearBump  Path A2 secondary contactMaterialID2 (spike excluded).
     contactDepthEmaTau    Short EMA on contactDepth before patch blend.
     patchHertzDeflBlend   Max weight of deflection proxy vs Hertz F/P area.
     patchDeflWidthFrac    Width fraction on chord×width deflection area.
@@ -1415,6 +1441,55 @@ F.GetGroundModelData = function(id)
     
     groundModelsLut[id] = data
     return name, data
+end
+
+-- Path A1/A2: blend primary+secondary GM soft/friction fields into ctw scratch (own local scope).
+-- Asphalt dry ≈ identity (strength≈1, defaultDepth≈0, fluid≈0, stribeck≈1). Spike mats excluded upstream.
+F.blendGroundThermal = function(w, groundModel, isAirborne)
+    local gm = groundModel or DOESNT_EXIST_DATA
+    local rough = tonumber(gm.rough) or 0
+    local strength = tonumber(gm.strength)
+    if not strength or strength <= 0 then strength = 1.0 end
+    local defDepth = tonumber(gm.defaultDepth) or 0
+    local fluid = tonumber(gm.fluidDensity) or 0
+    local stribeck = tonumber(gm.stribeckVelocity) or 1
+    local st = gm.staticFrictionCoefficient or 1
+    local sl = gm.slidingFrictionCoefficient or st
+    local rough1 = rough
+    local dualB = 0
+    local gm2 = w and w.groundModel2
+    if gm2 and not isAirborne then
+        dualB = topo.dualContactBlend or 0.32
+        local b1, b2 = 1.0 - dualB, dualB
+        rough = rough * b1 + (tonumber(gm2.rough) or 0) * b2
+        st = st * b1 + (gm2.staticFrictionCoefficient or 1) * b2
+        sl = sl * b1 + (gm2.slidingFrictionCoefficient or gm2.staticFrictionCoefficient or 1) * b2
+        local s2 = tonumber(gm2.strength)
+        if not s2 or s2 <= 0 then s2 = 1.0 end
+        strength = strength * b1 + s2 * b2
+        defDepth = defDepth * b1 + (tonumber(gm2.defaultDepth) or 0) * b2
+        fluid = fluid * b1 + (tonumber(gm2.fluidDensity) or 0) * b2
+        stribeck = stribeck * b1 + (tonumber(gm2.stribeckVelocity) or 1) * b2
+    end
+    ctw.gmRough = rough
+    ctw.gmStatic = st
+    ctw.gmSliding = sl
+    ctw.gmStrength = strength
+    ctw.gmDefDepth = defDepth
+    ctw.gmFluid = fluid
+    ctw.gmStribeck = stribeck
+    ctw.dualContactBlend = dualB
+    ctw.dualRoughDelta = max(0, rough - rough1)
+    -- Soft-sink / conduction extras from unused GM fields (A1)
+    local sRef = max(0.2, topo.softSinkStrengthRef or 1.0)
+    local softExtra = max(0, defDepth) * (topo.softSinkDefaultDepthCoef or 2.2)
+        + max(0, 1.0 - strength / sRef) * (topo.softSinkStrengthCoef or 0.40)
+        + max(0, fluid) * (topo.softSinkFluidCoef or 0.0007)
+        + max(0, 1.0 - min(1.0, stribeck / max(0.1, topo.softSinkStribeckRef or 1.0))) * (topo.softSinkStribeckCoef or 0.035)
+    ctw.softGmExtra = softExtra
+    ctw.condGmExtra = max(0, defDepth) * (topo.gmConductionDefaultDepthCoef or 2.5)
+        + max(0, 1.0 - strength / sRef) * (topo.gmConductionStrengthCoef or 0.30)
+        + max(0, fluid) * (topo.gmConductionFluidCoef or 0.0005)
 end
 
 F.setGroundModels = function(data)
@@ -2688,15 +2763,21 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     data.contactDepthSmooth = contactDepth
     local propulsionTorque = isAirborne and 0 or (wd.propulsionTorque or 0) * (wd.wheelDir or 1)
     local brakeTorque = isAirborne and 0 or (wd.brakeTorque or 0) * (wd.wheelDir or 1)
-    local loadRaw = isAirborne and 0 or (wd.downForceRaw or wd.downForce or 0)
-    if not isAirborne and (wd.downForce or 0) > 0 then
-        -- Prefer smoothed downForce for stability when available
-        loadRaw = wd.downForce or loadRaw
+    -- A3: smoothed downForce for Hertz/thermal mass; downForceRaw for util spikes
+    local loadRaw = isAirborne and 0 or (wd.downForce or wd.downForceRaw or w.downForceRaw or 0)
+    local loadUtil = loadRaw
+    if not isAirborne then
+        local rawN = wd.downForceRaw or w.downForceRaw or 0
+        if rawN > 100 then loadUtil = rawN end
     end
     local angularVel = isAirborne and 0 or abs(wd.angularVelocity or 0)
 
     local tyreWidth = bf.tireWidth or wd.tireWidth or wd.tyreWidth or wd.width or 0.2
-    local tyreRadius = (w.dynamicRadius and w.dynamicRadius > 0.05) and w.dynamicRadius or (bf.radius or wd.radius or 0.3)
+    -- A4: prefer dynamicRadius for patch length; clamp absurd deflation vs static
+    local staticRadius = bf.radius or wd.radius or 0.3
+    local dynRadius = (w.dynamicRadius and w.dynamicRadius > 0.05) and w.dynamicRadius or staticRadius
+    local tyreRadius = max(staticRadius * (topo.patchDynRadiusMinFrac or 0.55),
+        min(staticRadius * (topo.patchDynRadiusMaxFrac or 1.06), dynRadius))
     local airspeed = F.getFreestreamAirspeed()
 
     -- PHYSICAL AIRSPEED & ROTATIONAL HEADING COMBINATION MODEL (Forced Convection)
@@ -2929,10 +3010,10 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     if not isAirborne and contactDepth > 0.006 then
         depthHeatBoost = 1.0 + min(0.16, (contactDepth - 0.006) * 2.0)
     end
-    -- Phase C: mild peak utilization nudge on patch heat (corner work already has peakWorkFactor)
+    -- Path A3: peakForce / downForceRaw util nudge on patch heat (EMA still damps kerb noise)
     local peakWorkFactorEarly = 1.0
-    if peakForce and peakForce > 100 and loadRaw > 100 then
-        peakWorkFactorEarly = max(0.85, min(1.35, peakForce / max(loadRaw, 1)))
+    if peakForce and peakForce > 100 and loadUtil > 100 then
+        peakWorkFactorEarly = max(topo.patchUtilPeakLo or 0.82, min(topo.patchUtilPeakHi or 1.40, peakForce / max(loadUtil, 1)))
     end
     local utilNudge = 1.0 + ((peakWorkFactorEarly - 1.0) * (topo.patchUtilBlend or 0))
     local patchHeatScaleRaw = max(0.40, min(1.20, (patchFracHeat / max(0.05, topo.patchFracRef)) * depthHeatBoost * utilNudge))
@@ -2946,7 +3027,7 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         patchHeatScale = hsPrev + (patchHeatScaleRaw - hsPrev) * hsAlpha
         data.patchHeatScaleSmooth = patchHeatScale
     end
-    -- Phase A diagnostics (streamed to Heavy SURFACE CONTACT)
+    -- Phase A / Path A diagnostics (streamed to Heavy SURFACE CONTACT)
     data.lastPatchFrac = patchFrac
     data.lastPatchFracRaw = patchFracRaw
     data.lastPatchHeatScale = patchHeatScale
@@ -2954,6 +3035,8 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     data.lastHertzArea = hertzArea
     data.lastDeflArea = deflArea
     data.lastDepthBlend = depthBlend
+    data.lastUtilNudge = utilNudge
+    data.lastLoadUtil = loadUtil
 
     -- Stock friction multipliers shape heat generation
     local jbeamMu = max(0.4, min(1.8, bf.frictionCoef or 1.0))
@@ -3019,6 +3102,9 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         ctw.grainTempRatio = grainTempRatio
         ctw.groundModel = groundModel
         ctw.heatMassScale = heatMassScale
+        -- Path A1/A2: blend GM soft/friction into ctw (own helper scope — keeps locals safe)
+        F.blendGroundThermal(w, groundModel, isAirborne)
+        data.lastDualContactBlend = ctw.dualContactBlend or 0
         ctw.hotWearMult = hotWearMult
         ctw.isAirborne = isAirborne
         ctw.isDirtGrassSurface = isDirtGrassSurface
@@ -3209,7 +3295,8 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         -- Rebalanced skin ring heating rates to prevent rapid thermal saturation
         local rawFrictionalGain = (slipEnergyHeat * 0.05 + netTorque * 0.002) * 3 * weight
         
-        local surfaceMu = ((groundModel.staticFrictionCoefficient or 1) * 0.55 + (groundModel.slidingFrictionCoefficient or groundModel.staticFrictionCoefficient or 1) * 0.45) * jbeamMu
+        local surfaceMu = ((ctw.gmStatic or groundModel.staticFrictionCoefficient or 1) * 0.55
+            + (ctw.gmSliding or groundModel.slidingFrictionCoefficient or groundModel.staticFrictionCoefficient or 1) * 0.45) * jbeamMu
         local slideMuScale = max(0.5, min(1.6, jbeamSlideMu / max(0.2, jbeamMu)))
 
         -- Skin slip/work: compound rates + optional skinSlipWorkScale (default 1; no track fudge)
@@ -3233,10 +3320,11 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         -- P0-1: deposit slip/work/torque heat on patch-resident fraction (integrates with lockup floor)
         -- Street residual slip soft-cap also trims excess-prop slip/work boost (driven FWD cook).
         frictionalGain = frictionalGain * patchHeatScale * (1.0 + ((topo.drivePropSlipWorkMult or 1.0) - 1.0) * excessPropGateEff * streetSlipHeatScale)
-        -- Phase D: soft sink / rough damp frictional heat (conduction has its own depth/rough denom)
+        -- Phase D + Path A1: soft sink / rough / GM soft-wet damp frictional heat
         if not isAirborne then
             local sinkDamp = 1.0 / (1.0 + max(0, contactDepth or 0) * (topo.softSinkHeatCoef or 1.2)
-                + (tonumber(groundModel.rough) or 0) * (topo.softSinkRoughCoef or 0.35))
+                + (ctw.gmRough or tonumber(groundModel.rough) or 0) * (topo.softSinkRoughCoef or 0.35)
+                + (ctw.softGmExtra or 0))
             frictionalGain = frictionalGain * max(topo.softSinkHeatFloor or 0.72, sinkDamp)
         end
         -- P4: mild solar→skin (shared across rings by weight)
@@ -3276,11 +3364,13 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
             elseif isWetSurface then
                 surfaceConductivity, surfaceTemp = 0.75 * trackConductivityMult, localEnvTemp + (trackTemp - localEnvTemp) * 0.35
             end
-            -- Soft sink (contactDepth) or rough ground reduces clean asphalt conduction
+            -- Soft sink (contactDepth) or rough / soft-wet GM reduces clean asphalt conduction
             surfaceConduction = max(-25, min(110,
                 (surfaceConductivity * estimatedContactArea * ((skinSnap[i] or localEnvTemp) - surfaceTemp) / THERMAL_BOUNDARY_LAYER)
                 / (1 + slipEnergy * 0.1)
-                * 0.003 / (1.0 + max(0, contactDepth or 0) * 4.0 + (tonumber(groundModel.rough) or 0) * 0.5)
+                * 0.003 / (1.0 + max(0, contactDepth or 0) * 4.0
+                    + (ctw.gmRough or tonumber(groundModel.rough) or 0) * 0.5
+                    + (ctw.condGmExtra or 0))
             )) * weight
         end
 
@@ -3441,7 +3531,8 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     if ductPct > (DUCT_DEFAULT_PCT + 4) then
         dutyMods = (dutyMods == "") and "duct_tire_side" or (dutyMods .. ",duct_tire_side")
     end
-    if not isAirborne and ((contactDepth or 0) > 0.015 or (tonumber(groundModel.rough) or 0) > 0.15) then
+    if not isAirborne and ((contactDepth or 0) > 0.015 or (ctw.gmRough or tonumber(groundModel.rough) or 0) > 0.15
+        or (ctw.gmDefDepth or 0) > 0.008 or (ctw.gmFluid or 0) > 40 or (ctw.gmStrength or 1) < 0.88) then
         dutyMods = (dutyMods == "") and "soft_sink_damp" or (dutyMods .. ",soft_sink_damp")
     end
     data.lastDutyMods = dutyMods
@@ -3589,6 +3680,17 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         end
         
         wear = F.tempDistToWearMult(tempDistWeighted) * (slidingWear + (vehNotParked * abs(propulsionTorque * 0.008 - brakeTorque * 0.025) * 0.3 * TORQUE_ENERGY_MULTIPLIER) * 0.08 + angularVel * 0.0005) * (wearRate * cycleWearMultiplier / max(0.7, min(1.3, tyreWidth / 0.2))) * (1.0 + min(0.75, (w.suspStress or 0) * 0.35 * bottomOutSens)) * surfaceWearScale * dt
+
+        -- Path A2: secondary contact (kerb+asphalt) mild wear bump when ID2 rougher — spike excluded upstream
+        do
+            local dualB = ctw.dualContactBlend or 0
+            if dualB > 1e-4 then
+                local bump = min(topo.dualContactWearBump or 0.18, (ctw.dualRoughDelta or 0) * 0.55)
+                if bump > 1e-4 then
+                    wear = wear * (1.0 + dualB * bump)
+                end
+            end
+        end
 
         -- Excess-camber wear: neutral at camberWearMult=1.0 (bit-identical); >1 adds mild shoulder wear
         do
@@ -4488,6 +4590,15 @@ F.prepareWheelFrame = function(dt, localizedEnvTemp, invQuat, upVector, airspeed
                 and not w.isTireDeflated and not w.isBroken then
                 data.punctureSeverity = max(data.punctureSeverity or 0, 0.5)
             end
+            -- Path A2: secondary contact GM for heat/wear blend (never spike — leak ownership stays native)
+            w.groundModel2 = nil
+            w.contactMatId2 = -1
+            if mat2 and mat2 ~= -1 and mat2 ~= mat1
+                and mat1 ~= SPIKE_STRIP_MATERIAL_ID and mat2 ~= SPIKE_STRIP_MATERIAL_ID then
+                w.contactMatId2 = mat2
+                local _, gm2 = F.GetGroundModelData(mat2)
+                w.groundModel2 = gm2
+            end
 
             local scrubSens = data.interpolatedMods and data.interpolatedMods.scrubSensitivity or 1.0
             local dynR = w.dynamicRadius or (wd.radius or 0.3)
@@ -4647,6 +4758,8 @@ F.flushGuiStream = function(localizedEnvTemp)
                 entry.hertzArea = math.floor((data.lastHertzArea or 0) * 100000) / 100000
                 entry.deflArea = math.floor((data.lastDeflArea or 0) * 100000) / 100000
                 entry.depthBlend = math.floor((data.lastDepthBlend or 0) * 1000) / 1000
+                entry.utilNudge = math.floor((data.lastUtilNudge or 1) * 1000) / 1000
+                entry.dualContactBlend = math.floor((data.lastDualContactBlend or 0) * 1000) / 1000
 
                 entry.clog = (w.isBroken) and 0 or math.floor((data.currentClog or data.clog or 0) * 100)
                 entry.graining = (w.isBroken) and 0 or math.floor((data.currentGraining or data.graining or 0) * 100)
