@@ -9,8 +9,8 @@ angular.module("beamng.apps")
                             height: 100%;
                             max-height: 100%;
                             min-height: 0;
-                            background: rgba(18, 22, 28, 0.90);
-                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            background: rgba(18, 22, 28, 0.52);
+                            border: 1px solid rgba(255, 255, 255, 0.06);
                             border-radius: 6px;
                             box-sizing: border-box;
                             font-family: "Lucida Console", Monaco, monospace;
@@ -28,8 +28,6 @@ angular.module("beamng.apps")
                             border-bottom: 2px solid rgba(255, 255, 255, 0.08);
                             padding-bottom: 5px;
                             margin-bottom: 8px;
-                            gap: 6px;
-                            flex-wrap: wrap;
                         }
                         .ttm-title {
                             font-size: 12px;
@@ -37,18 +35,13 @@ angular.module("beamng.apps")
                             letter-spacing: 1.2px;
                             color: #38bdf8;
                         }
-                        .ttm-header-meta {
-                            font-size: 9px;
-                            color: #94a3b8;
-                            letter-spacing: 0.4px;
-                        }
                         .ttm-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
                             gap: 8px;
                         }
                         .ttm-card {
-                            background: rgba(30, 41, 59, 0.6);
+                            background: rgba(30, 41, 59, 0.38);
                             border: 1px solid rgba(255, 255, 255, 0.04);
                             border-radius: 5px;
                             padding: 8px;
@@ -119,7 +112,7 @@ angular.module("beamng.apps")
                         }
                         .ttm-diagnostics-grid {
                             display: grid;
-                            grid-template-columns: 1fr 1fr;
+                            grid-template-columns: 1fr 1fr 1fr;
                             gap: 6px;
                             border-top: 1px dashed rgba(255, 255, 255, 0.08);
                             margin-top: 6px;
@@ -133,40 +126,23 @@ angular.module("beamng.apps")
                             font-size: 8px;
                             letter-spacing: 0.4px;
                         }
-                        .ttm-footer {
-                            font-size: 8px;
-                            color: #64748b;
-                            text-align: right;
-                            margin-top: 5px;
-                        }
                     </style>
 
                     <div class="ttm-header">
-                        <span class="ttm-title">TYRE TELEMETRY (CREW)</span>
-                        <span class="ttm-header-meta">
-                            Env {{ (envTemp||0).toFixed(2) }}°C · Track {{ (trackTemp||0).toFixed(2) }}°C · Rain {{ (rainState||0).toFixed(2) }}%
-                        </span>
-                        <span class="ttm-header-meta">
-                            <span style="color: #64748b;">Aero ↓</span>
-                            <span style="color: #f59e0b; font-weight: bold;"> {{ totalDownforceKN }} kN</span>
-                            <span style="color: #475569; font-size: 9px;"> ({{ (aeroFracPct||0).toFixed(2) }}%)</span>
-                        </span>
+                        <span class="ttm-title">TYRE CREW</span>
                     </div>
 
                     <div class="ttm-grid">
                         <div class="ttm-card" ng-repeat="w in wheels">
                             <div class="ttm-card-header">
                                 <span class="ttm-wheel-name">{{ w.name }}</span>
-                                <span style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-                                    <span class="ttm-compound-tag">{{ formatProfile(w.profile) }}</span>
-                                    <span class="ttm-compound-tag" ng-if="w.purpose">{{ formatPurpose(w.purpose) }}</span>
-                                </span>
+                                <span class="ttm-compound-tag">{{ formatProfile(w.profile) }}</span>
                             </div>
 
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Tread Condition:</span>
                                 <span class="ttm-value" ng-style="{'color': getConditionColor(w.condition)}">
-                                    {{ (w.condition !== undefined ? w.condition : 0).toFixed(2) }}%
+                                    {{ (w.condition !== undefined ? w.condition : 0).toFixed(0) }}%
                                 </span>
                             </div>
                             <div class="ttm-bar-container" style="margin-bottom: 5px;">
@@ -176,7 +152,7 @@ angular.module("beamng.apps")
                             <div class="ttm-stat-row">
                                 <span class="ttm-label">Dynamic Grip:</span>
                                 <span class="ttm-value" ng-style="{'color': getGripColor(w.tyreGrip)}">
-                                    {{ ((w.tyreGrip || 0) * 100).toFixed(2) }}%
+                                    {{ ((w.tyreGrip || 0) * 100).toFixed(0) }}%
                                 </span>
                             </div>
 
@@ -184,28 +160,11 @@ angular.module("beamng.apps")
                                 <span class="ttm-label">Tire Pressure:</span>
                                 <span class="ttm-value">
                                     <span ng-style="{'color': getInflationColor(w.pressure, w.targetHotPressure || w.optimalPressure)}">
-                                        {{ (w.pressure !== undefined ? w.pressure : 0).toFixed(2) }} PSI
+                                        {{ (w.pressure !== undefined ? w.pressure : 0).toFixed(0) }} PSI
                                     </span>
                                     <span style="font-size: 9px; color: #64748b;">
-                                        (Cold {{ (w.coldPressure || w.initialPressure || 0).toFixed(2) }} / Hot {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(2) }})
+                                        (Hot {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(0) }})
                                     </span>
-                                </span>
-                            </div>
-
-                            <div class="ttm-stat-row" ng-if="w.zoneCondition">
-                                <span class="ttm-label">Zone Wear O|M|I:</span>
-                                <span class="ttm-value" style="font-size: 10px;">
-                                    {{ (w.zoneCondition[0]||0).toFixed(0) }}% |
-                                    {{ (w.zoneCondition[1]||0).toFixed(0) }}% |
-                                    {{ (w.zoneCondition[2]||0).toFixed(0) }}%
-                                </span>
-                            </div>
-
-                            <div class="ttm-stat-row">
-                                <span class="ttm-label">Camber / Toe:</span>
-                                <span class="ttm-value" ng-style="{'color': isExcessiveCamber(w.camber) ? '#ffaa44' : '#f1f5f9'}">
-                                    {{ (w.camber !== undefined ? w.camber : 0).toFixed(2) }}° /
-                                    {{ (w.toe !== undefined ? w.toe : 0).toFixed(2) }}°
                                 </span>
                             </div>
 
@@ -213,21 +172,7 @@ angular.module("beamng.apps")
                                 <span class="ttm-label">Temp State / Opt:</span>
                                 <span class="ttm-value">
                                     <span ng-style="{'color': tempCategoryColor(w.tempCategory)}">{{ w.tempCategory || 'Normal' }}</span>
-                                    <span style="color:#64748b;"> · avg {{ (w.avgTemp||0).toFixed(2) }}° / opt {{ (w.working_temp||0).toFixed(2) }}°</span>
-                                </span>
-                            </div>
-
-                            <div class="ttm-stat-row">
-                                <span class="ttm-label">Surface:</span>
-                                <span class="ttm-value" style="font-size: 10px;">
-                                    {{ w.surfaceName || '—' }} · {{ formatProfile(w.surfaceType) }}
-                                </span>
-                            </div>
-
-                            <div class="ttm-stat-row">
-                                <span class="ttm-label">Aero Load:</span>
-                                <span class="ttm-value" style="color: #f59e0b;">
-                                    {{ (w.aeroLoadN || 0) >= 1000 ? ((w.aeroLoadN || 0) / 1000).toFixed(2) + ' kN' : (w.aeroLoadN || 0).toFixed(2) + ' N' }}
+                                    <span style="color:#64748b;"> · avg {{ (w.avgTemp||0).toFixed(0) }}° / opt {{ (w.working_temp||0).toFixed(0) }}°</span>
                                 </span>
                             </div>
 
@@ -236,7 +181,7 @@ angular.module("beamng.apps")
                                 <div class="ttm-thermal-segment"
                                      ng-repeat="tempVal in w.surfaceTemps track by $index"
                                      ng-style="{'background-color': getTempColor(tempVal, w.working_temp), 'color': '#ffffff'}">
-                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(2) }}°
+                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(0) }}°
                                 </div>
                             </div>
 
@@ -245,32 +190,33 @@ angular.module("beamng.apps")
                                 <div class="ttm-thermal-segment"
                                      ng-repeat="tempVal in w.carcassTemps track by $index"
                                      ng-style="{'background-color': getTempColor(tempVal, w.working_temp), 'color': '#ffffff'}">
-                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(2) }}°
+                                    {{ (tempVal !== undefined ? tempVal : 0).toFixed(0) }}°
                                 </div>
                             </div>
 
                             <div class="ttm-stat-row">
-                                <span class="ttm-label">Rim / Air:</span>
-                                <span class="ttm-value">
-                                    <span ng-style="{'color': getTempColor(w.rimTemp, w.working_temp)}">{{ (w.rimTemp || 0).toFixed(2) }}°</span>
-                                    /
-                                    <span ng-style="{'color': getTempColor(w.airTemp, w.working_temp)}">{{ (w.airTemp || 0).toFixed(2) }}°</span>
+                                <span class="ttm-label">Rim:</span>
+                                <span class="ttm-value" ng-style="{'color': getTempColor(w.rimTemp, w.working_temp)}">
+                                    {{ (w.rimTemp !== undefined ? w.rimTemp : 0).toFixed(0) }}°
                                 </span>
                             </div>
 
-                            <div class="ttm-diagnostics-grid">
+                            <div class="ttm-stat-row">
+                                <span class="ttm-label">Stint Fade:</span>
+                                <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.stintFade)}">
+                                    {{ (w.stintFade || 0).toFixed(0) }}%
+                                </span>
+                            </div>
+                            <div class="ttm-bar-container" style="margin-bottom: 5px;">
+                                <div class="ttm-bar-fill" ng-style="{'width': (w.stintFade || 0) + '%', 'background-color': getDiagnosticColor(w.stintFade)}"></div>
+                            </div>
+
+                            <div class="ttm-diagnostics-grid" ng-if="hasDamage(w)">
                                 <div class="ttm-diagnostic-item">
-                                    <span class="ttm-diag-label">CLOG</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.clog)}">{{ (w.clog || 0).toFixed(0) }}%</span>
+                                    <span class="ttm-diag-label">FLATSPOT</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ (w.flatspot || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
-                                        <div class="ttm-bar-fill" ng-style="{'width': (w.clog || 0) + '%', 'background-color': getDiagnosticColor(w.clog)}"></div>
-                                    </div>
-                                </div>
-                                <div class="ttm-diagnostic-item">
-                                    <span class="ttm-diag-label">GRAINING</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.graining)}">{{ (w.graining || 0).toFixed(0) }}%</span>
-                                    <div class="ttm-bar-container">
-                                        <div class="ttm-bar-fill" ng-style="{'width': (w.graining || 0) + '%', 'background-color': getDiagnosticColor(w.graining)}"></div>
+                                        <div class="ttm-bar-fill" ng-style="{'width': (w.flatspot || 0) + '%', 'background-color': '#f43f5e'}"></div>
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
@@ -281,22 +227,12 @@ angular.module("beamng.apps")
                                     </div>
                                 </div>
                                 <div class="ttm-diagnostic-item">
-                                    <span class="ttm-diag-label">FLATSPOT</span>
-                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.flatspot)}">{{ (w.flatspot || 0).toFixed(0) }}%</span>
+                                    <span class="ttm-diag-label">GRAINING</span>
+                                    <span class="ttm-value" ng-style="{'color': getDiagnosticColor(w.graining)}">{{ (w.graining || 0).toFixed(0) }}%</span>
                                     <div class="ttm-bar-container">
-                                        <div class="ttm-bar-fill" ng-style="{'width': (w.flatspot || 0) + '%', 'background-color': '#f43f5e'}"></div>
+                                        <div class="ttm-bar-fill" ng-style="{'width': (w.graining || 0) + '%', 'background-color': getDiagnosticColor(w.graining)}"></div>
                                     </div>
                                 </div>
-                                <div class="ttm-diagnostic-item">
-                                    <span class="ttm-diag-label">LEAK / FILM</span>
-                                    <span class="ttm-value">{{ (w.leak || 0).toFixed(0) }}% / {{ (w.waterFilm || 0).toFixed(0) }}%</span>
-                                </div>
-                            </div>
-
-                            <div class="ttm-footer">
-                                Cycles: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.cycles || 0).toFixed(0) }}</span>
-                                &nbsp;|&nbsp; Stint: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.stintFade || 0).toFixed(0) }}%</span>
-                                &nbsp;|&nbsp; Duct: <span style="color: #f1f5f9; font-weight: bold;">{{ (w.ductPercent || 1).toFixed(0) }}%</span>
                             </div>
                         </div>
                     </div>
@@ -313,56 +249,33 @@ angular.module("beamng.apps")
                 }
 
                 // Client-side smooth motion: Lua ~30 Hz; RAF lerps display toward targets.
-                // Digest is throttled (~20 Hz): full $digest every RAF stalls CEF under Heavy/Medium binding load.
+                // Digest is throttled (~20 Hz): full $digest every RAF stalls CEF under binding load.
                 var LERP_K = 12;
                 var LERP_EPS = 0.05;
                 var DIGEST_INTERVAL_MS = 50; // ~20 Hz Angular updates; RAF still lerps at display rate
+                var DIAG_HIDE_THRESHOLD = 1.5;
                 var rafId = null;
                 var lastRafTs = 0;
                 var lastDigestTs = 0;
                 var rafRunning = false;
                 var targetWheels = [];
-                var targetMeta = {
-                    envTemp: 21,
-                    trackTemp: 21,
-                    rainState: 0,
-                    totalDownforceN: 0,
-                    aeroFracPct: 0
-                };
                 var WHEEL_LERP_KEYS = [
-                    "condition", "tyreGrip", "pressure", "camber", "toe", "avgTemp",
-                    "working_temp", "rimTemp", "airTemp", "aeroLoadN",
-                    "clog", "graining", "blistering", "flatspot", "leak", "waterFilm",
-                    "stintFade", "ductPercent"
+                    "condition", "tyreGrip", "pressure", "avgTemp",
+                    "working_temp", "rimTemp", "stintFade",
+                    "graining", "blistering", "flatspot"
                 ];
 
                 scope.wheels = [];
-                scope.envTemp = 21;
-                scope.trackTemp = 21;
-                scope.rainState = 0;
-                scope.totalDownforceKN = "0.00";
-                scope.aeroFracPct = 0;
 
                 scope.formatProfile = function (profile) {
                     if (!profile) return "";
                     return String(profile).replace(/_/g, " ");
                 };
 
-                scope.formatPurpose = function (purpose) {
-                    if (!purpose) return "";
-                    return String(purpose).replace(/_/g, " ").replace(/\b\w/g, function (c) {
-                        return c.toUpperCase();
-                    });
-                };
-
                 scope.tempCategoryColor = function (cat) {
                     if (cat === "Cold") return "#38bdf8";
                     if (cat === "Hot") return "#ef4444";
                     return "#10b981";
-                };
-
-                scope.isExcessiveCamber = function (camber) {
-                    return Math.abs(camber || 0) > 3.0;
                 };
 
                 scope.getConditionColor = function (condition) {
@@ -419,6 +332,13 @@ angular.module("beamng.apps")
                     return "hsla(" + Math.round(hue) + ", 80%, 45%, 1)";
                 };
 
+                scope.hasDamage = function (w) {
+                    if (!w) return false;
+                    return (w.flatspot || 0) > DIAG_HIDE_THRESHOLD
+                        || (w.blistering || 0) > DIAG_HIDE_THRESHOLD
+                        || (w.graining || 0) > DIAG_HIDE_THRESHOLD;
+                };
+
                 function lerpNum(cur, tgt, alpha) {
                     if (tgt === undefined || tgt === null) return cur;
                     if (cur === undefined || cur === null) return tgt;
@@ -435,42 +355,26 @@ angular.module("beamng.apps")
                 }
 
                 function prepareWheelTemps(w) {
+                    if (!w) return;
                     var t = w.temp || [];
                     w.surfaceTemps = ensureArr3(w.surfaceTemps, t[0], t[1], t[2]);
                     w.carcassTemps = ensureArr3(w.carcassTemps, t[3], t[4], t[5]);
-                    if (w.rimTemp === undefined) w.rimTemp = t[6] || 0;
-                    if (w.airTemp === undefined) w.airTemp = t[7] || 0;
-                    if (!w.zoneCondition || w.zoneCondition.length !== 3) {
-                        w.zoneCondition = [
-                            (w.zoneCondition && w.zoneCondition[0]) || w.condition || 100,
-                            (w.zoneCondition && w.zoneCondition[1]) || w.condition || 100,
-                            (w.zoneCondition && w.zoneCondition[2]) || w.condition || 100
-                        ];
-                    }
+                    if (w.rimTemp === undefined || w.rimTemp === null) w.rimTemp = t[6] || 0;
                 }
 
                 function copyStaticWheel(dst, src) {
                     dst.name = src.name;
                     dst.profile = src.profile;
-                    dst.purpose = src.purpose;
-                    dst.classifyReason = src.classifyReason;
                     dst.tempCategory = src.tempCategory;
-                    dst.surfaceName = src.surfaceName;
-                    dst.surfaceType = src.surfaceType;
-                    dst.coldPressure = src.coldPressure;
-                    dst.initialPressure = src.initialPressure;
                     dst.targetHotPressure = src.targetHotPressure;
                     dst.optimalPressure = src.optimalPressure;
-                    dst.cycles = src.cycles;
                 }
 
                 function snapLerpArrays(dst, src) {
                     var st = src.surfaceTemps || [0, 0, 0];
                     var ct = src.carcassTemps || [0, 0, 0];
-                    var zc = src.zoneCondition || [100, 100, 100];
                     dst.surfaceTemps = [st[0] || 0, st[1] || 0, st[2] || 0];
                     dst.carcassTemps = [ct[0] || 0, ct[1] || 0, ct[2] || 0];
-                    dst.zoneCondition = [zc[0] || 0, zc[1] || 0, zc[2] || 0];
                 }
 
                 function snapLerpScalars(dst, src) {
@@ -519,33 +423,9 @@ angular.module("beamng.apps")
                     rafId = requestAnimationFrame(rafTick);
                 }
 
-                function applyDisplayMeta() {
-                    scope.totalDownforceKN = ((scope._dfN || 0) / 1000).toFixed(2);
-                }
-
                 function lerpDisplay(alpha) {
                     var moved = false;
                     var i, j, k, prev, d, t;
-
-                    prev = scope.envTemp;
-                    scope.envTemp = lerpNum(scope.envTemp, targetMeta.envTemp, alpha);
-                    if (scope.envTemp !== prev) moved = true;
-
-                    prev = scope.trackTemp;
-                    scope.trackTemp = lerpNum(scope.trackTemp, targetMeta.trackTemp, alpha);
-                    if (scope.trackTemp !== prev) moved = true;
-
-                    prev = scope.rainState;
-                    scope.rainState = lerpNum(scope.rainState, targetMeta.rainState, alpha);
-                    if (scope.rainState !== prev) moved = true;
-
-                    prev = scope._dfN;
-                    scope._dfN = lerpNum(scope._dfN || 0, targetMeta.totalDownforceN, alpha);
-                    if (scope._dfN !== prev) moved = true;
-
-                    prev = scope.aeroFracPct;
-                    scope.aeroFracPct = lerpNum(scope.aeroFracPct, targetMeta.aeroFracPct, alpha);
-                    if (scope.aeroFracPct !== prev) moved = true;
 
                     var n = Math.min(scope.wheels.length, targetWheels.length);
                     for (i = 0; i < n; i++) {
@@ -566,13 +446,8 @@ angular.module("beamng.apps")
                             prev = d.carcassTemps[j];
                             d.carcassTemps[j] = lerpNum(d.carcassTemps[j], t.carcassTemps[j], alpha);
                             if (d.carcassTemps[j] !== prev) moved = true;
-
-                            prev = d.zoneCondition[j];
-                            d.zoneCondition[j] = lerpNum(d.zoneCondition[j], t.zoneCondition[j], alpha);
-                            if (d.zoneCondition[j] !== prev) moved = true;
                         }
                     }
-                    applyDisplayMeta();
                     return moved;
                 }
 
@@ -624,12 +499,6 @@ angular.module("beamng.apps")
                         prepareWheelTemps(src[i]);
                     }
 
-                    targetMeta.envTemp = dataStream.envTemp !== undefined ? dataStream.envTemp : targetMeta.envTemp;
-                    targetMeta.trackTemp = dataStream.trackTemp !== undefined ? dataStream.trackTemp : targetMeta.trackTemp;
-                    targetMeta.rainState = dataStream.rainState !== undefined ? dataStream.rainState : targetMeta.rainState;
-                    targetMeta.totalDownforceN = dataStream.totalDownforceN !== undefined ? dataStream.totalDownforceN : targetMeta.totalDownforceN;
-                    targetMeta.aeroFracPct = dataStream.aeroFracPct !== undefined ? dataStream.aeroFracPct : targetMeta.aeroFracPct;
-
                     if (structural) {
                         targetWheels = [];
                         var wheels = [];
@@ -641,12 +510,6 @@ angular.module("beamng.apps")
                             wheels.push(makeDisplayWheel(w));
                         }
                         scope.wheels = wheels;
-                        scope.envTemp = targetMeta.envTemp;
-                        scope.trackTemp = targetMeta.trackTemp;
-                        scope.rainState = targetMeta.rainState;
-                        scope._dfN = targetMeta.totalDownforceN;
-                        scope.aeroFracPct = targetMeta.aeroFracPct;
-                        applyDisplayMeta();
                         if (!scope.$$phase) {
                             scope.$evalAsync(angular.noop);
                         }

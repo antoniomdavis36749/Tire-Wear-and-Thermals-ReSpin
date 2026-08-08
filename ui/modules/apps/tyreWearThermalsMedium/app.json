@@ -10,16 +10,16 @@
     "ui.apps.categories.info",
     "ui.apps.categories.racing"
   ],
-  "description": "Crew mid telemetry: skin/carcass maps, grip, pressure, and surface damage modes.",
+  "description": "Crew view: driver telemetry plus carcass, rim soak, and stint fade.",
   "category": "Telemetry",
   "isAuxiliary": false,
   "interactive": "yes",
   "css": {
     "left": "0px",
     "top": "0px",
-    "width": "380px",
-    "height": "520px",
-    "min-width": "300px",
-    "min-height": "280px"
+    "width": "340px",
+    "height": "440px",
+    "min-width": "280px",
+    "min-height": "260px"
   }
 }

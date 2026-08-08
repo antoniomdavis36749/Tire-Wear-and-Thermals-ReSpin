@@ -227,6 +227,11 @@ angular.module("beamng.apps")
                                           ng-style="{'color': getInflationColor(w.pressure, w.targetHotPressure || w.optimalPressure)}">
                                         {{ pressureBandLabel(w) }}
                                     </span>
+                                    <span class="tth-compound-tag" style="margin-left: 4px;"
+                                          ng-if="coldSetWarnChip(w)"
+                                          ng-style="coldSetWarnStyle(w)">
+                                        {{ coldSetWarnChip(w) }}
+                                    </span>
                                     <span style="font-size: 8px; color: #64748b;">
                                         (Cold: {{ (w.coldPressure || w.initialPressure || 0).toFixed(2) }} / Hot tgt: {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(2) }}
                                         · r{{ (w.pressureRatio || 0).toFixed(2) }}
@@ -292,6 +297,14 @@ angular.module("beamng.apps")
                                     <span style="color:#64748b;">
                                         · Hz{{ (w.hertzArea||0).toFixed(4) }} / defl{{ (w.deflArea||0).toFixed(4) }}
                                         · blend{{ (w.depthBlend||0).toFixed(2) }}
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="tth-stat-row" ng-if="(w.dualContactBlend||0) > 0">
+                                <span class="tth-label">Dual-contact blend:</span>
+                                <span class="tth-value">
+                                    <span class="tth-compound-tag" style="color:#f59e0b; border-color:rgba(245,158,11,0.35); background:rgba(245,158,11,0.12);">
+                                        DUAL {{ (w.dualContactBlend||0).toFixed(2) }}
                                     </span>
                                 </span>
                             </div>
@@ -364,6 +377,13 @@ angular.module("beamng.apps")
                                 <span class="tth-value">
                                     {{ ((w.driveHeatGate||0)*100).toFixed(2) }}% /
                                     {{ ((w.driveHeatGateCarcass||0)*100).toFixed(2) }}%
+                                </span>
+                            </div>
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Street slip scale / util nudge:</span>
+                                <span class="tth-value" style="font-size: 9px;">
+                                    ×{{ (w.streetSlipScale !== undefined ? w.streetSlipScale : 1).toFixed(2) }}
+                                    · util{{ (w.utilNudge !== undefined ? w.utilNudge : 1).toFixed(2) }}
                                 </span>
                             </div>
                             <div class="tth-stat-row">
@@ -491,6 +511,7 @@ angular.module("beamng.apps")
                     "suspCompressionMm", "suspVel", "suspStress", "suspBumpMm", "suspDroopMm", "dynamicRadius",
                     "muStatic", "muSlide", "contactDepth", "rough",
                     "patchFrac", "patchHeatScale", "depthHeatBoost", "hertzArea", "deflArea", "depthBlend",
+                    "streetSlipScale", "utilNudge", "dualContactBlend",
                     "clog", "graining", "blistering", "flatspot", "leak", "waterFilm",
                     "stintFade", "ductPercent", "luaPressure", "nativePressure", "pressureDelta"
                 ];
@@ -653,6 +674,32 @@ angular.module("beamng.apps")
                         return "OVERINFLATED";
                     }
                     return "";
+                };
+
+                // Cold-set vs hot-target band: short UNDER/OVER chip (hidden when empty).
+                scope.coldSetWarnChip = function (w) {
+                    var warn = scope.getTuningWarning(
+                        (w && (w.coldPressure || w.initialPressure)) || 0,
+                        (w && (w.targetHotPressure || w.optimalPressure)) || 0
+                    );
+                    if (warn === "UNDERINFLATED") return "UNDER";
+                    if (warn === "OVERINFLATED") return "OVER";
+                    return "";
+                };
+                scope.coldSetWarnStyle = function (w) {
+                    var chip = scope.coldSetWarnChip(w);
+                    if (chip === "UNDER") {
+                        return {
+                            color: "#38bdf8",
+                            "border-color": "rgba(56,189,248,0.35)",
+                            background: "rgba(56,189,248,0.12)"
+                        };
+                    }
+                    return {
+                        color: "#f59e0b",
+                        "border-color": "rgba(245,158,11,0.35)",
+                        background: "rgba(245,158,11,0.12)"
+                    };
                 };
 
                 scope.getTempColor = function (tempVal, working_temp) {

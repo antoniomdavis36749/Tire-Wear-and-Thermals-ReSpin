@@ -35,7 +35,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 • Compound-aware behaviour (street → sport → race / slick spectrum)
 • Pressure, load, and surface effects on grip
 • Brake cooling duct sliders (Tuning → Brakes; saved in .pc configs)
-• UI apps: Driver / Classic / Crew / Pitwall tyre telemetry
+• UI apps: Driver / Classic / Crew (carcass + rim + stint fade) / Pitwall tyre telemetry
 • Multiplayer-compatible vehicle extension
 • BeamNG 0.39-aware pack-air / draft coexistence (no dependency on extra draft mods)
 
