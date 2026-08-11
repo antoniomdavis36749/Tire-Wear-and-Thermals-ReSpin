@@ -19,7 +19,7 @@ function Smooth01([double]$t) {
 }
 
 $topo = @{
-  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
+  drivePropCruiseNm = 340.0; drivePropExcessFullNm = 585.0
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
@@ -30,8 +30,8 @@ $topo = @{
   flexWarmGain = 0.00125
 }
 # Profile soft-cap packs (mirror Lua DRIVE_SOFTCAP_*)
-$SOFTCAP_STREET = @{ driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65 }
-$SOFTCAP_SPORT_PLUS = @{ driveSlipHeatMin = 0.88; driveSlipPropMin = 0.92; driveHighVCarcassScale = 0.70 }
+$SOFTCAP_STREET = @{ driveSlipHeatMin = 0.90; driveSlipPropMin = 0.93; driveHighVCarcassScale = 0.80 }
+$SOFTCAP_SPORT_PLUS = @{ driveSlipHeatMin = 0.94; driveSlipPropMin = 0.97; driveHighVCarcassScale = 0.82 }
 $SOFTCAP_OFF = @{ driveSlipHeatMin = 1.0; driveSlipPropMin = 1.0; driveHighVCarcassScale = 1.0 }
 $STREET_SOFTCAP_PURPOSES = @{
   street = $true; wet = $true; winter = $true; utility = $true; commercial = $true
@@ -67,7 +67,7 @@ function Get-DutyMods([hashtable]$s) {
 
   $mods = if ($isSlick) { $SOFTCAP_OFF } elseif ($isSportPlus) { $SOFTCAP_SPORT_PLUS } else { $SOFTCAP_STREET }
   $cruiseNm = [double]$topo.drivePropCruiseNm
-  $slickDriveScale = if ($isSlick) { 0.48 } else { 1.0 }
+  $slickDriveScale = if ($isSlick) { 0.52 } else { 1.0 }
   $softcapPurposeOk = Test-PurposeAllowsStreetSoftcap $purpose
 
   $streetCarcassScale = 1.0

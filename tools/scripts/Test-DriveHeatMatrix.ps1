@@ -21,12 +21,12 @@ function Smooth01([double]$t) {
 $topo = @{
   patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
-  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
-  drivePropSkinCoef = 0.048
-  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
-  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
-  drivePropSlipWorkMult = 1.14
-  drivePropSlickScale = 0.48; drivePropSlickCarcassScale = 0.26
+  drivePropCruiseNm = 340.0; drivePropExcessFullNm = 585.0
+  drivePropSkinCoef = 0.041
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.1e-7
+  drivePropFlexGateStart = 0.21; drivePropFlexExcess = 0.00034
+  drivePropSlipWorkMult = 1.08
+  drivePropSlickScale = 0.52; drivePropSlickCarcassScale = 0.29
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
@@ -61,7 +61,7 @@ $street = @{
   coreCool = 0.0385; coreVelCool = 0.0088; trackCondMult = 1.0
   treadCoef = 0.5
   tyreWidthM = 0.225; tyreRadius = 0.32; pressurePsi = 32.0
-  driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
+  driveSlipHeatMin = 0.90; driveSlipPropMin = 0.93; driveHighVCarcassScale = 0.80
 }
 $sportPlus = @{
   name = 'sport_plus'
@@ -73,7 +73,7 @@ $sportPlus = @{
   coreCool = 0.038; coreVelCool = 0.0095; trackCondMult = 1.15
   treadCoef = 0.30
   tyreWidthM = 0.265; tyreRadius = 0.33; pressurePsi = 30.0
-  driveSlipHeatMin = 0.88; driveSlipPropMin = 0.92; driveHighVCarcassScale = 0.70
+  driveSlipHeatMin = 0.94; driveSlipPropMin = 0.97; driveHighVCarcassScale = 0.82
 }
 $slick = @{
   name = 'medium_slick'
@@ -453,8 +453,8 @@ if (-not $spFwd) {
   Out ' FAIL: missing sport_plus/FWD/hard.'; $fail++
 } elseif (-not $spFwd.r.softCapEngaged) {
   Out ' FAIL: sport_plus FWD hard soft-cap did not engage.'; $fail++
-} elseif ($spFwd.r.streetHeat -lt 0.80 -or $spFwd.r.streetHeat -gt 0.98) {
-  Out (" FAIL: sport_plus heatSc=$($spFwd.r.streetHeat) want ~0.80-0.98"); $fail++
+} elseif ($spFwd.r.streetHeat -lt 0.88 -or $spFwd.r.streetHeat -gt 0.995) {
+  Out (" FAIL: sport_plus heatSc=$($spFwd.r.streetHeat) want ~0.88-0.995"); $fail++
 } else {
   Out (" OK: sport_plus milder soft-cap heatSc=$($spFwd.r.streetHeat) peak=$($spFwd.r.peakSkin)C")
 }

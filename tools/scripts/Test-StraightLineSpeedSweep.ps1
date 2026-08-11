@@ -1,14 +1,19 @@
-﻿# Straight-line cruise speed sweep soft-sim (25â€“300 mph).
+﻿# Straight-line cruise speed sweep soft-sim (25–300 mph).
 # Edge-case probe: RR/hyst + residual cruise slip vs v^0.8 convection at high V.
 # Mirrors CalcTyreWear post-fix knobs from luukstyrethermalsandwear.lua
 # (spawn grace, skinCore scale/floor, env clamp, cruise RR soft-cap, aero heat discount,
 # carcass cool coefs, hystSkinShare).
 #
 # Refs: Test-ThermalOddities.ps1, Test-AeroEdgeCase.ps1, Test-BurnoutHeat.ps1
+param(
+  [double]$AeroHeatScale = 0.55,
+  [string]$OutSuffix = ''
+)
 $ErrorActionPreference = 'Stop'
 $outDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'output'
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
-$out = Join-Path $outDir 'straight-line-speed-sweep.txt'
+$suf = if ($OutSuffix) { $OutSuffix } else { ('aero{0}' -f ($AeroHeatScale.ToString('0.00', [cultureinfo]::InvariantCulture))) }
+$out = Join-Path $outDir ("straight-line-speed-sweep-{0}.txt" -f $suf)
 
 function Lerp([double]$a, [double]$b, [double]$t) { return $a + ($b - $a) * $t }
 function Clamp([double]$v, [double]$lo, [double]$hi) {
@@ -24,17 +29,17 @@ $topo = @{
   flexWarmGain = 0.00095
   flexWarmLoad0 = 120.0; flexWarmLoad1 = 400.0
   flexWarmSpeed0 = 2.0; flexWarmSpeed1 = 20.0; flexWarmG0 = 0.28
-  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
-  drivePropSkinCoef = 0.048
-  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
-  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
-  drivePropSlipWorkMult = 1.14
-  drivePropSlickScale = 0.50; drivePropSlickCarcassScale = 0.30
+  drivePropCruiseNm = 340.0; drivePropExcessFullNm = 585.0
+  drivePropSkinCoef = 0.041
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.1e-7
+  drivePropFlexGateStart = 0.21; drivePropFlexExcess = 0.00034
+  drivePropSlipWorkMult = 1.08
+  drivePropSlickScale = 0.52; drivePropSlickCarcassScale = 0.29
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
-  aeroHeatScale = 0.55; aeroHeatSpeedStart = 15.0; aeroHeatSpeedFull = 52.0; aeroHeatMaxFrac = 0.48
+  aeroHeatScale = $AeroHeatScale; aeroHeatSpeedStart = 15.0; aeroHeatSpeedFull = 52.0; aeroHeatMaxFrac = 0.48
   skinCoreScale = 1.85; skinCoreFloor = 0.070
   carcassCoolVel = 0.28; carcassCoolStatic = 0.20
-  hystSkinShare = 0.18
+  hystSkinShare = 0.28
 }
 $SPAWN_CONV_GRACE_S = 14.0
 $STREET_PREHEAT_BLEND = 0.34
@@ -60,7 +65,7 @@ $compounds = @(
     staticLoadN = 3800.0
     # Mild passenger aero: ~0 at low V â†’ ~500 N/wheel @ 300 mph
     aeroPeakN = 500.0
-    driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
+    driveSlipHeatMin = 0.90; driveSlipPropMin = 0.93; driveHighVCarcassScale = 0.80
   }
   @{
     name = 'medium_slick'
@@ -395,8 +400,8 @@ Out 'STRAIGHT-LINE SPEED SWEEP SOFT-SIM'
 Out 'Cruise: residual slip=0.025  gMag=0.06  (cruise RR soft-cap=0.48)'
 Out ("Ambient={0:n1}C  track={1:n1}C (tod={2} cloud={3})" -f $ENV_C, $TRACK_C, $TOD, $CLOUD)
 Out 'Settle: up to 210s or |dT/dt| sum < 0.015 C/s for 4s (after spawn grace)'
-Out 'Knobs: skinCoreScale=1.85 floor=0.070  carcassCoolVel/Static=0.28/0.20  hystSkinShare=0.18'
-Out '        aeroHeatScale=0.55 maxFrac=0.48  vFull=52m/s  spawnGrace=14s'
+Out 'Knobs: skinCoreScale=1.85 floor=0.070  carcassCoolVel/Static=0.28/0.20  hystSkinShare=0.28'
+Out ("        aeroHeatScale={0} maxFrac=0.48  vFull=52m/s  spawnGrace=14s" -f $AeroHeatScale)
 Out '        streetCarcass damp: 78-112 m/s -> scale 0.65 (non-slick excess-prop carcass)'
 Out 'Prop: Nm/wheel = 40 + 0.038*v^2  (aero/RR hold; excess gate opens at high V)'
 Out ''

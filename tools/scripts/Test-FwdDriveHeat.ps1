@@ -31,12 +31,12 @@ function Smooth01([double]$t) {
 $topo = @{
   patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
-  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
-  drivePropSkinCoef = 0.048
-  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
-  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
-  drivePropSlipWorkMult = 1.14
-  drivePropSlickScale = 0.48; drivePropSlickCarcassScale = 0.26
+  drivePropCruiseNm = 340.0; drivePropExcessFullNm = 585.0
+  drivePropSkinCoef = 0.041
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.1e-7
+  drivePropFlexGateStart = 0.21; drivePropFlexExcess = 0.00034
+  drivePropSlipWorkMult = 1.08
+  drivePropSlickScale = 0.52; drivePropSlickCarcassScale = 0.29
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
@@ -68,7 +68,7 @@ $street = @{
   coreCool = 0.0385; coreVelCool = 0.0088; trackCondMult = 1.0
   treadCoef = 0.5
   tyreWidthM = 0.225; tyreRadius = 0.32; pressurePsi = 32.0
-  driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
+  driveSlipHeatMin = 0.90; driveSlipPropMin = 0.93; driveHighVCarcassScale = 0.80
 }
 $sportPlus = @{
   name = 'sport_plus'
@@ -78,7 +78,7 @@ $sportPlus = @{
   skinCore = 0.088; airCool = 0.029; staticCool = 0.095
   coreCool = 0.038; coreVelCool = 0.0095; trackCondMult = 1.15
   treadCoef = 0.30
-  driveSlipHeatMin = 0.88; driveSlipPropMin = 0.92; driveHighVCarcassScale = 0.70
+  driveSlipHeatMin = 0.94; driveSlipPropMin = 0.97; driveHighVCarcassScale = 0.82
   tyreWidthM = 0.265; tyreRadius = 0.33; pressurePsi = 30.0
 }
 $slick = @{
@@ -396,7 +396,7 @@ function Out([string]$s) { [void]$sb.AppendLine($s) }
 
 Out '=== FWD / RWD drive-slip heat soft-sim ==='
 Out ('Generated: {0:yyyy-MM-dd HH:mm}' -f (Get-Date))
-Out 'Live knobs: topo enable ramps + profile driveSlipHeatMin/PropMin (street 0.78/0.86, sport+ 0.88/0.92)'
+Out 'Live knobs: topo enable ramps + profile driveSlipHeatMin/PropMin (street 0.90/0.93, sport+ 0.94/0.97)'
 Out ('FWD slipE from lastSlip=20 -> {0:n3}; RWD lastSlip=9 -> {1:n3}; burnout lastSlip=20 -> {2:n3}' -f `
   $fwdSlip, $rwdSlip, $burnSlip)
 Out ''
@@ -451,8 +451,8 @@ $sl = $paired | Where-Object { $_.name -like 'medium_slick*' } | Select-Object -
 $rwd = $paired | Where-Object { $_.name -like 'RWD street hard accel*' } | Select-Object -First 1
 
 $fail = 0
-if ($fwd -and (($fwd.before.peakSkin - $fwd.after.peakSkin) -lt 2.5)) {
-  Out ' FAIL: FWD rolling spin not cooled enough (expect >=2.5C peak relief after Pass 5 milder soft-cap).'; $fail++
+if ($fwd -and (($fwd.before.peakSkin - $fwd.after.peakSkin) -lt 1.0)) {
+  Out ' FAIL: FWD rolling spin not cooled enough (expect >=1.0C peak relief after Pass 6 milder soft-cap).'; $fail++
 } else {
   Out (' OK: FWD rolling spin peak {0:n1} -> {1:n1}C (relief {2:n1}C)' -f `
     $fwd.before.peakSkin, $fwd.after.peakSkin, ($fwd.before.peakSkin - $fwd.after.peakSkin))
@@ -467,8 +467,8 @@ if ($drift -and ([math]::Abs($drift.after.peakSkin - $drift.before.peakSkin) -gt
 } else {
   Out (' OK: drift unchanged (peak {0:n1}C, heatScale={1:n3})' -f $drift.after.peakSkin, $drift.after.streetHeat)
 }
-if ($sp -and ($sp.after.streetHeat -ge 0.999 -or $sp.after.streetHeat -lt 0.80 -or $sp.after.streetHeat -gt 0.98)) {
-  Out ' FAIL: sport_plus should use milder soft-cap (heatSc ~0.80-0.98).'; $fail++
+if ($sp -and ($sp.after.streetHeat -ge 0.999 -or $sp.after.streetHeat -lt 0.88 -or $sp.after.streetHeat -gt 0.995)) {
+  Out ' FAIL: sport_plus should use milder soft-cap (heatSc ~0.88-0.995).'; $fail++
 } else {
   Out (" OK: sport_plus milder soft-cap heatSc={0:n3}" -f $sp.after.streetHeat)
 }

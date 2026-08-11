@@ -30,12 +30,12 @@ function Smooth01([double]$t) {
 $topo = @{
   patchFracMin = 0.032; patchFracHeatMin = 0.022; patchFracMax = 0.22; patchFracRef = 0.068
   freeBeltCoolMult = 1.32
-  drivePropCruiseNm = 310.0; drivePropExcessFullNm = 560.0
-  drivePropSkinCoef = 0.048
-  drivePropHystBase = 5e-8; drivePropHystExcess = 3.8e-7
-  drivePropFlexGateStart = 0.18; drivePropFlexExcess = 0.00040
-  drivePropSlipWorkMult = 1.14
-  drivePropSlickScale = 0.48; drivePropSlickCarcassScale = 0.26
+  drivePropCruiseNm = 340.0; drivePropExcessFullNm = 585.0
+  drivePropSkinCoef = 0.041
+  drivePropHystBase = 5e-8; drivePropHystExcess = 3.1e-7
+  drivePropFlexGateStart = 0.21; drivePropFlexExcess = 0.00034
+  drivePropSlipWorkMult = 1.08
+  drivePropSlickScale = 0.52; drivePropSlickCarcassScale = 0.29
   drivePropStreetSpeed0 = 78.0; drivePropStreetSpeed1 = 112.0
   driveStreetSlipSpeed0 = 3.5; driveStreetSlipSpeed1 = 14.0
   driveStreetSlipCapStart = 0.16; driveStreetSlipCapFull = 0.52
@@ -71,7 +71,7 @@ $street = @{
   coreCool = 0.0385; coreVelCool = 0.0088; trackCondMult = 1.0
   treadCoef = 0.5
   tyreWidthM = 0.225; tyreRadius = 0.32; pressurePsi = 32.0
-  driveSlipHeatMin = 0.78; driveSlipPropMin = 0.86; driveHighVCarcassScale = 0.65
+  driveSlipHeatMin = 0.90; driveSlipPropMin = 0.93; driveHighVCarcassScale = 0.80
 }
 $sportPlus = @{
   name = 'sport_plus'
@@ -83,7 +83,7 @@ $sportPlus = @{
   coreCool = 0.038; coreVelCool = 0.0095; trackCondMult = 1.15
   treadCoef = 0.30
   tyreWidthM = 0.265; tyreRadius = 0.33; pressurePsi = 30.0
-  driveSlipHeatMin = 0.88; driveSlipPropMin = 0.92; driveHighVCarcassScale = 0.70
+  driveSlipHeatMin = 0.94; driveSlipPropMin = 0.97; driveHighVCarcassScale = 0.82
 }
 # Race / medium slick (same as Test-FwdDriveHeat / Test-StraightLineSpeedSweep)
 $slick = @{
@@ -424,7 +424,7 @@ Out "=== FWD drive-slip EDGE soft-sim (street / Race slick / sport_plus / rally 
 Out ("Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm')")
 Out "Live gates P1: driveStreetSlip* + milder sport_plus mins; massScale; AWD excess damp"
 Out ("FWD slipE lastSlip=20 -> $([math]::Round($fwdSlip, 3)); cruise slipE=$([math]::Round($cruiseSlip, 3))")
-Out "NOTE: sport_plus soft-cap eligible with HeatMin=0.88 PropMin=0.92; slick still excluded."
+Out "NOTE: sport_plus soft-cap eligible with HeatMin=0.94 PropMin=0.97; slick still excluded."
 Out ""
 
 $rows = @()
@@ -508,8 +508,8 @@ if (-not $streetFwd) {
   $relief = $streetFwd.before.peakSkin - $streetFwd.after.peakSkin
   if (-not $streetFwd.after.softCapEngaged) {
     Out " FAIL: street FWD hard accel soft-cap did not engage."; $fail++
-  } elseif ($relief -lt 2.5) {
-    Out (" FAIL: street FWD relief too small ($([math]::Round($relief,1))C; Pass 5 expect >=2.5C)."); $fail++
+  } elseif ($relief -lt 1.0) {
+    Out (" FAIL: street FWD relief too small ($([math]::Round($relief,1))C; Pass 6 expect >=1.0C)."); $fail++
   } else {
     Out (" OK: street FWD soft-cap engaged heatSc=$([math]::Round($streetFwd.after.streetHeat,3)) peak $([math]::Round($streetFwd.before.peakSkin,1))->$([math]::Round($streetFwd.after.peakSkin,1))C")
   }
@@ -524,8 +524,8 @@ if (-not $spFwd) {
   Out " FAIL: missing sport_plus FWD hard accel."; $fail++
 } elseif (-not $spFwd.after.softCapEngaged) {
   Out " FAIL: sport_plus FWD hard soft-cap did not engage (P1 milder path)."; $fail++
-} elseif ($spFwd.after.streetHeat -lt 0.80 -or $spFwd.after.streetHeat -gt 0.98) {
-  Out (" FAIL: sport_plus heatSc=$([math]::Round($spFwd.after.streetHeat,3)) want ~0.80-0.98 milder band."); $fail++
+} elseif ($spFwd.after.streetHeat -lt 0.88 -or $spFwd.after.streetHeat -gt 0.995) {
+  Out (" FAIL: sport_plus heatSc=$([math]::Round($spFwd.after.streetHeat,3)) want ~0.88-0.995 milder band."); $fail++
 } else {
   $spRelief = $spFwd.before.peakSkin - $spFwd.after.peakSkin
   Out (" OK: sport_plus milder soft-cap heatSc=$([math]::Round($spFwd.after.streetHeat,3)) peak $([math]::Round($spFwd.before.peakSkin,1))->$([math]::Round($spFwd.after.peakSkin,1))C relief=$([math]::Round($spRelief,1))C")

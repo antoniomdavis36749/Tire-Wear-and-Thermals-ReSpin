@@ -26,10 +26,10 @@ $sb = New-Object System.Text.StringBuilder
 function Out([string]$s) { [void]$sb.AppendLine($s); Write-Host $s }
 
 # --- Soft-cap packs (live DRIVE_SOFTCAP_*) ---
-$SOFTCAP_STREET     = @{ heatMin = 0.78; propMin = 0.86; highV = 0.65; label = 'street' }
-$SOFTCAP_SPORT_PLUS = @{ heatMin = 0.88; propMin = 0.92; highV = 0.70; label = 'sport+' }
-$SOFTCAP_SPORT_MID  = @{ heatMin = 0.85; propMin = 0.90; highV = 0.68; label = 'sportMid' }
-$SOFTCAP_VINTAGE    = @{ heatMin = 0.90; propMin = 0.94; highV = 0.78; label = 'vintage' }
+$SOFTCAP_STREET     = @{ heatMin = 0.90; propMin = 0.93; highV = 0.80; label = 'street' }
+$SOFTCAP_SPORT_PLUS = @{ heatMin = 0.94; propMin = 0.97; highV = 0.82; label = 'sport+' }
+$SOFTCAP_SPORT_MID  = @{ heatMin = 0.92; propMin = 0.95; highV = 0.81; label = 'sportMid' }
+$SOFTCAP_VINTAGE    = @{ heatMin = 0.95; propMin = 0.97; highV = 0.88; label = 'vintage' }
 $SOFTCAP_OFF        = @{ heatMin = 1.00; propMin = 1.00; highV = 1.00; label = 'OFF' }
 
 # Character cold/hot grip powers (live CHARACTER_*)

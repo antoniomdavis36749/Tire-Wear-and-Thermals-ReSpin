@@ -113,16 +113,16 @@ Expect ($stdWarm -lt $slickWarm) ("standard < medium_slick on dry ({0:n3} < {1:n
 Expect ($sportWarm -lt $spWarm) 'sport < sport_plus on dry'
 Expect ($spWarm -lt $slickWarm) 'sport_plus < medium_slick on dry'
 
-# Pass 5: vintage/bias-ply thermal coherence (mirror live Lua; no gm dump)
+# Pass 6: vintage/bias-ply thermal coherence (mirror live Lua; no gm dump)
 # Bias-ply: softer carcass flex → elevated workHeat vs standard, but far below pre-Pass-5 7.2 cliff.
 # Soft-cap floors closer to 1.0 than street debt pack.
 $vBias = @{ slip = 6.5; work = 5.7; rr = 0.94; treadI = 0.50; carcassI = 0.82; gm = 0.92; tOpt = 56 }
 $vMid = @{ slip = 6.9; work = 5.45; rr = 0.91; treadI = 0.49; carcassI = 0.80; gm = 0.945; tOpt = 58 }
 $vClassic = @{ slip = 7.4; work = 5.05; rr = 0.88; treadI = 0.48; carcassI = 0.78; gm = 0.97; tOpt = 60 }
-$vSoft = @{ heatMin = 0.90; propMin = 0.94; highV = 0.78 }
-$stSoft = @{ heatMin = 0.78; propMin = 0.86; highV = 0.65 }
+$vSoft = @{ heatMin = 0.95; propMin = 0.97; highV = 0.88 }
+$stSoft = @{ heatMin = 0.90; propMin = 0.93; highV = 0.80 }
 [void]$out.Add('')
-[void]$out.Add('VINTAGE_PASS5_THERMAL_ASSERTS')
+[void]$out.Add('VINTAGE_PASS6_THERMAL_ASSERTS')
 Expect ($vBias.work -lt 6.2 -and $vBias.work -gt 5.0) ("biasply workHeat coherent ({0})" -f $vBias.work)
 Expect ($vBias.slip -lt 7.2) ("biasply slipHeat below old 7.35 cliff ({0})" -f $vBias.slip)
 Expect ($vBias.rr -gt 0.85 -and $vBias.rr -gt $vClassic.rr) ("biasply RR > classic radial ({0} > {1})" -f $vBias.rr, $vClassic.rr)

@@ -376,11 +376,11 @@ if (Test-Path $luaPath) {
   $stampOk = ($lua -match 'CHARACTER_SLICK_SOFT') -and ($lua -match 'stampSpectrumCharacter') -and ($lua -match '49 knobs')
   if (-not $stampOk) { $charFail++ }
   Out ("{0}: CHARACTER packs + 49-knob schema comment" -f ($(if ($stampOk) { 'PASS' } else { 'FAIL' })))
-  # Soft-cap magnitudes present (Pass 5 floors toward 1.0); vintage pack distinct
-  $softOk = ($lua -match 'driveSlipHeatMin\s*=\s*0\.78') -and ($lua -match 'DRIVE_SOFTCAP_SPORT_PLUS') `
-    -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.90')
+  # Soft-cap magnitudes present (Pass 6 floors toward 1.0); vintage pack distinct
+  $softOk = ($lua -match 'driveSlipHeatMin\s*=\s*0\.90') -and ($lua -match 'DRIVE_SOFTCAP_SPORT_PLUS') `
+    -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.95')
   if (-not $softOk) { $charFail++ }
-  Out ("{0}: soft-cap packs still present (street 0.78 + vintage 0.90)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
+  Out ("{0}: soft-cap packs still present (street 0.90 + vintage 0.95)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
   $remapOk = ($lua -match 'remapSlickSoftness') -and ($lua -match 'modernrace')
   if (-not $remapOk) { $charFail++ }
   Out ("{0}: remapSlickSoftness + strong race tokens present" -f ($(if ($remapOk) { 'PASS' } else { 'FAIL' })))

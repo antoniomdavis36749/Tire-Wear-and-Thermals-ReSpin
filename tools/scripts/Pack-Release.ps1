@@ -4,8 +4,9 @@
   Build a BeamNG Repo–correct release zip for Tire Wear and Thermals ReSpin.
 
 .DESCRIPTION
-  Zips top-level game folders only (lua, ui, scripts, …) — NOT the parent mod folder.
+  Zips top-level game folders only (lua, ui, scripts, vehicles when present, …) — NOT the parent mod folder.
   Excludes tools/, .vscode/, .git/, and the West Coast lap-test harness.
+  vehicles/ holds optional compatibility tire JBeams (COMPAT_TIRES.md); never pack companion meshes.
 
 .PARAMETER OutDir
   Folder for the zip (default: tools/output).
@@ -38,6 +39,7 @@ $stage = Join-Path $env:TEMP ("respin-pack-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 try {
+    # lua/ui/scripts required; vehicles/ ships optional compatibility tire JBeams (see COMPAT_TIRES.md)
     $includeDirs = @('lua', 'ui', 'scripts')
     foreach ($d in $includeDirs) {
         $src = Join-Path $ModRoot $d
@@ -45,7 +47,13 @@ try {
         Copy-Item -Recurse -Force $src (Join-Path $stage $d)
     }
 
-    foreach ($f in @('license', 'CREDITS.md', 'NOTICE', 'README.md', 'LISTING.md')) {
+    $vehicles = Join-Path $ModRoot 'vehicles'
+    if (Test-Path $vehicles) {
+        Copy-Item -Recurse -Force $vehicles (Join-Path $stage 'vehicles')
+        Write-Host "Included vehicles/ (compatibility tires)"
+    }
+
+    foreach ($f in @('license', 'CREDITS.md', 'NOTICE', 'README.md', 'LISTING.md', 'COMPAT_TIRES.md')) {
         $src = Join-Path $ModRoot $f
         if (Test-Path $src) {
             Copy-Item -Force $src (Join-Path $stage $f)
@@ -71,7 +79,7 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $false)
 
     Write-Host "Wrote $zipPath"
-    Write-Host "Verify: opening the zip should show lua/, ui/, scripts/ at the root (not a parent mod folder)."
+    Write-Host "Verify: opening the zip should show lua/, ui/, scripts/ (and vehicles/ if present) at the root (not a parent mod folder)."
     $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
     try {
         $roots = $zip.Entries | ForEach-Object {

@@ -251,7 +251,7 @@ function Simulate-Thermal {
     if (($curSlip -lt 0.06) -and ($curG -lt 0.28)) {
       $driveHeatGate = $driveHeatGate * 0.15
     }
-    $netTorque = $vehNotParked * [math]::Abs($curProp * 0.048 * $driveHeatGate) * 0.075 * $rollingRes * $flexModifier
+    $netTorque = $vehNotParked * [math]::Abs($curProp * 0.041 * $driveHeatGate) * 0.075 * $rollingRes * $flexModifier
 
     $raw = ($seh * 0.05 + $netTorque * 0.002) * 3.0 * $wt
     $surfMu = 1.05

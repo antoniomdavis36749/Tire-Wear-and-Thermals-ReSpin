@@ -37,8 +37,8 @@ $SOFTSIM_CORNER_HEAT = 0.62
 $SOFTSIM_DRIVE_HEAT_FULL = 18.5
 $SOFTSIM_CARCASS_DRIVE_FULL = 9.5
 # Live THERMAL_TOPOLOGY (AFTER)
-$DRIVE_PROP_SLICK_SCALE = 0.48
-$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.26
+$DRIVE_PROP_SLICK_SCALE = 0.52
+$DRIVE_PROP_SLICK_CARCASS_SCALE = 0.29
 # Prior split scales (BEFORE this pass)
 $PRIOR_SKIN_SCALE = 0.50
 $PRIOR_CARCASS_SCALE = 0.30
@@ -141,8 +141,8 @@ function SimulateAxle([hashtable]$prof, [string]$axle, [double]$slickSkinScale, 
     if ($driveGate -gt 0) {
       $effGateSkin = $driveGate * $slickSkinScale
       $effGateCarcass = $driveGate * $slickCarcassScale
-      $slipWorkBoost = 1.0 + (1.28 - 1.0) * $effGateSkin
-      $driveSkin = (0.048 * $SOFTSIM_DRIVE_HEAT_FULL * [double]$prof.workHeat * 0.28) * $effGateSkin
+      $slipWorkBoost = 1.0 + (1.08 - 1.0) * $effGateSkin
+      $driveSkin = (0.041 * $SOFTSIM_DRIVE_HEAT_FULL * [double]$prof.workHeat * 0.28) * $effGateSkin
       $raw = ($raw * $slipWorkBoost) + $driveSkin
     }
 

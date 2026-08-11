@@ -389,6 +389,8 @@ local function armTelemetry(veh, intervalSec)
   if not veh then return end
   local telPath = telemetryPath()
   -- Buffered CSV I/O allows denser sampling; default 1.0s (manual was 3.0s for open/close lag)
+  -- Header: legacy wall..film + appended UI-stream cols (profile/purpose/patch/aero/dutyMods/gates).
+  -- Parsers that only read legacy indices remain valid; new fields are suffix-only.
   local interval = intervalSec or 1.0
   -- Always re-queue: vehicle onReset used to clear path; keep CSV alive for full stint
   local cmd = string.format([[
