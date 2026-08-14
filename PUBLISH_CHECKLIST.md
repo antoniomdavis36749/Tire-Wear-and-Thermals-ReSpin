@@ -105,17 +105,30 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 - [ ] Tag / commit both artifacts from the same git revision before Repo upload
 - [ ] Optional: Pigniteon ETKC Respin parts smoke before advertising that companion specifically
 
-## F. Repo submission
+## F. Repo submission (two resources)
 
-- [ ] Upload zip via in-game Repository / website as **new resource** (not an update to Redux 29934)
-- [ ] Fill title, description, images, tags
-- [ ] Wait for moderator review (can take several working days)
-- [ ] After approval: note resource URL; keep zip **filename stable** for future updates
+Upload **both** as **new** resources (not updates to Redux 29934). Same git revision for both zips.
+
+### F1. Core — Tire Wear and Thermals ReSpin
+
+- [ ] Upload `TireWearThermalsReSpin_antoniomdavis36749.zip`
+- [ ] Paste core BBCode from `LISTING.md`; gallery: hero → `ui_four_apps` → `ducts`
+- [ ] Category confirmed on form
+- [ ] After approval: note core resource URL; keep zip filename stable
+
+### F2. Compat Tires — second listing
+
+- [x] Decision: Compat is a **second Repo resource** (not bundled / not “later only”)
+- [ ] Upload `TireWearThermalsReSpin_CompatTires.zip`
+- [ ] Paste Compat BBCode from `LISTING.md`; gallery: Compat hero
+- [ ] Category confirmed on form (Vehicles/Parts likely)
+- [ ] After approval: note Compat URL; cross-link core ↔ Compat in both descriptions
+- [ ] Optional: Pigniteon ETKC smoke before advertising that companion in Compat listing
 
 ## G. Post-publish maintenance
 
 - [ ] Keep `main` for ongoing development; merge publish polish selectively
-- [ ] Updates: same zip filename, bump version, changelog summary
+- [ ] Updates: same zip filenames, bump version on **both** resources when JBeams or thermals change together
 - [ ] When changing physics: re-test clean zip install before each update
 
 ---
@@ -123,6 +136,6 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 ## Quick start (this branch)
 
 1. Finish sections A–D locally and in-game.  
-2. Run `tools/scripts/Pack-Release.ps1`.  
-3. Verify zip layout, then test the zip alone.  
-4. Submit as a **new** BeamNG Repo resource.
+2. Run `tools/scripts/Pack-Release.ps1` (emits core + Compat zips).  
+3. Verify both zip layouts.  
+4. Submit **two** new BeamNG Repo resources (core, then Compat).

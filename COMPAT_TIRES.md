@@ -19,14 +19,16 @@ Until upstream authors adopt stock-compatible values, these `…_Respin` parts a
 
 Enable **both** ReSpin and the companion. Configs still mount author tires by default — swap in Parts → Wheels/Tires.
 
-## Packaging (two zips — one git tree)
+## Packaging (two Repo resources — one git tree)
 
 Compat tires **cannot** ship inside the core ReSpin zip. BeamNG classifies any package that contains `vehicles/` as a vehicle mod and mounts only that folder — `ui/` / `lua/` / `scripts/` vanish and Apps disappear.
 
-| Artifact | Contents | Git source |
+**Publish plan:** upload **two** new Repo resources from the same git revision:
+
+| Repo resource | Zip | Contents |
 | --- | --- | --- |
-| Core | `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` | this repo |
-| Companion | `vehicles/`, `mod_info/TWTRS_COMPAT/`, `COMPAT_TIRES.md` | same repo (`vehicles/common/`) |
+| Tire Wear and Thermals ReSpin | `TireWearThermalsReSpin_antoniomdavis36749.zip` | `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` |
+| Tire Wear and Thermals ReSpin — Compat Tires | `TireWearThermalsReSpin_CompatTires.zip` | `vehicles/`, `mod_info/TWTRS_COMPAT/`, docs |
 
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_antoniomdavis36749.zip'
@@ -34,7 +36,7 @@ Compat tires **cannot** ship inside the core ReSpin zip. BeamNG classifies any p
 # -SkipCompatTires  → core only
 ```
 
-Keep both packages on the same git revision so JBeam clones stay in sync with thermals calibration. Unpacked mono-folder installs still work for local dev (whole tree mounts).
+Keep both packages on the same git revision so JBeam clones stay in sync with thermals calibration. Unpacked mono-folder installs still work for local dev (whole tree mounts). Listing copy-paste: **`LISTING.md`** (core + Compat sections).
 
 ## Files (ship in companion zip only)
 

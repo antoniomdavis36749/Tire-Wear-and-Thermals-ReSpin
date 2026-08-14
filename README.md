@@ -43,15 +43,15 @@ Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`**.
 
 BeamNG Repo prep lives on branch `beamng-repo-publish`. See **`PUBLISH_CHECKLIST.md`**.
 
-Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a second zip from the same git tree:
+Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a **second Repo resource** from the same git tree:
 
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'
 # → core zip + TireWearThermalsReSpin_CompatTires.zip (when vehicles/ exists)
 ```
 
-Repo listing copy-paste text: **`LISTING.md`**.  
-Compatibility tires inventory / companion packing: **`COMPAT_TIRES.md`**.
+Repo listing copy-paste (core + Compat): **`LISTING.md`**.  
+Compatibility tires inventory / packing: **`COMPAT_TIRES.md`**.
 
 ## Brake coupling (non-goals)
 

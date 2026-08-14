@@ -1,6 +1,17 @@
 # BeamNG Repo listing (copy-paste)
 
-Use this when creating the **new** Repository resource. Keep the zip filename stable across updates.
+**Two Repo resources** from the same git tree (required — `vehicles/` cannot ship inside core):
+
+| Resource | Zip | Tag id (local) |
+| --- | --- | --- |
+| **Core** — thermals + UI | `TireWearThermalsReSpin_antoniomdavis36749.zip` | `TWTRS_RESPIN` |
+| **Compat Tires** — second listing | `TireWearThermalsReSpin_CompatTires.zip` | `TWTRS_COMPAT` |
+
+Keep each zip filename stable across updates. After both are approved, cross-link the two Repo URLs in each description.
+
+---
+
+## Core resource
 
 | Field | Value |
 | --- | --- |
@@ -49,13 +60,13 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 2. Spawn a vehicle.
 3. Apps menu → add [B]Tyre Wear & Thermals[/B] (Driver, Classic, Crew, or Pitwall).
 4. Optional: Tuning → Brakes → Front/Rear duct opening (1% = closed, 100% = fully open).
-5. Optional (compatibility tires): install the separate [B]Compat Tires[/B] companion zip, plus [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] for meshes. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick). Author configs still default to upstream tires.
+5. Optional (compatibility tires): install the separate Repo resource [B]Tire Wear and Thermals ReSpin — Compat Tires[/B], plus [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] for meshes. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick). Author configs still default to upstream tires.
 
 [HR][/HR]
 [B]Requirements[/B]
 • Current BeamNG.drive (developed/tested with 0.39-era builds)
 • No required companion mods for core thermals/wear
-• Optional Compat Tires zip is a [B]separate[/B] package (cannot ship inside the core zip — BeamNG would hide the UI apps)
+• Optional [B]Compat Tires[/B] is a [B]second Repo resource[/B] (cannot ship inside this zip — BeamNG would hide the UI apps)
 • Compatibility tires also need the matching car mod for meshes only (Scintilla GT3 Racing Parts / Pigniteon ETK Racing). ReSpin does not redistribute those meshes.
 
 [B]Known limitations (Alpha)[/B]
@@ -75,6 +86,57 @@ Redux: [URL]https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/
 [B]License[/B]
 GNU Affero General Public License v3 — see the [I]license[/I] file in the package. Source must remain available for network-use derivatives under AGPL.
 ```
+
+---
+
+## Compat Tires resource (second listing)
+
+| Field | Value |
+| --- | --- |
+| **Title** | Tire Wear and Thermals ReSpin — Compat Tires |
+| **Tagline** | Optional Respin-selectable GT3 tire JBeams (meshes stay in companion car mods) |
+| **Version** | 0.1.1 |
+| **Zip filename** | `TireWearThermalsReSpin_CompatTires.zip` |
+| **Prefix** | Alpha |
+| **Category** | Vehicles / Parts (confirm on upload form) |
+| **Requires** | Core ReSpin Repo resource + Scintilla GT3 and/or Pigniteon ETK Racing for meshes |
+
+### Description (BBCode)
+
+```bbcode
+[B]Tire Wear and Thermals ReSpin — Compat Tires[/B]
+
+Optional [B]second Repo resource[/B] for the core [I]Tire Wear and Thermals ReSpin[/I] mod. Ships [B]JBeam-only[/B] selectable [I]*_Respin[/I] tire clones so popular third-party GT3 packs can sit in a ReSpin-friendly thermal window.
+
+This is [B]not[/B] a standalone thermals mod — install [B]core ReSpin[/B] first.
+
+[HR][/HR]
+[B]Install[/B]
+1. Install / enable [B]Tire Wear and Thermals ReSpin[/B] (core — thermals + UI apps).
+2. Install / enable [B]this[/B] Compat Tires resource.
+3. Install the matching car mod for meshes (Scintilla GT3 Racing Parts and/or Pigniteon ETK Racing).
+4. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick).
+
+[HR][/HR]
+[B]Why a separate Repo listing?[/B]
+BeamNG mounts vehicle-classified packages at [I]vehicles/[/I] only. Compat tires must not live inside the core ReSpin zip or the Apps / Lua never mount.
+
+[HR][/HR]
+[B]Includes[/B]
+• Scintilla GT3 Respin tires (default Soft + Hard/Medium/Soft Slick SKUs)
+• Pigniteon ETKC Grip-All GT3 Respin tires
+• Stock-like friction / softness for ReSpin thermal windows — author tire files unchanged
+
+[HR][/HR]
+[B]Legal[/B]
+• Does [B]not[/B] redistribute companion meshes, textures, or sounds.
+• Upstream car/tire authors are optional companions — not ReSpin contributors.
+• Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
+• Pigniteon ETK Racing — credit per that pack’s Repo listing
+• AGPL-3.0 — same lineage as core ReSpin. Source: [URL]https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin[/URL]
+```
+
+Gallery for this listing: `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`).
 
 ---
 
@@ -139,4 +201,4 @@ Mention on the listing when advertising the stop-gap parts; full inventory in `C
 - Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 - Pigniteon ETK Racing — credit the pack author as on that Repo listing
 
-Do not ship their meshes/textures inside either ReSpin zip. Compat tires are a **separate** Repo/local package from the same git tree (`vehicles/common/` + `mod_info/TWTRS_COMPAT/`).
+Do not ship their meshes/textures inside either ReSpin zip. Compat tires are a **second BeamNG Repo resource** from the same git tree (`vehicles/common/` + `mod_info/TWTRS_COMPAT/`).
