@@ -41,7 +41,7 @@ Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`**.
 
 ## Publishing
 
-BeamNG Repo prep lives on branch `beamng-repo-publish`. See **`PUBLISH_CHECKLIST.md`**.
+BeamNG Repo prep: polish on `testing/main`, merge to `main` for the public source link. See **`PUBLISH_CHECKLIST.md`**.
 
 Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a **second Repo resource** from the same git tree:
 
