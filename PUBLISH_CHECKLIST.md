@@ -73,20 +73,20 @@ Do **not** reuse Redux’s resource identity. This is a new listing derived from
 - [x] Removed Redux `resource_id` / `MXFQY32S5` / foreign owner fields / stale hashes
 - [x] Local placeholder tagid `TWTRS_RESPIN` (Repo will assign official tag on upload)
 - [x] BeamNG forum username confirmed: `antoniomdavis36749`
-- [x] Icon / preview images — locked heroes + four-UI in-game gallery (`ui_four_apps.jpg`); optional ducts shot still nice-to-have
+- [x] Icon / preview images — locked heroes + four-UI gallery + ducts
 - [ ] Category confirmed on upload form
 - [x] Prefix: Alpha (street/wet still open; race Soft/Med/Hard band locked)
 
 ## D. Technical readiness
 
-- [ ] Game version: verify on current BeamNG (0.39+) clean profile
+- [x] Game version: verify on current BeamNG (0.39+) clean profile / current install
 - [x] No Lua load errors (`main function has more than 200 local variables`, missing modules) — local-cap work landed earlier
 - [x] Vehicle spawn + thermals/wear/grip behave (RWD Soft/Med/Hard + FWD/AWD Soft edge cases)
 - [x] UI apps appear and stream data (Pitwall stint/odo + heat knobs verified live)
-- [ ] Brake duct sliders appear and save in `.pc`
-- [ ] No dependency on companion draft mod
-- [ ] Only **one** copy of this mod enabled (disable old `tyre-thermals-and-wear` unpacked folder)
-- [ ] Hardcoded VFS paths: either remove arm-marker absolute unpacked path or make it optional/no-op for packaged installs
+- [x] Brake duct sliders appear and save in `.pc` (user tech check 2026-08-14)
+- [x] No dependency on companion draft mod (user tech check 2026-08-14)
+- [x] Only **one** copy of this mod enabled (user tech check 2026-08-14)
+- [x] Hardcoded VFS paths: reviewed / no-op for packaged installs (user tech check 2026-08-14)
 
 ## E. Packing (zips)
 
