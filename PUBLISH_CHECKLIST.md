@@ -1,9 +1,11 @@
 # BeamNG Repo publish checklist
 
-Branch: `beamng-repo-publish` (dev calibration also on `testing/main`)  
+Branches: **`testing/main`** (active polish) → merge to **`main`** (GitHub default / Repo source link)  
 Working folder: `Tire-Wear-and-Thermals-ReSpin-main`  
 Official packing docs: https://documentation.beamng.com/modding/mod-support/mod_packing/  
 Guidelines: https://www.beamng.com/game/support/policies/modding-guidelines/
+
+`beamng-repo-publish` is retired (stale ancestor; do not use).
 
 ## Status legend
 
