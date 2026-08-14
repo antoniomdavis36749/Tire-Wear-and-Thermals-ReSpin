@@ -19,7 +19,24 @@ Until upstream authors adopt stock-compatible values, these `…_Respin` parts a
 
 Enable **both** ReSpin and the companion. Configs still mount author tires by default — swap in Parts → Wheels/Tires.
 
-## Files (ship in release zip)
+## Packaging (two zips — one git tree)
+
+Compat tires **cannot** ship inside the core ReSpin zip. BeamNG classifies any package that contains `vehicles/` as a vehicle mod and mounts only that folder — `ui/` / `lua/` / `scripts/` vanish and Apps disappear.
+
+| Artifact | Contents | Git source |
+| --- | --- | --- |
+| Core | `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` | this repo |
+| Companion | `vehicles/`, `mod_info/TWTRS_COMPAT/`, `COMPAT_TIRES.md` | same repo (`vehicles/common/`) |
+
+```powershell
+.\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_antoniomdavis36749.zip'
+# writes core zip + TireWearThermalsReSpin_CompatTires.zip when vehicles/ is present
+# -SkipCompatTires  → core only
+```
+
+Keep both packages on the same git revision so JBeam clones stay in sync with thermals calibration. Unpacked mono-folder installs still work for local dev (whole tree mounts).
+
+## Files (ship in companion zip only)
 
 All under `vehicles/common/`:
 
@@ -73,14 +90,15 @@ Default Respin friction target (all of the above except compound variants only c
 
 ## Player instructions (listing-ready)
 
-1. Install ReSpin **and** the companion car mod.
-2. Spawn the GT3 config.
-3. Vehicle config → Parts → tires → choose a name ending in **Respin** (and optional Hard/Medium/Soft Slick for Scintilla).
-4. Save a personal `.pc` if you want it sticky.
+1. Install **core** ReSpin (thermals + UI) **and** the **Compat Tires** companion zip.
+2. Install the matching car mod (meshes).
+3. Spawn the GT3 config.
+4. Vehicle config → Parts → tires → choose a name ending in **Respin** (and optional Hard/Medium/Soft Slick for Scintilla).
+5. Save a personal `.pc` if you want it sticky.
 
 ## Legal / attribution (publish)
 
-- Do **not** redistribute companion meshes, textures, or sounds inside the ReSpin zip.
+- Do **not** redistribute companion meshes, textures, or sounds inside either ReSpin zip.
 - Credit upstream tire/car authors as **optional companions**, not ReSpin contributors:
   - Scintilla GT3 Racing Parts — Exchy / Turbo49 / Cyborella (et al.) — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
   - Pigniteon ETK Racing — pack author as on the Repo listing for that zip
@@ -91,9 +109,10 @@ Default Respin friction target (all of the above except compound variants only c
 
 - Prefer unique filenames under `vehicles/common/` (`*_Respin.jbeam`) — never overwrite upstream paths.
 - Part IDs must stay unique (`*_Respin`, `*_Respin_hard_slick`, …).
-- After adding a new companion: update this file, `CREDITS.md`, `LISTING.md`, and confirm `Pack-Release.ps1` includes `vehicles/`.
-- Smoke-test: spawn car → select Respin tire → no missing-mesh errors → HUD shows soft/medium/hard slick as expected → green window reachable on a short hotlap.
-- Author mods must remain **unmodified** in player installs; only ReSpin ships the clones.
+- After adding a new tire clone: update this file, `CREDITS.md`, `LISTING.md`, and rebuild **both** zips from the same commit.
+- Smoke-test: enable core + compat zip + car mod → select Respin tire → no missing-mesh errors → HUD shows soft/medium/hard slick as expected → green window reachable on a short hotlap.
+- Author mods must remain **unmodified** in player installs; only the compat zip ships the clones.
+- Never merge `vehicles/` into the core release zip.
 
 ## Changelog seed (for Repo updates)
 

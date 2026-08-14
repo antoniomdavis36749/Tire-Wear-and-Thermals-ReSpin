@@ -2,7 +2,10 @@
 param(
     [string]$OutDir = '',
     [string]$ZipName = 'TireWearThermalsReSpin.zip',
-    [string]$CompatTiresZip = ''
+    # Empty = auto-pack TireWearThermalsReSpin_CompatTires.zip when vehicles/ exists.
+    # Pass a name to override; use -SkipCompatTires to omit.
+    [string]$CompatTiresZip = '',
+    [switch]$SkipCompatTires
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,6 +92,9 @@ try {
     $mi = Join-Path $ModRoot 'mod_info'
     if (Test-Path $mi) {
         Copy-Item -Recurse -Force $mi (Join-Path $stage 'mod_info')
+        # Companion identity belongs only in the compat-tires zip.
+        $compatMi = Join-Path $stage 'mod_info\TWTRS_COMPAT'
+        if (Test-Path $compatMi) { Remove-Item -Recurse -Force $compatMi }
         Get-ChildItem (Join-Path $stage 'mod_info') -Recurse -Filter 'icon-redux-reference.jpg' -ErrorAction SilentlyContinue | Remove-Item -Force
     }
 
@@ -106,20 +112,35 @@ finally {
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 }
 
-if ($CompatTiresZip) {
+$vehicles = Join-Path $ModRoot 'vehicles'
+if (-not $SkipCompatTires -and (Test-Path $vehicles)) {
+    if (-not $CompatTiresZip) {
+        $CompatTiresZip = 'TireWearThermalsReSpin_CompatTires.zip'
+    }
     if ($CompatTiresZip -notmatch '\.zip$') { $CompatTiresZip = "$CompatTiresZip.zip" }
-    $vehicles = Join-Path $ModRoot 'vehicles'
-    if (-not (Test-Path $vehicles)) { throw 'No vehicles/ folder for compat tires zip' }
     $vstage = Join-Path $env:TEMP ("respin-veh-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $vstage | Out-Null
     try {
         Copy-Item -Recurse -Force $vehicles (Join-Path $vstage 'vehicles')
-        $compatSrc = Join-Path $ModRoot 'COMPAT_TIRES.md'
-        if (Test-Path $compatSrc) { Copy-Item -Force $compatSrc (Join-Path $vstage 'COMPAT_TIRES.md') }
+        foreach ($f in @('COMPAT_TIRES.md', 'license', 'NOTICE', 'CREDITS.md')) {
+            $src = Join-Path $ModRoot $f
+            if (Test-Path $src) { Copy-Item -Force $src (Join-Path $vstage $f) }
+        }
+        $compatInfo = Join-Path $ModRoot 'mod_info\TWTRS_COMPAT'
+        if (Test-Path $compatInfo) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $vstage 'mod_info') | Out-Null
+            Copy-Item -Recurse -Force $compatInfo (Join-Path $vstage 'mod_info\TWTRS_COMPAT')
+        }
         New-ZipFromStage -StageDir $vstage -DestZip (Join-Path $OutDir $CompatTiresZip)
-        Write-Host 'Compat tires zip is vehicles-only (install alongside core zip).'
+        Write-Host 'Compat tires zip is a separate vehicle companion (install alongside core).'
     }
     finally {
         if (Test-Path $vstage) { Remove-Item -Recurse -Force $vstage }
     }
+}
+elseif ($CompatTiresZip -and -not (Test-Path $vehicles)) {
+    throw 'No vehicles/ folder for compat tires zip'
+}
+elseif ($SkipCompatTires) {
+    Write-Host 'Skipped compat tires zip (-SkipCompatTires).'
 }

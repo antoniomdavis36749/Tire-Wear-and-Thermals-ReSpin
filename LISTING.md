@@ -49,13 +49,14 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 2. Spawn a vehicle.
 3. Apps menu → add [B]Tyre Wear & Thermals[/B] (Driver, Classic, Crew, or Pitwall).
 4. Optional: Tuning → Brakes → Front/Rear duct opening (1% = closed, 100% = fully open).
-5. Optional (compatibility tires): with [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] also enabled, open Parts → tires and pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick variants). Author configs still default to upstream tires.
+5. Optional (compatibility tires): install the separate [B]Compat Tires[/B] companion zip, plus [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] for meshes. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick). Author configs still default to upstream tires.
 
 [HR][/HR]
 [B]Requirements[/B]
 • Current BeamNG.drive (developed/tested with 0.39-era builds)
 • No required companion mods for core thermals/wear
-• Compatibility tires need the matching car mod for meshes only (Scintilla GT3 Racing Parts / Pigniteon ETK Racing). ReSpin does not redistribute those meshes.
+• Optional Compat Tires zip is a [B]separate[/B] package (cannot ship inside the core zip — BeamNG would hide the UI apps)
+• Compatibility tires also need the matching car mod for meshes only (Scintilla GT3 Racing Parts / Pigniteon ETK Racing). ReSpin does not redistribute those meshes.
 
 [B]Known limitations (Alpha)[/B]
 • Street / utility / wet compounds still need broader surface A/B; race Soft/Med/Hard band is locked from live Track 15°C stints
@@ -117,4 +118,4 @@ Mention on the listing when advertising the stop-gap parts; full inventory in `C
 - Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 - Pigniteon ETK Racing — credit the pack author as on that Repo listing
 
-Do not ship their meshes/textures inside the ReSpin zip.
+Do not ship their meshes/textures inside either ReSpin zip. Compat tires are a **separate** Repo/local package from the same git tree (`vehicles/common/` + `mod_info/TWTRS_COMPAT/`).

@@ -1,0 +1,13 @@
+{
+  "title": "Tire Wear and Thermals ReSpin — Compat Tires",
+  "tag_line": "Optional Respin-selectable GT3 tire JBeams (meshes stay in companion car mods)",
+  "version_string": "0.1.1",
+  "filename": "TireWearThermalsReSpin_CompatTires.zip",
+  "tagid": "TWTRS_COMPAT",
+  "username": "antoniomdavis36749",
+  "prefix_title": "Alpha",
+  "category_title": "",
+  "resource_category_id": 7,
+  "attachments": [],
+  "message": "[B]Tire Wear and Thermals ReSpin — Compat Tires[/B]\n\nOptional [B]companion[/B] to the core ReSpin thermals/wear mod. Ships [B]JBeam-only[/B] selectable [I]*_Respin[/I] tire clones so popular third-party GT3 packs can sit in a ReSpin-friendly thermal window.\n\n[HR][/HR]\n[B]Install[/B]\n1. Install / enable [B]Tire Wear and Thermals ReSpin[/B] (core zip — thermals + UI).\n2. Install / enable [B]this[/B] compat-tires zip.\n3. Install the matching car mod (Scintilla GT3 Racing Parts and/or Pigniteon ETK Racing) for meshes.\n4. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick).\n\n[HR][/HR]\n[B]Why a separate zip?[/B]\nBeamNG mounts vehicle-classified zips at [I]vehicles/[/I] only. Compat tires must not live inside the core ReSpin zip or the Apps / Lua never mount.\n\n[HR][/HR]\n[B]Legal[/B]\n• Does [B]not[/B] redistribute companion meshes, textures, or sounds.\n• Upstream car/tire authors are optional companions — not ReSpin contributors. See COMPAT_TIRES.md / CREDITS.md.\n• AGPL-3.0 — same lineage as core ReSpin. Source: [URL]https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin[/URL]"
+}

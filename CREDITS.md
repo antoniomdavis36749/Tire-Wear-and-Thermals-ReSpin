@@ -22,7 +22,7 @@ Tire-side brake coupling only: native BeamNG owns rotor thermals and fade. ReSpi
 
 ## Optional compatibility tire companions
 
-ReSpin may ship **JBeam-only** selectable clones (`*_Respin`) that reference meshes from third-party vehicle mods. Those authors are **not** ReSpin contributors; credit them as optional companions. Do not redistribute their meshes, textures, or sounds in the ReSpin package. Details: `COMPAT_TIRES.md`.
+ReSpin may ship **JBeam-only** selectable clones (`*_Respin`) in a **separate Compat Tires companion zip** (same git tree: `vehicles/common/`). Those authors are **not** ReSpin contributors; credit them as optional companions. Do not redistribute their meshes, textures, or sounds. Details: `COMPAT_TIRES.md`.
 
 - **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 - **Pigniteon ETK Racing** — credit per that pack’s Repo listing
