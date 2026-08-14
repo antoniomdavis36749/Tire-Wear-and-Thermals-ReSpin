@@ -28,7 +28,7 @@ function Baseline($c){ return [double]$c[0]+[double]$c[1]+[double]$c[2] }
 $profiles = @(
   [ordered]@{name='drift';c=@(0.88,0.12,-0.05);gm=0.88;lat=0.92;long=0.95;tOpt=75.0;plat=14.0;wc=65.0;wh=65.0;floor=0.28;ad=0.48;casing=0.4;slipHeat=10.0;workHeat=3.6;wearRate=0.002;hotWear=4.5;blisterRatio=1.80;treadInertia=0.40;carcassInertia=0.648;react=1.3;skinCore=0.094;airCool=0.0225;staticCool=0.08;coreCool=0.0455},
   [ordered]@{name='sport';c=@(1.02,0.16,-0.06);gm=1.00;lat=1.0;long=1.0;tOpt=66.0;plat=16.0;wc=62.0;wh=55.0;floor=0.28;ad=0.42;casing=0.5;slipHeat=8.1;workHeat=4.4;wearRate=0.00045;hotWear=2.98;blisterRatio=1.55;treadInertia=0.483;carcassInertia=0.782;react=1.2;skinCore=0.076;airCool=0.02625;staticCool=0.08;coreCool=0.035},
-  [ordered]@{name='standard';c=@(0.92,0.12,-0.04);gm=0.96;lat=1.0;long=1.0;tOpt=60.0;plat=16.0;wc=58.0;wh=55.0;floor=0.26;ad=0.40;casing=0.6;slipHeat=8.4;workHeat=5.1;wearRate=0.0005;hotWear=3.0;blisterRatio=1.55;treadInertia=0.504;carcassInertia=0.816;react=1.25;skinCore=0.068;airCool=0.0275;staticCool=0.08;coreCool=0.0385}
+  [ordered]@{name='standard';c=@(0.92,0.12,-0.04);gm=1.00;lat=1.0;long=1.0;tOpt=60.0;plat=16.0;wc=58.0;wh=55.0;floor=0.26;ad=0.40;casing=0.6;slipHeat=8.4;workHeat=5.1;wearRate=0.0005;hotWear=3.0;blisterRatio=1.55;treadInertia=0.504;carcassInertia=0.816;react=1.25;skinCore=0.068;airCool=0.0275;staticCool=0.08;coreCool=0.0385}
 )
 
 $dt=0.01; $env=21.0; $slip=0.55; $gMag=0.75; $airspeed=22.0; $loadRaw=4500.0; $vehMass=1400.0

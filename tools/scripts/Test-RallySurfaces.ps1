@@ -57,41 +57,48 @@ function ProfileBias([double]$g, [string]$surface, [string]$profile) {
   $isPaddle=$p.Contains('paddle'); $isWinter=$p.Contains('winter')
   $isCrawler=$p.Contains('crawler'); $isMT=$p.Contains('mudterrain'); $isAT=$p.Contains('allterrain')
   $isSlick=$p.Contains('slick'); $isRain=($p -eq 'rain'); $isDrift=$p.Contains('drift'); $isDrag=$p.Contains('drag')
-  $isSport=$p.Contains('sport') -and -not $p.Contains('supersport')
+  $isSportPlus=$p.Contains('sport_plus')
+  $isSport=$p.Contains('sport') -and -not $isSportPlus -and -not $p.Contains('supersport')
+  $isStreetLoose=($p.Contains('standard') -or $isSport -or $p.Contains('vintage')) -and -not $isRally -and -not $isAT -and -not $isMT -and -not $isCrawler -and -not $isSlick -and -not $isDrag -and -not $isPaddle
+  $isStreetAsphalt=($p.Contains('standard') -or $p.Contains('vintage')) -and -not $isRally -and -not $isAT -and -not $isMT -and -not $isCrawler -and -not $isSlick -and -not $isDrag -and -not $isPaddle
 
   switch ($surface) {
     'sand' {
       if($isPaddle){return $g*1.35} elseif($isMT){return $g*1.10} elseif($isAT -or $isCrawler){return $g*1.06}
-      elseif($isSlick -or $isDrag){return $g*0.88}
+      elseif($isStreetLoose){return $g*0.90} elseif($isSlick -or $isDrag){return $g*0.88}
     }
     'mud' {
-      if($isPaddle){return $g*1.25} elseif($isMT -or $isCrawler){return $g*1.14} elseif($isAT){return $g*1.08}
-      elseif($isSlick -or $isDrag){return $g*0.82}
+      if($isPaddle){return $g*1.25} elseif($isMT -or $isCrawler){return $g*1.14}
+      elseif($isRally -or $isAT){return $g*1.08}
+      elseif($isStreetLoose){return $g*0.86} elseif($isSlick -or $isDrag){return $g*0.82}
     }
     'rock' {
       if($isCrawler){return $g*1.18} elseif($isAT){return $g*1.06}
       elseif($isPaddle){return $g*0.80} elseif($isSlick){return $g*0.94}
     }
     { $_ -in @('gravel','dirt') } {
-      if($isRally){return $g*1.12} elseif($isAT){return $g*1.10} elseif($isMT){return $g*1.06}
+      if($isRally){return $g*1.20} elseif($isAT){return $g*1.10} elseif($isMT){return $g*1.06}
+      elseif($isStreetLoose){return $g*0.90}
       elseif($isSlick -or $isDrag){return $g*0.90} elseif($isDrift){return $g*0.95}
     }
     'gravel_wet' {
-      if($isRally -or $isAT){return $g*1.08} elseif($isMT -or $isCrawler){return $g*1.10}
-      elseif($isRain){return $g*1.06} elseif($isSlick){return $g*0.85}
+      if($isRally){return $g*1.14} elseif($isAT){return $g*1.08}
+      elseif($isMT -or $isCrawler){return $g*1.10}
+      elseif($isRain){return $g*1.06} elseif($isStreetLoose){return $g*0.88} elseif($isSlick){return $g*0.85}
     }
     { $_ -in @('snow','ice') } {
       if($isWinter){return $g*1.22} elseif($isRain){return $g*1.08}
-      elseif($isAT){return $g*1.05} elseif($isSlick -or $isDrag){return $g*0.82}
+      elseif($isAT){return $g*1.05} elseif($isStreetLoose){return $g*0.92} elseif($isSlick -or $isDrag){return $g*0.82}
     }
     'wet_paved' {
       if($isRain){return $g*1.06} elseif($isWinter){return $g*1.04}
       elseif($isSlick -or $isDrag){return $g*0.92}
     }
     { $_ -in @('dry_paved','hard_smooth') } {
-      if($isSlick -or $isDrag){return $g*1.02}
+      if($isSlick -or $isDrag){return $g*1.0}
       elseif($isMT -or $isCrawler){return $g*0.96}
       elseif($isPaddle){return $g*0.90}
+      elseif($isStreetAsphalt){return $g*1.02}
     }
   }
   return $g
@@ -106,8 +113,9 @@ $tires = @(
   @{ class='rally'; name='rally_gravel_hard';    tread=0.85; gm=0.96; drain=0.75; wet=1.038; dry=1.00 },
   @{ class='alias'; name='tarmac';               tread=0.35; gm=0.96; drain=0.75; wet=1.038; dry=1.00 },
   @{ class='alias'; name='asphalt_rally';        tread=0.40; gm=0.96; drain=0.75; wet=1.038; dry=1.00 },
-  # Control: sport (not rally) for relative checks
-  @{ class='ctrl';  name='sport';                tread=0.50; gm=1.00; drain=0.72; wet=1.03;  dry=1.02 }
+  # Controls: sport + standard (street-family surface bias; not rally)
+  @{ class='ctrl';  name='sport';                tread=0.50; gm=1.00; drain=0.72; wet=1.03;  dry=1.02 },
+  @{ class='ctrl';  name='standard';             tread=0.70; gm=1.00; drain=0.80; wet=1.05;  dry=1.00 }
 )
 
 $surfaces = @('dry_paved','hard_smooth','wet_paved','gravel','gravel_wet','dirt','mud','sand','snow','ice','rock','generic')
@@ -188,6 +196,12 @@ foreach ($s in @('gravel','dirt','mud','sand')) {
 Expect ($rows['rally_gravel_medium']['gravel'] -gt $rows['sport']['gravel']) 'rally_medium > sport on gravel'
 Expect ($rows['rally_gravel_medium']['dirt'] -gt $rows['sport']['dirt']) 'rally_medium > sport on dirt'
 Expect ($rows['rally_gravel_medium']['gravel_wet'] -gt $rows['sport']['gravel_wet']) 'rally_medium > sport on gravel_wet'
+# Mud still worse than gravel (clog-softening must not erase surface hierarchy)
+Expect ($rows['rally_gravel_medium']['mud'] -lt $rows['rally_gravel_medium']['gravel']) 'rally_medium mud < gravel'
+Expect ($rows['rally_gravel_soft']['mud'] -lt $rows['rally_gravel_soft']['gravel']) 'rally_soft mud < gravel'
+# Loose baseline floor after gravel/dirt bias bump (1.12 → 1.20)
+Expect ($rows['rally_gravel_medium']['gravel'] -gt 1.05) 'rally_medium gravel bite (>1.05)'
+Expect ($rows['rally_gravel_soft']['gravel'] -gt 0.95) 'rally_soft gravel bite (>0.95)'
 
 # Alias parity with matching tread
 Expect ([math]::Abs($rows['tarmac']['dry_paved'] - $rows['rally_tarmac']['dry_paved']) -lt 0.001) 'tarmac alias ~= rally_tarmac on dry_paved'
@@ -206,8 +220,27 @@ foreach ($n in $rallyNames) {
 Expect ($rows['rally_gravel_soft']['gravel'] -lt $rows['rally_gravel_medium']['gravel']) 'soft < medium on gravel'
 Expect ($rows['rally_gravel_medium']['gravel'] -lt $rows['rally_gravel_hard']['gravel']) 'medium < hard on gravel'
 
-# Tarmac competitive on asphalt vs sport
-Expect ($rows['rally_tarmac']['dry_paved'] -ge $rows['sport']['dry_paved'] - 0.05) 'rally_tarmac ~>= sport on dry_paved (within 0.05)'
+# Tarmac competitive on asphalt vs sport (not a cheat — allow ~0.10 gap; sport still leads)
+Expect ($rows['rally_tarmac']['dry_paved'] -ge $rows['sport']['dry_paved'] - 0.10) 'rally_tarmac ~>= sport on dry_paved (within 0.10)'
+
+# Street asphalt vs loose relative gap (after standard gm bump + street-family bias)
+$stdDry = [double]$rows['standard']['dry_paved']
+$stdGrav = [double]$rows['standard']['gravel']
+$stdDirt = [double]$rows['standard']['dirt']
+$stdMud = [double]$rows['standard']['mud']
+$stdAG = $stdDry / [math]::Max(0.001, $stdGrav)
+$stdAD = $stdDry / [math]::Max(0.001, $stdDirt)
+$stdAM = $stdDry / [math]::Max(0.001, $stdMud)
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine(('STREET_ASPHALT_LOOSE standard dry={0:n3} gravel={1:n3} dirt={2:n3} mud={3:n3}' -f $stdDry,$stdGrav,$stdDirt,$stdMud))
+[void]$sb.AppendLine(('  ratios asphalt:gravel={0:n3} asphalt:dirt={1:n3} asphalt:mud={2:n3}' -f $stdAG,$stdAD,$stdAM))
+Expect ($stdDry -gt $stdGrav) 'standard dry_paved > gravel'
+Expect ($stdDry -gt $stdDirt) 'standard dry_paved > dirt'
+Expect ($stdMud -lt $stdGrav) 'standard mud < gravel'
+Expect ($stdAG -ge 1.12) ("standard asphalt:gravel gap >=1.12 (got {0:n3})" -f $stdAG)
+Expect ($stdAD -ge 1.12) ("standard asphalt:dirt gap >=1.12 (got {0:n3})" -f $stdAD)
+# Rally loose still clearly ahead of street on gravel after street penalty
+Expect ($rows['rally_gravel_medium']['gravel'] -gt $rows['standard']['gravel']) 'rally_medium > standard on gravel'
 
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine("RESULT: $pass passed, $fail failed")

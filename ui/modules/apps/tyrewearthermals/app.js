@@ -233,7 +233,7 @@ angular.module("beamng.apps")
                         ctx.fillStyle = "#ffaa44";
                     }
 
-                    var footerText = warningTag + pres.toFixed(1) + " PSI";
+                    var footerText = warningTag + Math.round(pres) + " PSI";
                     ctx.fillText(footerText, cx, y + rowH - footerH * 0.25);
                 }
 

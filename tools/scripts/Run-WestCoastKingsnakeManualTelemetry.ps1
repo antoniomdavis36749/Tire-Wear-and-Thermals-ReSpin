@@ -10,6 +10,7 @@
     - AI disabled (no learn / race / damage-reset AI)
     - CSV telemetry -> tools/output/wc-kingsnake-lap-telemetry.csv
     - In-memory CSV buffer with rare flush; sample interval 1.0s
+    - Header keeps wall..film; UI-stream fields append after film (dutyMods may be quoted)
     - Status phase=manual_telemetry
 
   Stock Kingsnake uses sport tires (PROFILE_POINTS continuum: sport / sport_plus /
@@ -30,7 +31,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $gameExe = 'C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\Bin64\BeamNG.drive.x64.exe'
-$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main\tools'
+$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main\tools'
 $modOut = Join-Path $modVs 'output'
 $status = Join-Path $modOut 'wc-kingsnake-lap-status.json'
 $result = Join-Path $modOut 'wc-kingsnake-lap-result.txt'

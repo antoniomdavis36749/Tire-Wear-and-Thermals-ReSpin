@@ -1,6 +1,8 @@
 $tel = Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'output') 'wc-gt4-lap-telemetry.csv'
 $lines = Get-Content $tel
 Write-Output "lines=$($lines.Count)"
+# Legacy columns wall..film (indices 0..22). Newer UI-stream cols append after film and may
+# include quoted dutyMods with commas — only use fixed indices on the legacy prefix.
 $raw = $lines | Where-Object { $_ -and ($_ -notmatch '^#') -and ($_ -notmatch '^wall,') }
 $n = 0; $skMin = 999.0; $skMax = -999.0; $skSum = 0.0
 $gMin = 999.0; $gMax = -999.0; $gSum = 0.0; $cMin = 999.0

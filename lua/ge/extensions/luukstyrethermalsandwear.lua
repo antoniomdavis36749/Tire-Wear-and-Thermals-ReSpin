@@ -23,7 +23,10 @@ local function safeReadFriction(gm)
     local strength = gm.strength or (gm.cdata and gm.cdata.strength)
     local rough = gm.roughness or gm.rough or (gm.cdata and (gm.cdata.roughness or gm.cdata.rough))
     local fluidDensity = gm.fluidDensity or (gm.cdata and gm.cdata.fluidDensity)
-    return static, sliding, strength, rough, fluidDensity
+    local defaultDepth = gm.defaultDepth or (gm.cdata and gm.cdata.defaultDepth)
+    local stribeckVelocity = gm.stribeckVelocity or gm.stribeckVel
+        or (gm.cdata and (gm.cdata.stribeckVelocity or gm.cdata.stribeckVel))
+    return static, sliding, strength, rough, fluidDensity, defaultDepth, stribeckVelocity
 end
 
 -- Manually serializes ground model configurations safely using a protected caller
@@ -51,15 +54,19 @@ local function getGroundModels(objId)
                 local strength = 1.0
                 local rough = 0.0
                 local fluidDensity = 0.0
+                local defaultDepth = 0.0
+                local stribeckVelocity = 1.0
                 
                 -- Read direct and C++ cdata properties safely inside pcall
-                local ok, static, sliding, str, r, fluid = pcall(safeReadFriction, gm)
+                local ok, static, sliding, str, r, fluid, defDepth, stribeck = pcall(safeReadFriction, gm)
                 if ok then
                     staticFriction = static or 1.0
                     slidingFriction = sliding or 1.0
                     strength = str or 1.0
                     rough = r or 0.0
                     fluidDensity = fluid or 0.0
+                    defaultDepth = defDepth or 0.0
+                    stribeckVelocity = stribeck or 1.0
                 end
                 
                 cmd = cmd .. "[\"" .. name .. "\"] = { "
@@ -67,7 +74,9 @@ local function getGroundModels(objId)
                 cmd = cmd .. "slidingFrictionCoefficient = " .. tostring(slidingFriction) .. ", "
                 cmd = cmd .. "strength = " .. tostring(strength) .. ", "
                 cmd = cmd .. "rough = " .. tostring(rough) .. ", "
-                cmd = cmd .. "fluidDensity = " .. tostring(fluidDensity) .. " }, "
+                cmd = cmd .. "fluidDensity = " .. tostring(fluidDensity) .. ", "
+                cmd = cmd .. "defaultDepth = " .. tostring(defaultDepth) .. ", "
+                cmd = cmd .. "stribeckVelocity = " .. tostring(stribeckVelocity) .. " }, "
             end
         end
         cmd = cmd .. "debug = 0 }; "
@@ -107,11 +116,15 @@ local function onUpdate(dt)
     local cloudCover = 0.2
 
     if core_environment then
-        -- Retrieve temperature safely
+        -- Retrieve temperature safely (GE may return Kelvin or Celsius)
         if type(core_environment.getTemperature) == "function" then
             envTemp = core_environment.getTemperature() or 21
         elseif core_environment.temperature ~= nil then
             envTemp = core_environment.temperature
+        end
+        -- Normalize to Celsius before mailbox (vehicle also sanitizes, but keep units consistent)
+        if type(envTemp) == "number" and envTemp > 180 then
+            envTemp = envTemp - 273.15
         end
 
         -- Retrieve time of day safely

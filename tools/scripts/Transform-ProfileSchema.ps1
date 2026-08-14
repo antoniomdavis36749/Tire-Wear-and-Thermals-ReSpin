@@ -15,13 +15,9 @@ function Get-Num([hashtable]$m, [string]$key, [double]$default) {
 }
 
 function Transform-ModsMap([hashtable]$m) {
-    $skin = Get-Num $m 'skinToCoreRate' (Get-Num $m 'skinCoreConductance' 0.068)
-    $core = Get-Num $m 'coreToSkinRate' $skin
-    $cond = if ($m.ContainsKey('skinCoreConductance')) { [double]$m['skinCoreConductance'] } else { ($skin + $core) * 0.5 }
-
-    $ti = Get-Num $m 'thermalInertia' 1.1
-    $treadI = if ($m.ContainsKey('treadInertia')) { [double]$m['treadInertia'] } else { [math]::Round($ti * 0.42, 4) }
-    $carcI  = if ($m.ContainsKey('carcassInertia')) { [double]$m['carcassInertia'] } else { [math]::Round($ti * 0.68, 4) }
+    $cond = Get-Num $m 'skinCoreConductance' 0.068
+    $treadI = Get-Num $m 'treadInertia' 0.46
+    $carcI  = Get-Num $m 'carcassInertia' 0.75
 
     $optTemp = Get-Num $m 'optimalTemp' 65
     $adhesion = Get-Num $m 'adhesion' 0.45
@@ -221,8 +217,6 @@ if ($newSrc -notmatch 'CORE_REACTION_RATE') {
 [IO.File]::WriteAllText($path, $newSrc)
 Write-Host "Transformed $count profile tables."
 Write-Host ("skinCoreConductance={0}" -f ([regex]::Matches($newSrc, 'skinCoreConductance')).Count)
-Write-Host ("coreReactionRate={0}" -f ([regex]::Matches($newSrc, 'coreReactionRate')).Count)
 Write-Host ("treadInertia={0}" -f ([regex]::Matches($newSrc, 'treadInertia')).Count)
+Write-Host ("carcassInertia={0}" -f ([regex]::Matches($newSrc, 'carcassInertia')).Count)
 Write-Host ("tempPlateau={0}" -f ([regex]::Matches($newSrc, 'tempPlateau')).Count)
-Write-Host ("skinToCoreRate={0}" -f ([regex]::Matches($newSrc, 'skinToCoreRate')).Count)
-Write-Host ("thermalInertia={0}" -f ([regex]::Matches($newSrc, 'thermalInertia')).Count)

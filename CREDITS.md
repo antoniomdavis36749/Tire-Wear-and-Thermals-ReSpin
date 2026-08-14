@@ -4,13 +4,25 @@ Tire-Wear-and-Thermals-ReSpin is derived from open-source BeamNG.drive tyre ther
 
 ## Authors to credit
 
-- **lucky4luuk** — original mod author  
+- **lucky4luuk** — original mod author (released as open source; cite authorship)  
   Resource: https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/
 
 - **Zesty_Maple98** — expanded and reworked the original into Tyre Wear and Thermals Redux  
   Resource: https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/  
-  Upstream source: https://github.com/ample-samples/tyre-thermals-and-wear
+  Upstream source: https://github.com/ample-samples/tyre-thermals-and-wear  
+  Permission received to publish this ReSpin derivative with credit.
 
 Please preserve these credits when redistributing or forking this ReSpin.
 
 License: GNU Affero General Public License v3 (`license`).
+
+## Brake / duct scope note
+
+Tire-side brake coupling only: native BeamNG owns rotor thermals and fade. ReSpin soaks rim/carcass from stock brake temps; duct sliders cool tyre/rim air and modulate soak — they do not write native rotor cooling coefficients.
+
+## Optional compatibility tire companions
+
+ReSpin may ship **JBeam-only** selectable clones (`*_Respin`) in a **separate Compat Tires companion zip** (same git tree: `vehicles/common/`). Those authors are **not** ReSpin contributors; credit them as optional companions. Do not redistribute their meshes, textures, or sounds. Details: `COMPAT_TIRES.md`.
+
+- **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
+- **Pigniteon ETK Racing** — credit per that pack’s Repo listing

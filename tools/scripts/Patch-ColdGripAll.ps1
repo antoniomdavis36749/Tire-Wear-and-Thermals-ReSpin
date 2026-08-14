@@ -20,7 +20,7 @@ $rules = @{
   'donut'             = @{ adhesion=0.30; coldWidth=55; gripFloor=0.22; gripMultiplier=0.68; tempPlateau=14 }
   'rally'             = @{ adhesion=0.45; coldWidth=62; gripFloor=0.28; gripMultiplier=0.96; tempPlateau=16 }
   'rain'              = @{ adhesion=0.50; coldWidth=62; gripFloor=0.28; gripMultiplier=0.90; tempPlateau=15 }
-  'standard'          = @{ adhesion=0.40; coldWidth=58; gripFloor=0.26; gripMultiplier=0.96; tempPlateau=16 }
+  'standard'          = @{ adhesion=0.40; coldWidth=58; gripFloor=0.26; gripMultiplier=1.00; tempPlateau=16 }
   'allterrain'        = @{ adhesion=0.36; coldWidth=58; gripFloor=0.26; gripMultiplier=0.86; tempPlateau=18 }
   'mudterrain'        = @{ adhesion=0.32; coldWidth=58; gripFloor=0.26; gripMultiplier=0.82; tempPlateau=18 }
   'hard_slick'        = @{ adhesion=0.48; coldWidth=68; gripFloor=0.30; gripMultiplier=1.00; tempPlateau=14 }

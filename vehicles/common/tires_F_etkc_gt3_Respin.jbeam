@@ -1,0 +1,156 @@
+// Stop-gap ReSpin-compatible clones of Pigniteon ETK Racing GT3 tires.
+// Requires pigniteon_etk_racing mounted for tire meshes/materials under vehicles/etkc/tires_gt3/.
+{
+"tire_F_295_30_18_gt3_Respin": {
+    "information":{
+        "authors":"Pigniteon / ReSpin stop-gap",
+        "name":"295/30R18 Grip-All GT3 Front Tires Respin",
+        "value":270,
+    },
+    "slotType" : "tire_F_18x11",
+    "flexbodies": [
+        ["mesh", "[group]:", "nonFlexMaterials"],
+        ["tire_01f_18x11_25_gt3", ["wheel_FR","tire_FR"], [], {"pos":{"x":-0.47, "y":0.0, "z":0.0}, "rot":{"x":0, "y":0, "z":180}, "scale":{"x":1.04, "y":1.003, "z":1.003}}],
+        ["tire_01f_18x11_25_gt3", ["wheel_FL","tire_FL"], [], {"pos":{"x": 0.47, "y":0.0, "z":0.0}, "rot":{"x":0, "y":0, "z":0},   "scale":{"x":1.04, "y":1.003, "z":1.003}}],
+    ],
+    "variables": [
+        ["name", "type", "unit", "category", "default", "min", "max", "title", "description"],
+        ["$tirepressure_F", "range", "psi", "Wheels", 22, 0, 50, "Tire Pressure", "Relative to atmospheric pressure", {"subCategory":"Front"}],
+    ],
+    "pressureWheels": [
+        ["name","hubGroup","group","node1:","node2:","nodeS","nodeArm:","wheelDir"],
+        {"disableMeshBreaking":false,"disableHubMeshBreaking":false},
+        {"hasTire":true},
+        {"enableTireReinfBeams":false},
+        {"enableTireLbeams":true},
+        {"enableTireSideReinfBeams":false},
+        {"enableTreadReinfBeams":true},
+        {"enableTirePeripheryReinfBeams":true},
+
+        //general settings
+        {"radius":0.32},
+        {"tireWidth":0.265},
+
+        //tire options
+        {"wheelSideBeamSpring":"$=$tirepressure_F*600","wheelSideBeamDamp":15},
+        {"wheelSideBeamSpringExpansion":481000,"wheelSideBeamDampExpansion":35},
+        {"wheelSideTransitionZone":0.12,"wheelSideBeamPrecompression":0.985},
+
+        {"wheelReinfBeamSpring":33000,"wheelReinfBeamDamp":190},
+        {"wheelReinfBeamDampCutoffHz":500,"wheelReinfBeamPrecompression":0.98},
+
+        {"wheelTreadBeamSpring":81000,"wheelTreadBeamDamp":80},
+        {"wheelTreadBeamDampCutoffHz":500,"wheelTreadBeamPrecompression":0.98},
+
+        {"wheelTreadReinfBeamSpring":241000,"wheelTreadReinfBeamDamp":70},
+        {"wheelTreadReinfBeamDampCutoffHz":500,"wheelTreadReinfBeamPrecompression":0.98},
+
+        {"wheelPeripheryBeamSpring":51000,"wheelPeripheryBeamDamp":30},
+        {"wheelPeripheryBeamDampCutoffHz":500,"wheelPeripheryBeamPrecompression":0.98},
+
+        {"wheelPeripheryReinfBeamSpring":151000,"wheelPeripheryReinfBeamDamp":30},
+        {"wheelPeripheryReinfBeamDampCutoffHz":500,"wheelPeripheryReinfBeamPrecompression":0.98},
+
+        //general tire values
+        {"nodeWeight":0.21},
+        {"nodeMaterial":"|NM_RUBBER"},
+        {"triangleCollision":false},
+        {"pressurePSI":"$tirepressure_F"},
+        {"dragCoef":5},
+
+        //groundmodel friction multipliers
+        {"frictionCoef":1.0},
+        {"slidingFrictionCoef":1.0},
+        {"stribeckExponent":1.75},
+        {"stribeckVelMult":2.5},
+        {"treadCoef":0.0},
+
+        //advanced friction values
+        {"noLoadCoef":1.85},
+        {"loadSensitivitySlope":0.00022},
+        {"fullLoadCoef":0.80},
+        {"softnessCoef":1},
+
+        //deform values
+        {"wheelSideBeamDeform":17000,"wheelSideBeamStrength":22000},
+        {"wheelTreadBeamDeform":12000,"wheelTreadBeamStrength":16000},
+        {"wheelPeripheryBeamDeform":50000,"wheelPeripheryBeamStrength":50000},
+    ],
+},
+"tire_F_295_35_18_gt3_Respin": {
+    "information":{
+        "authors":"Pigniteon / ReSpin stop-gap",
+        "name":"295/35R18 Grip-All GT3 Front Tires Respin",
+        "value":300,
+    },
+    "slotType" : "tire_F_18x11",
+    "flexbodies": [
+        ["mesh", "[group]:", "nonFlexMaterials"],
+        ["tire_01f_17x9_25_gt3", ["wheel_FR","tire_FR"], [], {"pos":{"x":-0.47, "y":0.0, "z":0.0}, "rot":{"x":0, "y":0, "z":180}, "scale":{"x":1.205, "y":1.022, "z":1.022}}],
+        ["tire_01f_17x9_25_gt3", ["wheel_FL","tire_FL"], [], {"pos":{"x": 0.47, "y":0.0, "z":0.0}, "rot":{"x":0, "y":0, "z":0},   "scale":{"x":1.205, "y":1.022, "z":1.022}}],
+    ],
+    "variables": [
+        ["name", "type", "unit", "category", "default", "min", "max", "title", "description"],
+        ["$tirepressure_F", "range", "psi", "Wheels", 22, 0, 50, "Tire Pressure", "Relative to atmospheric pressure", {"subCategory":"Front"}],
+    ],
+    "pressureWheels": [
+        ["name","hubGroup","group","node1:","node2:","nodeS","nodeArm:","wheelDir"],
+        {"disableMeshBreaking":false,"disableHubMeshBreaking":false},
+        {"hasTire":true},
+        {"enableTireReinfBeams":false},
+        {"enableTireLbeams":true},
+        {"enableTireSideReinfBeams":false},
+        {"enableTreadReinfBeams":true},
+        {"enableTirePeripheryReinfBeams":true},
+
+        //general settings
+        {"radius":0.325},
+        {"tireWidth":0.275},
+
+        //tire options
+        {"wheelSideBeamSpring":"$=$tirepressure_F*600","wheelSideBeamDamp":15},
+        {"wheelSideBeamSpringExpansion":481000,"wheelSideBeamDampExpansion":35},
+        {"wheelSideTransitionZone":0.12,"wheelSideBeamPrecompression":0.985},
+
+        {"wheelReinfBeamSpring":33000,"wheelReinfBeamDamp":190},
+        {"wheelReinfBeamDampCutoffHz":500,"wheelReinfBeamPrecompression":0.98},
+
+        {"wheelTreadBeamSpring":81000,"wheelTreadBeamDamp":80},
+        {"wheelTreadBeamDampCutoffHz":500,"wheelTreadBeamPrecompression":0.98},
+
+        {"wheelTreadReinfBeamSpring":241000,"wheelTreadReinfBeamDamp":70},
+        {"wheelTreadReinfBeamDampCutoffHz":500,"wheelTreadReinfBeamPrecompression":0.98},
+
+        {"wheelPeripheryBeamSpring":51000,"wheelPeripheryBeamDamp":30},
+        {"wheelPeripheryBeamDampCutoffHz":500,"wheelPeripheryBeamPrecompression":0.98},
+
+        {"wheelPeripheryReinfBeamSpring":151000,"wheelPeripheryReinfBeamDamp":30},
+        {"wheelPeripheryReinfBeamDampCutoffHz":500,"wheelPeripheryReinfBeamPrecompression":0.98},
+
+        //general tire values
+        {"nodeWeight":0.21},
+        {"nodeMaterial":"|NM_RUBBER"},
+        {"triangleCollision":false},
+        {"pressurePSI":"$tirepressure_F"},
+        {"dragCoef":5},
+
+        //groundmodel friction multipliers
+        {"frictionCoef":1.0},
+        {"slidingFrictionCoef":1.0},
+        {"stribeckExponent":1.75},
+        {"stribeckVelMult":2.5},
+        {"treadCoef":0.0},
+
+        //advanced friction values
+        {"noLoadCoef":1.85},
+        {"loadSensitivitySlope":0.00022},
+        {"fullLoadCoef":0.80},
+        {"softnessCoef":1},
+
+        //deform values
+        {"wheelSideBeamDeform":17000,"wheelSideBeamStrength":22000},
+        {"wheelTreadBeamDeform":12000,"wheelTreadBeamStrength":16000},
+        {"wheelPeripheryBeamDeform":50000,"wheelPeripheryBeamStrength":50000},
+    ],
+},
+}

@@ -10,6 +10,7 @@
     - AI disabled (no learn / race / damage-reset AI)
     - CSV telemetry -> tools/output/wc-scintilla-lap-telemetry.csv
     - In-memory CSV buffer with rare flush; sample interval 1.0s
+    - Header keeps wall..film; UI-stream fields append after film (dutyMods may be quoted)
     - Status phase=manual_telemetry
 
   Stock Scintilla GTs uses Sport Plus tires:
@@ -21,7 +22,10 @@
 
   Trigger file: tools/RUN_WC_MANUAL_TEL (body includes profile=scintilla)
 
-  You drive 4 Belasco laps. Script confirms CSV is writing then exits
+  You drive 4 Belasco laps. Script confirms CSV is writing then exits.
+
+  Soft C4 mute-removal (ReSpin Soft Slick): Phase 1 slick scales=1.0; Phase 2 cruise RR/choke=1.0.
+  WCU right-turn bias: expect RL hotter than RR in heavy-accel zones — track/load, not Soft C4 bug.
   while leaving the game running.
 
   Fails if TELEMETRY_CSV_ARMED / CSV never appear within ArmTimeoutSec after
@@ -33,7 +37,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $gameExe = 'C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\Bin64\BeamNG.drive.x64.exe'
-$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main\tools'
+$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main\tools'
 $modOut = Join-Path $modVs 'output'
 $status = Join-Path $modOut 'wc-scintilla-lap-status.json'
 $result = Join-Path $modOut 'wc-scintilla-lap-result.txt'

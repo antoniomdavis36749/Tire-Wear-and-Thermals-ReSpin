@@ -1,21 +1,30 @@
 <#
 .SYNOPSIS
-    Soft-sim sweep: downforce heat aggressiveness analysis + tuning record.
+    Soft-sim sweep: downforce heat aggressiveness analysis + A/B aeroHeatScale.
     Validates the aeroHeatScale discount applied in luukstyrethermalsandwear.lua.
 
 .DESCRIPTION
-    Analyses the effective load_kg_thermal multiplier across speed / downforce levels,
-    verifies the reduction is conservative (still thermally meaningful) and produces a
-    before/after delta table.
+    Analyses the effective load_kg_thermal multiplier across speed / downforce levels.
+    Default runs A (0.55 mute) vs B (1.0 mute-off) for Scintilla GT-like loads.
+    Script-side only — does not edit production THERMAL_TOPOLOGY.
+
+.PARAMETER AeroHeatScale
+    Optional single-scale run. Omit to run A/B (0.55 vs 1.0).
 #>
+param(
+    [double]$AeroHeatScale = -1
+)
+
+$ErrorActionPreference = 'Stop'
 
 # ============================================================
-# CONSTANTS (must match THERMAL_TOPOLOGY in the Lua file)
+# CONSTANTS (must match live THERMAL_TOPOLOGY)
 # ============================================================
-$AERO_HEAT_SCALE      = 0.55    # aero portion efficiency vs mechanical load
 $AERO_SPEED_START_MS  = 15.0    # m/s  (~54 km/h)
-$AERO_SPEED_FULL_MS   = 56.0    # m/s  (~202 km/h)
+$AERO_SPEED_FULL_MS   = 52.0    # m/s  (~187 km/h) — live (was 56)
 $AERO_MAX_FRAC        = 0.48    # max fraction of load assumed aero at full speed
+$SCALE_A              = 0.55    # current mute
+$SCALE_B              = 1.0     # mute-off
 
 # load_kg non-linear curve (mirrors Lua)
 function Get-LoadKg([double]$loadN) {
@@ -24,103 +33,115 @@ function Get-LoadKg([double]$loadN) {
     return $lkg
 }
 
-# aero ramp at a given airspeed
 function Get-AeroRamp([double]$speedMs) {
     $range = [Math]::Max(1.0, $AERO_SPEED_FULL_MS - $AERO_SPEED_START_MS)
     $ramp  = [Math]::Max(0.0, [Math]::Min(1.0, ($speedMs - $AERO_SPEED_START_MS) / $range))
     return $ramp
 }
 
-# thermal load fraction
-function Get-ThermalLoadFrac([double]$speedMs) {
+function Get-ThermalLoadFrac([double]$speedMs, [double]$scale) {
     $ramp    = Get-AeroRamp $speedMs
     $frac    = $ramp * $AERO_MAX_FRAC
-    $thermal = 1.0 - $frac * (1.0 - $AERO_HEAT_SCALE)
+    $thermal = 1.0 - $frac * (1.0 - $scale)
     return $thermal
 }
 
-# ============================================================
-# SWEEP TABLE: speed vs thermal load fraction
-# ============================================================
-Write-Host ""
-Write-Host "=== AERO HEAT DISCOUNT: speed sweep ===" -ForegroundColor Cyan
-Write-Host ("  {0,-18} {1,-12} {2,-14} {3,-14} {4,-12}" -f "Speed","AeroRamp","AeroFrac","ThermalFrac","Discount%")
-Write-Host ("-" * 72)
+function Show-SpeedSweep([double]$scale, [string]$label) {
+    Write-Host ""
+    Write-Host ("=== AERO HEAT DISCOUNT: speed sweep  [{0}  aeroHeatScale={1}] ===" -f $label, $scale) -ForegroundColor Cyan
+    Write-Host ("  {0,-18} {1,-12} {2,-14} {3,-14} {4,-12}" -f "Speed","AeroRamp","AeroFrac","ThermalFrac","Discount%")
+    Write-Host ("-" * 72)
+    foreach ($kmh in @(0, 50, 80, 100, 130, 160, 200, 250, 300)) {
+        $ms      = $kmh / 3.6
+        $ramp    = Get-AeroRamp $ms
+        $frac    = $ramp * $AERO_MAX_FRAC
+        $tFrac   = Get-ThermalLoadFrac $ms $scale
+        $disc    = (1 - $tFrac) * 100
+        Write-Host ("  {0,-8} km/h ({1:F1} m/s)   ramp={2:F3}  aeroFrac={3:F3}  thermal={4:F3}  -{5:F1}%" -f $kmh, $ms, $ramp, $frac, $tFrac, $disc)
+    }
+}
 
-foreach ($kmh in @(0, 50, 80, 100, 130, 160, 200, 250, 300)) {
-    $ms      = $kmh / 3.6
-    $ramp    = Get-AeroRamp $ms
-    $frac    = $ramp * $AERO_MAX_FRAC
-    $tFrac   = Get-ThermalLoadFrac $ms
-    $disc    = (1 - $tFrac) * 100
-    Write-Host ("  {0,-8} km/h ({1:F1} m/s)   ramp={2:F3}  aeroFrac={3:F3}  thermal={4:F3}  -{5:F1}%" -f $kmh, $ms, $ramp, $frac, $tFrac, $disc)
+function Get-ScintillaCase([double]$scale) {
+    # Scintilla GT rear corner @ 200 km/h (high-DF proxy)
+    $staticLoad  = 3100.0
+    $aeroExtra   = 520.0
+    $totalLoad   = $staticLoad + $aeroExtra
+    $speedMs     = 200.0 / 3.6
+    $load_kg_base = Get-LoadKg $staticLoad
+    $load_kg_full = Get-LoadKg $totalLoad
+    $thermalFrac  = Get-ThermalLoadFrac $speedMs $scale
+    $load_kg_thermal = $load_kg_full * $thermalFrac
+    $rawRatio = $load_kg_full / $load_kg_base
+    $thermalRatio = $load_kg_thermal / $load_kg_base
+    return [pscustomobject]@{
+        scale = $scale
+        staticN = $staticLoad
+        totalN = $totalLoad
+        loadKgBase = [math]::Round($load_kg_base, 2)
+        loadKgFull = [math]::Round($load_kg_full, 2)
+        thermalFrac = [math]::Round($thermalFrac, 4)
+        loadKgTh = [math]::Round($load_kg_thermal, 2)
+        aeroAddsHeatPct = [math]::Round(($thermalRatio - 1.0) * 100.0, 2)
+        rawAeroAddsPct = [math]::Round(($rawRatio - 1.0) * 100.0, 2)
+        aeroRamp = [math]::Round((Get-AeroRamp $speedMs), 4)
+    }
+}
+
+$scales = if ($AeroHeatScale -ge 0) { @($AeroHeatScale) } else { @($SCALE_A, $SCALE_B) }
+$labels = @{
+    ([string]$SCALE_A) = 'A (mute ON)'
+    ([string]$SCALE_B) = 'B (mute OFF)'
+}
+
+Write-Host ""
+Write-Host "=== Test-DownforceHeat soft-sim (script-side; Lua untouched) ===" -ForegroundColor Cyan
+Write-Host ("  knobs: aeroHeatSpeedStart={0}  aeroHeatSpeedFull={1}  aeroHeatMaxFrac={2}" -f `
+    $AERO_SPEED_START_MS, $AERO_SPEED_FULL_MS, $AERO_MAX_FRAC)
+
+foreach ($s in $scales) {
+    $lab = if ($labels.ContainsKey([string]$s)) { $labels[[string]$s] } else { "scale=$s" }
+    Show-SpeedSweep $s $lab
 }
 
 # ============================================================
-# SOFT-SIM: before/after delta for Scintilla GT at 200 km/h
-#   Assumptions:
-#     - Static corner load:  ~3100 N  (1250 kg car / 4 wheels * 9.81)
-#     - Aero rear corner:    ~520 N   (est. ~2000 N total rear aero @ 200 km/h)
-#     - Total rear loadRaw:  ~3620 N
+# SOFT-SIM: Scintilla GT A/B at 200 km/h
 # ============================================================
 Write-Host ""
-Write-Host "=== SOFT-SIM: Scintilla GT rear corner at 200 km/h ===" -ForegroundColor Cyan
-
-$staticLoad  = 3100   # N
-$aeroExtra   = 520    # N estimated rear-corner aero addition @ 200 km/h
-$totalLoad   = $staticLoad + $aeroExtra
-$speedKmh    = 200
-$speedMs     = $speedKmh / 3.6
-
-$load_kg_base = Get-LoadKg $staticLoad
-$load_kg_full = Get-LoadKg $totalLoad
-$thermalFrac  = Get-ThermalLoadFrac $speedMs
-$load_kg_thermal = $load_kg_full * $thermalFrac
-
-Write-Host ("  Static load:           {0,6} N  → load_kg = {1:F1}" -f $staticLoad, $load_kg_base)
-Write-Host ("  Static+aero load:      {0,6} N  → load_kg = {1:F1}" -f $totalLoad,  $load_kg_full)
-Write-Host ("  Thermal load (scaled): {0,6} N  → load_kg_thermal = {1:F1}  (×{2:F3})" -f $totalLoad, $load_kg_thermal, $thermalFrac)
+Write-Host "=== SOFT-SIM: Scintilla GT rear corner @ 200 km/h ===" -ForegroundColor Cyan
+$rows = foreach ($s in $scales) { Get-ScintillaCase $s }
+$r0 = $rows[0]
+Write-Host ("  Static load:           {0,6} N  -> load_kg = {1:F1}" -f $r0.staticN, $r0.loadKgBase)
+Write-Host ("  Static+aero load:      {0,6} N  -> load_kg = {1:F1}" -f $r0.totalN,  $r0.loadKgFull)
+Write-Host ("  Raw aero heat lift (no mute): +{0:F1}% vs static-only" -f $r0.rawAeroAddsPct)
 Write-Host ""
+Write-Host ("  {0,-16} {1,8} {2,12} {3,12} {4,14}" -f 'Case','scale','thermFrac','load_kg_th','aeroHeat+%')
+Write-Host ("  " + ('-' * 66))
+foreach ($r in $rows) {
+    $lab = if ($labels.ContainsKey([string]$r.scale)) { $labels[[string]$r.scale] } else { "scale=$($r.scale)" }
+    Write-Host ("  {0,-16} {1,8:F2} {2,12:F3} {3,12:F1} {4,13:F1}%" -f `
+        $lab, $r.scale, $r.thermalFrac, $r.loadKgTh, $r.aeroAddsHeatPct)
+}
 
-$rawRatio      = $load_kg_full / $load_kg_base
-$thermalRatio  = $load_kg_thermal / $load_kg_base
-$rawDeltaPct   = ($rawRatio - 1) * 100
-$thermalDeltaPct = ($thermalRatio - 1) * 100
+if ($rows.Count -ge 2) {
+    $a = $rows | Where-Object { [math]::Abs($_.scale - $SCALE_A) -lt 1e-9 } | Select-Object -First 1
+    $b = $rows | Where-Object { [math]::Abs($_.scale - $SCALE_B) -lt 1e-9 } | Select-Object -First 1
+    if ($a -and $b) {
+        $liftTh = (($b.loadKgTh / [math]::Max(0.01, $a.loadKgTh)) - 1.0) * 100.0
+        $liftHeat = $b.aeroAddsHeatPct - $a.aeroAddsHeatPct
+        Write-Host ""
+        Write-Host "=== A(0.55) vs B(1.0) DELTA ===" -ForegroundColor Yellow
+        Write-Host ("  load_kg_thermal B/A:     +{0:F1}%  ({1:F1} -> {2:F1})" -f $liftTh, $a.loadKgTh, $b.loadKgTh)
+        Write-Host ("  aero heat-lift vs static: A +{0:F1}%  B +{1:F1}%  (B-A = +{2:F1} pp)" -f `
+            $a.aeroAddsHeatPct, $b.aeroAddsHeatPct, $liftHeat)
+        Write-Host ("  thermalFrac:              A {0:F3}  B {1:F3}  (ramp={2:F3} @200km/h)" -f `
+            $a.thermalFrac, $b.thermalFrac, $a.aeroRamp)
+        Write-Host '  Caveat: analytical load_kg_thermal only - not full skin/carcass eq soft-sim.'
+        Write-Host '          Use Test-StraightLineSpeedSweep -AeroHeatScale for eq temps.'
+    }
+}
 
-Write-Host ("  BEFORE (no discount): aero adds {0:F1}% more heat generation" -f $rawDeltaPct) -ForegroundColor Yellow
-Write-Host ("  AFTER  (discounted):  aero adds {0:F1}% more heat generation" -f $thermalDeltaPct) -ForegroundColor Green
 Write-Host ""
-Write-Host ("  Reduction in aero thermal impact: {0:F1} percentage points" -f ($rawDeltaPct - $thermalDeltaPct)) -ForegroundColor Cyan
-
-# ============================================================
-# VERDICT
-# ============================================================
-Write-Host ""
-Write-Host "=== VERDICT ===" -ForegroundColor Cyan
-$verdict = if ($rawDeltaPct -gt 12) { "Too aggressive (pre-fix)" } else { "OK" }
-Write-Host ("  Pre-fix aero heat delta: {0:F1}%  → {1}" -f $rawDeltaPct, $verdict) -ForegroundColor ($rawDeltaPct -gt 12 ? "Red" : "Green")
-$verdict2 = if ($thermalDeltaPct -ge 3 -and $thermalDeltaPct -le 10) { "GOOD (still meaningful)" } else { "CHECK" }
-Write-Host ("  Post-fix aero heat delta: {0:F1}%  → {1}" -f $thermalDeltaPct, $verdict2) -ForegroundColor ($verdict2 -eq "GOOD (still meaningful)" ? "Green" : "Yellow")
-
-# ============================================================
-# PARAMETERS CHANGED
-# ============================================================
-Write-Host ""
-Write-Host "=== CHANGES TO luukstyrethermalsandwear.lua ===" -ForegroundColor Cyan
-Write-Host "  THERMAL_TOPOLOGY additions:"
-Write-Host "    aeroHeatScale      = 0.55  (aero load thermal efficiency; was effectively 1.0)"
-Write-Host "    aeroHeatSpeedStart = 15.0  m/s  (~54 km/h)"
-Write-Host "    aeroHeatSpeedFull  = 56.0  m/s  (~200 km/h)"
-Write-Host "    aeroHeatMaxFrac    = 0.48  (max aero fraction of total load at peak speed)"
-Write-Host ""
-Write-Host "  New variable in CalcTyreThermals():"
-Write-Host "    load_kg_thermal = load_kg * (1 - aeroFrac * (1 - aeroHeatScale))"
-Write-Host "    Replaces load_kg in: loadCoeff (skin), loadRrHeat, flexWarmHeat, flexExcess"
-Write-Host "    Does NOT change: loadRaw/loadN (grip), flexWarmLoad gate (onset behavior)"
-Write-Host ""
-Write-Host "  GUI stream additions:"
-Write-Host "    guiStream.totalDownforceN  – estimated total aero downforce (N) all wheels"
-Write-Host "    guiStream.aeroFracPct      – speed-based aero fraction %"
-Write-Host "    entry.aeroLoadN            – per-wheel estimated aero load (N)"
-Write-Host ""
-Write-Host "Done." -ForegroundColor Green
+Write-Host '=== LIVE TOPOLOGY (reference; not modified) ===' -ForegroundColor Cyan
+Write-Host '  aeroHeatScale=0.55  aeroHeatSpeedStart=15  aeroHeatSpeedFull=52  aeroHeatMaxFrac=0.48'
+Write-Host '  load_kg_thermal = load_kg * (1 - aeroRamp * maxFrac * (1 - aeroHeatScale))'
+Write-Host 'Done.' -ForegroundColor Green
