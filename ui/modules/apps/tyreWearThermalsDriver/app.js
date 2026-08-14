@@ -9,8 +9,8 @@ angular.module("beamng.apps")
                             height: 100%;
                             max-height: 100%;
                             min-height: 0;
-                            background: rgba(18, 22, 28, 0.90);
-                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            background: rgba(18, 22, 28, 0.52);
+                            border: 1px solid rgba(255, 255, 255, 0.06);
                             border-radius: 6px;
                             box-sizing: border-box;
                             font-family: "Lucida Console", Monaco, monospace;
@@ -37,11 +37,12 @@ angular.module("beamng.apps")
                         }
                         .ttd-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                            gap: 8px;
+                            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                            gap: 6px;
                         }
                         .ttd-card {
-                            background: rgba(30, 41, 59, 0.6);
+                            background: rgba(30, 41, 59, 0.38);
+                            min-width: 0;
                             border: 1px solid rgba(255, 255, 255, 0.04);
                             border-radius: 5px;
                             padding: 8px;
@@ -328,6 +329,7 @@ angular.module("beamng.apps")
                 }
 
                 function prepareWheelTemps(w) {
+                    if (!w) return;
                     var t = w.temp || [];
                     w.surfaceTemps = ensureArr3(w.surfaceTemps, t[0], t[1], t[2]);
                 }

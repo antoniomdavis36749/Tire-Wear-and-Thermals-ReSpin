@@ -9,17 +9,18 @@ angular.module("beamng.apps")
                             height: 100%;
                             max-height: 100%;
                             min-height: 0;
-                            background: rgba(18, 22, 28, 0.90);
-                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            background: rgba(8, 12, 18, 0.96);
+                            border: 1px solid rgba(255, 255, 255, 0.18);
                             border-radius: 6px;
                             box-sizing: border-box;
                             font-family: "Lucida Console", Monaco, monospace;
-                            color: #f1f5f9;
+                            color: #f8fafc;
                             overflow-x: hidden;
                             overflow-y: auto;
                             -webkit-overflow-scrolling: touch;
                             padding: 9px;
                             pointer-events: auto;
+                            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
                         }
                         .tth-header {
                             display: flex;
@@ -32,24 +33,24 @@ angular.module("beamng.apps")
                             flex-wrap: wrap;
                         }
                         .tth-title {
-                            font-size: 11px;
+                            font-size: 15px;
                             font-weight: bold;
                             letter-spacing: 1.2px;
                             color: #f59e0b;
                         }
                         .tth-header-meta {
-                            font-size: 9px;
-                            color: #94a3b8;
+                            font-size: 13px;
+                            color: #e2e8f0;
                             letter-spacing: 0.4px;
                         }
                         .tth-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                             gap: 10px;
                         }
                         .tth-card {
-                            background: rgba(30, 41, 59, 0.6);
-                            border: 1px solid rgba(255, 255, 255, 0.04);
+                            background: rgba(15, 23, 42, 0.92);
+                            border: 1px solid rgba(255, 255, 255, 0.14);
                             border-radius: 5px;
                             padding: 9px;
                             box-sizing: border-box;
@@ -63,14 +64,15 @@ angular.module("beamng.apps")
                             margin-bottom: 7px;
                         }
                         .tth-wheel-name {
-                            font-size: 12px;
+                            font-size: 16px;
                             font-weight: bold;
                             color: #38bdf8;
                         }
                         .tth-compound-tag {
-                            font-size: 9px;
-                            background: rgba(56, 189, 248, 0.12);
-                            border: 1px solid rgba(56, 189, 248, 0.2);
+                            font-size: 13px;
+                            background: rgba(56, 189, 248, 0.22);
+                            border: 1px solid rgba(56, 189, 248, 0.45);
+                            color: #e0f2fe;
                             padding: 1px 5px;
                             border-radius: 3px;
                             text-transform: uppercase;
@@ -80,23 +82,24 @@ angular.module("beamng.apps")
                             display: flex;
                             justify-content: space-between;
                             margin-bottom: 4px;
-                            font-size: 10px;
+                            font-size: 14px;
                         }
                         .tth-label {
-                            color: #94a3b8;
+                            color: #cbd5e1;
                         }
                         .tth-value {
                             font-weight: bold;
+                            color: #ffffff;
                         }
                         .tth-section-label {
-                            font-size: 9px;
+                            font-size: 13px;
                             color: #f59e0b;
                             margin-top: 7px;
                             letter-spacing: 0.4px;
                         }
                         .tth-section-label-muted {
-                            font-size: 9px;
-                            color: #94a3b8;
+                            font-size: 13px;
+                            color: #e2e8f0;
                             margin-top: 7px;
                             margin-bottom: 1px;
                         }
@@ -106,21 +109,21 @@ angular.module("beamng.apps")
                             grid-template-columns: repeat(3, 1fr);
                             gap: 3px;
                             margin: 5px 0;
-                            height: 21px;
+                            height: 30px;
                         }
                         .tth-thermal-segment {
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            font-size: 10px;
+                            font-size: 14px;
                             font-weight: bold;
                             border-radius: 3px;
-                            text-shadow: 1px 1px 1px rgba(0,0,0,0.85);
+                            text-shadow: 0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,1);
                         }
                         /* Progress and Health Bars */
                         .tth-bar-container {
                             width: 100%;
-                            background: rgba(255, 255, 255, 0.05);
+                            background: rgba(255, 255, 255, 0.16);
                             border-radius: 3px;
                             height: 5px;
                             overflow: hidden;
@@ -128,6 +131,15 @@ angular.module("beamng.apps")
                         }
                         .tth-bar-fill {
                             height: 100%;
+                        }
+                        /* Capture-focused test channels (Patch/Heat, drive gates, slip) */
+                        .tth-test-channels .tth-stat-row {
+                            font-size: 15px;
+                            margin-bottom: 5px;
+                        }
+                        .tth-test-channels .tth-section-label {
+                            font-size: 14px;
+                            margin-top: 9px;
                         }
                         /* Symmetrical Diagnostics Dashboard */
                         .tth-diagnostics-grid {
@@ -139,18 +151,18 @@ angular.module("beamng.apps")
                             padding-top: 7px;
                         }
                         .tth-diagnostic-item {
-                            font-size: 9px;
+                            font-size: 13px;
                         }
                         .tth-diag-label {
-                            color: #64748b;
+                            color: #cbd5e1;
                             display: block;
                             margin-bottom: 2px;
-                            font-size: 8px;
+                            font-size: 14px;
                             letter-spacing: 0.4px;
                         }
                         .tth-footer {
-                            font-size: 8px;
-                            color: #64748b;
+                            font-size: 14px;
+                            color: #cbd5e1;
                             text-align: right;
                             margin-top: 6px;
                         }
@@ -162,13 +174,14 @@ angular.module("beamng.apps")
                             Env {{ (envTemp||0).toFixed(2) }}°C · Track {{ (trackTemp||0).toFixed(2) }}°C · Rain {{ (rainState||0).toFixed(2) }}% · Film {{ (waterFilm||0).toFixed(2) }}%
                         </span>
                         <span class="tth-header-meta">
-                            <span style="color: #64748b;">Aero ↓</span>
+                            <span style="color: #cbd5e1;">Aero ↓</span>
                             <span style="color: #f59e0b; font-weight: bold;">{{ totalDownforceKN }} kN</span>
-                            <span style="color: #64748b; font-size: 8px;">({{ (aeroFracPct||0).toFixed(2) }}% of load)</span>
+                            <span style="color: #cbd5e1; font-size: 14px;">({{ (aeroFracPct||0).toFixed(2) }}% of load)</span>
                         </span>
-                        <span class="tth-header-meta" style="width: 100%; color: #64748b;">
+                        <span class="tth-header-meta" style="width: 100%; color: #cbd5e1;">
                             Elev {{ (elevationM||0).toFixed(2) }}m · ToD {{ timeOfDay }} · Cloud {{ (cloudCover||0).toFixed(2) }}% · Wake {{ (packWake||0).toFixed(2) }}% · Δair {{ (packAirDelta||0).toFixed(2) }}°
                             · Stream {{ (streamHz||0).toFixed(0) }} Hz · EnvΔ {{ (envTempRange||0).toFixed(2) }}°
+                            · Stint {{ (stintKm||0).toFixed(2) }} km · Odo {{ (odoKm||0).toFixed(2) }} km
                         </span>
                     </div>
 
@@ -182,19 +195,29 @@ angular.module("beamng.apps")
                                     <span class="tth-compound-tag" ng-if="w.purpose">{{ formatPurpose(w.purpose) }}</span>
                                 </span>
                             </div>
-                            <div class="tth-stat-row" ng-if="w.profile1 || w.profile2" style="font-size: 8px; margin-top: -3px;">
+                            <div class="tth-stat-row" ng-if="w.profile1 || w.profile2" style="font-size: 14px; margin-top: -3px;">
                                 <span class="tth-label">Profiles</span>
-                                <span class="tth-value" style="font-size: 8px; color: #94a3b8;">
+                                <span class="tth-value" style="font-size: 14px; color: #e2e8f0;">
                                     {{ formatProfile(w.profile1) }} → {{ formatProfile(w.profile2) }}
                                 </span>
                             </div>
-                            <div class="tth-stat-row" ng-if="w.classifyReason" style="font-size: 8px; margin-top: -2px;">
+                            <div class="tth-stat-row" ng-if="w.classifyReason" style="font-size: 14px; margin-top: -2px;">
                                 <span class="tth-label">Classify</span>
-                                <span class="tth-value" style="font-size: 8px; color: #64748b;">{{ w.classifyReason }}</span>
+                                <span class="tth-value" style="font-size: 14px; color: #cbd5e1;">{{ w.classifyReason }}</span>
                             </div>
-                            <div class="tth-stat-row" ng-if="w.dutyMods" style="font-size: 8px; margin-top: -2px;">
+                            <div class="tth-stat-row" ng-if="w.dutyMods" style="font-size: 14px; margin-top: -2px;">
                                 <span class="tth-label">Duty mods</span>
-                                <span class="tth-value" style="font-size: 8px; color: #64748b;">{{ formatDutyMods(w.dutyMods) }}</span>
+                                <span class="tth-value" style="font-size: 14px; color: #cbd5e1;">{{ formatDutyMods(w.dutyMods) }}</span>
+                            </div>
+                            <div class="tth-stat-row" style="font-size: 14px; margin-top: -2px;">
+                                <span class="tth-label">Heat knobs</span>
+                                <span class="tth-value" style="font-size: 13px; color: #fbbf24;">
+                                    air{{ (w.airCoolRate||0).toFixed(3) }}
+                                    · vel×{{ (w.skinVelCoolScale!==undefined ? w.skinVelCoolScale : 1).toFixed(2) }}
+                                    · g0{{ (w.workHeatG0!==undefined ? w.workHeatG0 : 0.22).toFixed(2) }}
+                                    · slip{{ (w.slipHeatRate||0).toFixed(1) }}/work{{ (w.workHeatRate||0).toFixed(1) }}
+                                    · trk{{ (w.trackCondMult!==undefined ? w.trackCondMult : 1).toFixed(2) }}
+                                </span>
                             </div>
 
                             <!-- Structural Condition -->
@@ -232,7 +255,7 @@ angular.module("beamng.apps")
                                           ng-style="coldSetWarnStyle(w)">
                                         {{ coldSetWarnChip(w) }}
                                     </span>
-                                    <span style="font-size: 8px; color: #64748b;">
+                                    <span style="font-size: 14px; color: #cbd5e1;">
                                         (Cold: {{ (w.coldPressure || w.initialPressure || 0).toFixed(2) }} / Hot tgt: {{ (w.targetHotPressure || w.optimalPressure || 0).toFixed(2) }}
                                         · r{{ (w.pressureRatio || 0).toFixed(2) }}
                                         · Lua {{ (w.luaPressure !== undefined ? w.luaPressure : w.pressure || 0).toFixed(1) }}
@@ -245,7 +268,7 @@ angular.module("beamng.apps")
                             <!-- Zone wear O|M|I -->
                             <div class="tth-stat-row" style="margin-top: 4px;" ng-if="w.zoneCondition">
                                 <span class="tth-label">Zone Wear O|M|I:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 13px;">
                                     {{ (w.zoneCondition[0]||0).toFixed(0) }}% |
                                     {{ (w.zoneCondition[1]||0).toFixed(0) }}% |
                                     {{ (w.zoneCondition[2]||0).toFixed(0) }}%
@@ -265,15 +288,16 @@ angular.module("beamng.apps")
                                 <span class="tth-label">Temp State / Opt:</span>
                                 <span class="tth-value">
                                     <span ng-style="{'color': tempCategoryColor(w.tempCategory)}">{{ w.tempCategory || 'Normal' }}</span>
-                                    <span style="color:#64748b;"> · avg {{ (w.avgTemp||0).toFixed(2) }}° / opt {{ (w.working_temp||0).toFixed(2) }}°</span>
+                                    <span style="color:#cbd5e1;"> · avg {{ (w.avgTemp||0).toFixed(2) }}° / opt {{ (w.working_temp||0).toFixed(2) }}°</span>
                                 </span>
                             </div>
 
-                            <!-- SURFACE CONTACT DATA -->
+                            <!-- SURFACE CONTACT + TEST CHANNELS (capture-sized fonts) -->
+                            <div class="tth-test-channels">
                             <div class="tth-section-label">SURFACE CONTACT</div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Material / Class:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ w.surfaceName || '—' }} · {{ formatProfile(w.surfaceType) }}
                                 </span>
                             </div>
@@ -283,7 +307,7 @@ angular.module("beamng.apps")
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Depth / Rough / Flags:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ (w.contactDepth||0).toFixed(2) }}m · r{{ (w.rough||0).toFixed(2) }}
                                     <span ng-if="w.airborne" style="color:#38bdf8;"> · AIR</span>
                                     <span ng-if="w.underWater" style="color:#38bdf8;"> · H2O</span>
@@ -291,10 +315,10 @@ angular.module("beamng.apps")
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Patch / Heat / DepthBoost:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ (w.patchFrac||0).toFixed(3) }} × {{ (w.patchHeatScale||1).toFixed(2) }}
                                     · boost{{ (w.depthHeatBoost||1).toFixed(2) }}
-                                    <span style="color:#64748b;">
+                                    <span style="color:#cbd5e1;">
                                         · Hz{{ (w.hertzArea||0).toFixed(4) }} / defl{{ (w.deflArea||0).toFixed(4) }}
                                         · blend{{ (w.depthBlend||0).toFixed(2) }}
                                     </span>
@@ -307,6 +331,7 @@ angular.module("beamng.apps")
                                         DUAL {{ (w.dualContactBlend||0).toFixed(2) }}
                                     </span>
                                 </span>
+                            </div>
                             </div>
 
                             <!-- Skin Thermal Distribution (Outer | Middle | Inner) -->
@@ -341,7 +366,7 @@ angular.module("beamng.apps")
                                 <span class="tth-value" ng-style="{'color': getTempColor(w.brakeSurface, 400)}">
                                     {{ (w.brakeSurface !== undefined ? w.brakeSurface : 0).toFixed(2) }} /
                                     {{ (w.brakeCore !== undefined ? w.brakeCore : 0).toFixed(2) }} °C
-                                    <span style="font-size: 8px; color: #64748b;">
+                                    <span style="font-size: 14px; color: #cbd5e1;">
                                         · η{{ ((w.brakeThermalEfficiency !== undefined ? w.brakeThermalEfficiency : 1) * 100).toFixed(0) }}%
                                     </span>
                                 </span>
@@ -349,7 +374,7 @@ angular.module("beamng.apps")
 
                             <div class="tth-stat-row">
                                 <span class="tth-label">Brake→rim soak:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 13px;">
                                     {{ ((w.brakeSoakRateCs !== undefined ? w.brakeSoakRateCs : 0) >= 0 ? '+' : '') }}{{ (w.brakeSoakRateCs !== undefined ? w.brakeSoakRateCs : 0).toFixed(2) }} °C/s
                                     · duct air×{{ (w.ductAirCoolFactor !== undefined ? w.ductAirCoolFactor : 1).toFixed(2) }}
                                     / soak×{{ (w.ductSoakCondFactor !== undefined ? w.ductSoakCondFactor : 1.15).toFixed(2) }}
@@ -371,6 +396,7 @@ angular.module("beamng.apps")
                             </div>
 
                             <!-- TEST / PHYSICS CHANNELS -->
+                            <div class="tth-test-channels">
                             <div class="tth-section-label">TEST CHANNELS</div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Drive heat gate S/C:</span>
@@ -381,7 +407,7 @@ angular.module("beamng.apps")
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Street slip scale / util nudge:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     ×{{ (w.streetSlipScale !== undefined ? w.streetSlipScale : 1).toFixed(2) }}
                                     · util{{ (w.utilNudge !== undefined ? w.utilNudge : 1).toFixed(2) }}
                                 </span>
@@ -402,21 +428,22 @@ angular.module("beamng.apps")
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Slip E / long / side:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ (w.slipEnergy||0).toFixed(2) }} / {{ (w.longSlip||0).toFixed(2) }} / {{ (w.sideSlip||0).toFixed(2) }}
                                 </span>
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Susp z / vel / stress:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ (w.suspCompressionMm || 0).toFixed(2) }}mm · {{ (w.suspVel||0).toFixed(2) }}m/s · {{ (w.suspStress||0).toFixed(2) }}
                                 </span>
                             </div>
                             <div class="tth-stat-row">
                                 <span class="tth-label">Bump / Droop / Rdyn:</span>
-                                <span class="tth-value" style="font-size: 9px;">
+                                <span class="tth-value" style="font-size: 14px;">
                                     {{ (w.suspBumpMm || 0).toFixed(2) }} / {{ (w.suspDroopMm || 0).toFixed(2) }} mm · {{ (w.dynamicRadius||0).toFixed(2) }}m
                                 </span>
+                            </div>
                             </div>
 
                             <!-- Distinct surface modes -->
@@ -498,7 +525,9 @@ angular.module("beamng.apps")
                     cloudCover: 0,
                     packWake: 0,
                     packAirDelta: 0,
-                    envTempRange: 0
+                    envTempRange: 0,
+                    stintKm: 0,
+                    odoKm: 0
                 };
                 var WHEEL_LERP_KEYS = [
                     "condition", "tyreGrip", "pressure", "pressureRatio", "camber", "toe", "avgTemp",
@@ -512,6 +541,8 @@ angular.module("beamng.apps")
                     "muStatic", "muSlide", "contactDepth", "rough",
                     "patchFrac", "patchHeatScale", "depthHeatBoost", "hertzArea", "deflArea", "depthBlend",
                     "streetSlipScale", "utilNudge", "dualContactBlend",
+                    "airCoolRate", "skinVelCoolScale", "workHeatG0", "slipHeatRate", "workHeatRate",
+                    "trackCondMult", "staticCoolRate",
                     "clog", "graining", "blistering", "flatspot", "leak", "waterFilm",
                     "stintFade", "ductPercent", "luaPressure", "nativePressure", "pressureDelta"
                 ];
@@ -530,6 +561,8 @@ angular.module("beamng.apps")
                 scope.packAirDelta = 0;
                 scope.streamHz = 30;
                 scope.envTempRange = 0;
+                scope.stintKm = 0;
+                scope.odoKm = 0;
                 scope._dfN = 0;
                 scope._tod = 0;
 
@@ -868,6 +901,12 @@ angular.module("beamng.apps")
                     prev = scope.envTempRange;
                     scope.envTempRange = lerpNum(scope.envTempRange, targetMeta.envTempRange, alpha);
                     if (scope.envTempRange !== prev) moved = true;
+                    prev = scope.stintKm;
+                    scope.stintKm = lerpNum(scope.stintKm, targetMeta.stintKm, alpha);
+                    if (scope.stintKm !== prev) moved = true;
+                    prev = scope.odoKm;
+                    scope.odoKm = lerpNum(scope.odoKm, targetMeta.odoKm, alpha);
+                    if (scope.odoKm !== prev) moved = true;
 
                     var n = Math.min(scope.wheels.length, targetWheels.length);
                     for (i = 0; i < n; i++) {
@@ -958,6 +997,8 @@ angular.module("beamng.apps")
                     targetMeta.packWake = dataStream.packWake !== undefined ? dataStream.packWake : targetMeta.packWake;
                     targetMeta.packAirDelta = dataStream.packAirDelta !== undefined ? dataStream.packAirDelta : targetMeta.packAirDelta;
                     targetMeta.envTempRange = dataStream.envTempRange !== undefined ? dataStream.envTempRange : targetMeta.envTempRange;
+                    targetMeta.stintKm = dataStream.stintKm !== undefined ? dataStream.stintKm : targetMeta.stintKm;
+                    targetMeta.odoKm = dataStream.odoKm !== undefined ? dataStream.odoKm : targetMeta.odoKm;
 
                     if (dataStream.streamHz !== undefined) scope.streamHz = dataStream.streamHz;
 
@@ -982,6 +1023,8 @@ angular.module("beamng.apps")
                         scope.packWake = targetMeta.packWake;
                         scope.packAirDelta = targetMeta.packAirDelta;
                         scope.envTempRange = targetMeta.envTempRange;
+                        scope.stintKm = targetMeta.stintKm;
+                        scope.odoKm = targetMeta.odoKm;
                         applyDisplayMeta();
                         if (!scope.$$phase) {
                             scope.$evalAsync(angular.noop);

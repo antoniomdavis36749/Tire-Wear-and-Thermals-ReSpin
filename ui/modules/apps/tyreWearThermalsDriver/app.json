@@ -14,12 +14,13 @@
   "category": "Telemetry",
   "isAuxiliary": false,
   "interactive": "yes",
+  "preserveAspectRatio": false,
   "css": {
     "left": "0px",
     "top": "0px",
     "width": "340px",
     "height": "400px",
-    "min-width": "280px",
-    "min-height": "240px"
+    "min-width": "140px",
+    "min-height": "100px"
   }
 }

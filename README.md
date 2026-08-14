@@ -30,11 +30,13 @@ BeamNG requires the runtime folders below; do not rename them.
 | `lua/common/extensions/` | Shared utilities |
 | `scripts/luukstyrethermalsandwear/` | Mod entry (`modscript.lua`) |
 | `ui/modules/apps/` | In-game tyre HUD apps |
+| `vehicles/common/` | Optional compatibility tire JBeams (`*_Respin`) — see `COMPAT_TIRES.md` |
 | `mod_info/` | BeamNG resource metadata |
 | `tools/` | Dev soft-sims, WC lap triggers, fixtures — not required to play |
 | `.vscode/settings.json` | Editor Lua language-server config only |
 
-See `tools/README.md` for soft-sim / telemetry workflow.
+See `tools/README.md` for soft-sim / telemetry workflow.  
+Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`**.
 
 ## Publishing
 
@@ -46,7 +48,8 @@ Build a correctly nested release zip (excludes `tools/` and the WC lap harness):
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'
 ```
 
-Repo listing copy-paste text: **`LISTING.md`**.
+Repo listing copy-paste text: **`LISTING.md`**.  
+Compatibility tires inventory (for future updates): **`COMPAT_TIRES.md`**.
 
 ## Brake coupling (non-goals)
 
