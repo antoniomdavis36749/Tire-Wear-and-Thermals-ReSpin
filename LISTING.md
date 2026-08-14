@@ -88,23 +88,44 @@ GNU Affero General Public License v3 — see the [I]license[/I] file in the pack
 
 ---
 
-## Screenshot plan (still needed)
+## Screenshot / gallery plan (Repo page)
 
-Aim for **≥2** clear images on the listing:
+Yes — BeamNG Repo listings support **multiple images** with **captions/descriptions** on the resource page (upload gallery + optional notes in the description BBCode).
 
-1. **UI + car** — Crew or Classic app visible while driving (temps / wear readable)
-2. **Tuning ducts** — Brakes category showing Front/Rear duct sliders
-3. Optional: **before/after heat** — inner/center/outer rings after a hard lap
-4. Optional: **Pitwall diagnostics** — engineer view with stint/odo + heat knobs
+### Locked heroes (use these)
 
-Keep the current `mod_info/TWTRS_RESPIN/icon.jpg` or replace with a cleaner square icon when you have one.
+| Image | Resource | Caption / description (paste on upload) |
+| --- | --- | --- |
+| `mod_info/TWTRS_RESPIN/images/listing_hero.jpg` (icon: `icon.jpg`) | **Core** ReSpin | **ReSpin** — Tire wear, thermals & grip for BeamNG.drive. Open-source continuation of Luuk + Redux. |
+| `mod_info/TWTRS_RESPIN/images/ui_four_apps.jpg` | **Core** ReSpin | **Four UI tiers in one shot** — Pitwall (full engineer), Crew (carcass + stint fade), Driver (quick read), and Classic (compact I/C/O temps). Pick the density you need. |
+| `mod_info/TWTRS_RESPIN/images/ducts.jpg` | **Core** ReSpin | **Brake cooling ducts** — Tuning → Brakes → Front/Rear Cooling Ducts (1% = closed, 100% = open). Saved with the vehicle `.pc`. |
+| `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`) | **Compat Tires** companion | **ReSpin Tires** — Optional selectable `*_Respin` GT3 tire JBeams (meshes stay in the car mods). Install beside core ReSpin. |
+
+Masters (do not restyle without unlock): `tools/listing/locked/respin-core-hero.jpg`, `respin-compat-hero.jpg`, `respin-ui-four-apps.jpg`, `respin-ducts.jpg`.
+
+### Gallery captions — the four apps (from `ui_four_apps.jpg`)
+
+Use as one image with this description, or split into bullets in the listing body:
+
+1. **Pitwall** (left) — Full engineer telemetry: environment, per-tire tread/grip/PSI, surface vs carcass heat, brakes/rim soak, test channels.
+2. **Crew** (top right) — Four-corner crew view with tread, grip, PSI, temp state, and surface heat maps.
+3. **Driver** (middle right) — Streamlined driver HUD: condition, grip, pressure, heat bars.
+4. **Classic** (bottom right) — Compact inner/center/outer temperature blocks per axle.
+
+Exposure on the source capture was pulled down for listing readability; UI panels were kept intact.
+
+Gallery order tip: hero → `ui_four_apps` → `ducts`.
 
 ---
 
 ## Thumbnail / icon
 
-`mod_info/TWTRS_RESPIN/icon.jpg` is an original ReSpin thumbnail (generated tyre/pit close-up, no team/sponsor logos).
-`icon-redux-reference.jpg` is the old Redux-carried reference kept locally for comparison (do not ship if you prefer only the new icon — packer includes `icon.jpg` only via the mod_info folder copy; exclude the reference before packing if present).
+Locked poster icons replace the older tyre/pit thumbnail:
+
+- Core: `mod_info/TWTRS_RESPIN/icon.jpg`
+- Compat: `mod_info/TWTRS_COMPAT/icon.jpg`
+
+`icon-redux-reference.jpg` (if present locally) is archive-only — do not ship.
 
 ## Credits note
 

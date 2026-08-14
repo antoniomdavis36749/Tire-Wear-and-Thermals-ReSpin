@@ -60,7 +60,7 @@ Player zip should contain only runtime content. Dev tooling must not ship.
 - [x] Document compatibility tires (`COMPAT_TIRES.md`); companion zip + `TWTRS_COMPAT` metadata
 - [x] Clean-zip smoke: core Apps visible when `vehicles/` is **not** in the core package
 - [x] Smoke-test Respin Soft/Med/Hard on Scintilla GT3 (WCU Track 15°C) — band locked
-- [ ] Smoke-test Pigniteon ETKC Respin parts before advertising that companion specifically
+- [ ] Smoke-test Pigniteon ETKC Respin parts before advertising that companion specifically (optional; Scintilla path confirmed)
 
 ## C. Identity & metadata (new Repo resource)
 
@@ -73,7 +73,7 @@ Do **not** reuse Redux’s resource identity. This is a new listing derived from
 - [x] Removed Redux `resource_id` / `MXFQY32S5` / foreign owner fields / stale hashes
 - [x] Local placeholder tagid `TWTRS_RESPIN` (Repo will assign official tag on upload)
 - [x] BeamNG forum username confirmed: `antoniomdavis36749`
-- [ ] Icon / preview images (≥2 screenshots — see `LISTING.md` shot plan)
+- [x] Icon / preview images — locked heroes + four-UI in-game gallery (`ui_four_apps.jpg`); optional ducts shot still nice-to-have
 - [ ] Category confirmed on upload form
 - [x] Prefix: Alpha (street/wet still open; race Soft/Med/Hard band locked)
 
@@ -98,11 +98,12 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 
 - [x] Use `tools/scripts/Pack-Release.ps1` (POSIX paths; core without `vehicles/`; auto companion zip)
 - [x] Core zip roots: `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` — **no** `vehicles/`
-- [ ] Compat zip roots: `vehicles/`, `mod_info/TWTRS_COMPAT/` — JBeams only, no meshes
-- [ ] Install **core alone** → Apps appear; install **compat alongside** → Respin tires selectable
-- [ ] Clear cache if needed; check `BeamNG.log` for missing files
-- [ ] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam`
+- [x] Compat zip roots: `vehicles/`, `mod_info/TWTRS_COMPAT/` — JBeams only, no meshes
+- [x] Install **core + compat** → Apps still appear; Respin tires selectable (Scintilla confirmed 2026-08-14)
+- [x] No missing meshes on Respin tire swap; HUD classifies Soft/Med/Hard correctly
+- [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam`
 - [ ] Tag / commit both artifacts from the same git revision before Repo upload
+- [ ] Optional: Pigniteon ETKC Respin parts smoke before advertising that companion specifically
 
 ## F. Repo submission
 
