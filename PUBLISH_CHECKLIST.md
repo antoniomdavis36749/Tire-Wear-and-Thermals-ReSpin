@@ -39,6 +39,7 @@ Live Belasco / WCU Track ~15°C protocol (~4 laps / ~22 km). Soft compound knobs
 - [x] Credit **lucky4luuk** (original, open source — cite authorship) and **Zesty_Maple98** (Redux) — `CREDITS.md`, `NOTICE`, README, app authors, listing text
 - [x] Luuk: open-source release; authorship citation required (stated in listing)
 - [x] Zesty_Maple98 official permission received (stated in listing)
+- [x] Scintilla GT3 listing photo-mode stills — courtesy permission obtained (stated in `CREDITS.md` / `LISTING.md`)
 - [x] Confirm BeamNG forum username: `antoniomdavis36749`
 - [x] Link **your** GitHub source on the listing (`LISTING.md` / `info.json`)
 

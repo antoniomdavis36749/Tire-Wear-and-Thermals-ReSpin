@@ -26,3 +26,7 @@ ReSpin may ship **JBeam-only** selectable clones (`*_Respin`) in a **separate Co
 
 - **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 - **Pigniteon ETK Racing** — credit per that pack’s Repo listing
+
+## Listing imagery
+
+Repo heroes / gallery stills that show the **Civetta Scintilla GT3** are in-game photo-mode captures of that pack. **Courtesy permission** was obtained from the pack authors for ReSpin listing use. ReSpin does not redistribute their meshes, textures, or sounds.

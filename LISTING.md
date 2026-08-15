@@ -160,11 +160,11 @@ Yes — BeamNG Repo listings support **multiple images** with **captions/descrip
 
 | Image | Resource | Caption / description (paste on upload) |
 | --- | --- | --- |
-| `mod_info/TWTRS_RESPIN/images/listing_hero.jpg` (icon: `icon.jpg`) | **Core** ReSpin | **ReSpin** — Tire wear, thermals & grip for BeamNG.drive. Open-source continuation of Luuk + Redux. |
+| `mod_info/TWTRS_RESPIN/images/listing_hero.jpg` (icon: `icon.jpg`) | **Core** ReSpin | **ReSpin** — Tire wear, thermals & grip for BeamNG.drive. Open-source continuation of Luuk + Redux. Vehicle: Scintilla GT3 Racing Parts (listing stills used with author permission). |
 | `mod_info/TWTRS_RESPIN/images/ui_four_apps.jpg` | **Core** ReSpin | **Four UI tiers in one shot** — Pitwall (full engineer), Crew (carcass + stint fade), Driver (quick read), and Classic (compact I/C/O temps). Pick the density you need. |
 | `mod_info/TWTRS_RESPIN/images/ducts.jpg` | **Core** ReSpin | **Brake cooling ducts** — Tuning → Brakes → Front/Rear Cooling Ducts (1% = closed, 100% = open). Saved with the vehicle `.pc`. |
 | `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`) | **Compat Tires** companion | **ReSpin Tires** — Optional selectable `*_Respin` GT3 tire JBeams (meshes stay in the car mods). Install beside core ReSpin. |
-| `mod_info/TWTRS_RESPIN/images/tire_thermal_map.jpg` (draft) | **Core** ReSpin (optional 4th gallery) | **Tire thermal map** — Inner / center / outer tread + surface, carcass, and rim-soak callouts (same Hirochi / ring language as the hero). |
+| `mod_info/TWTRS_RESPIN/images/tire_thermal_map.jpg` (draft) | **Core** ReSpin (optional 4th gallery) | **Tire thermal map** — Inner / center / outer tread in Pitwall colors (cyan-teal cooler, green usable, amber hotter) plus surface, carcass, and rim-soak callouts. |
 
 Masters (do not restyle without unlock): `tools/listing/locked/respin-core-hero.jpg`, `respin-compat-hero.jpg`, `respin-ui-four-apps.jpg`, `respin-ducts.jpg`. Draft (not locked): `tools/listing/drafts/respin-tire-thermal-map.jpg`.
 
@@ -196,6 +196,7 @@ Locked poster icons replace the older tyre/pit thumbnail:
 
 - **lucky4luuk** — original work released as open source; cite authorship.
 - **Zesty_Maple98** — Redux expansion; permission received for this ReSpin.
+- **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — courtesy permission for listing photo-mode stills that show that vehicle. Meshes stay in their pack.
 
 ## Compatibility tires (optional companions — not ReSpin authors)
 
