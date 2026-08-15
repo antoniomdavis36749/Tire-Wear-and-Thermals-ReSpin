@@ -104,7 +104,7 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 - [x] Install **core + compat** → Apps still appear; Respin tires selectable (Scintilla confirmed 2026-08-14)
 - [x] No missing meshes on Respin tire swap; HUD classifies Soft/Med/Hard correctly
 - [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam`
-- [ ] Tag / commit both artifacts from the same git revision before Repo upload
+- [x] Tag / commit both artifacts from the same git revision before Repo upload (packed from 7735a6e / main merge)
 - [ ] Optional: Pigniteon ETKC Respin parts smoke before advertising that companion specifically
 
 ## F. Repo submission (two resources)

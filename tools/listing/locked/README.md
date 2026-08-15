@@ -18,3 +18,5 @@ Shipped copies:
 - `mod_info/TWTRS_COMPAT/icon.jpg` (512) + `images/listing_hero.jpg` (1280)
 
 Regen icons from masters if needed; do not replace masters without an explicit unlock.
+
+Draft (not locked — candidate core gallery #4): `../drafts/respin-tire-thermal-map.jpg` — tire close-up thermal diagram (I/C/O + surface / carcass / rim soak).

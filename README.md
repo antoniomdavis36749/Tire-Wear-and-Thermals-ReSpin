@@ -15,7 +15,8 @@ Source lineage remains AGPL-3.0 (see `license`). Thank you to both authors for r
 
 ### Related links
 
-- Redux / discussion: https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/
+- ReSpin discussion: https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/
+- Redux / upstream discussion: https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/
 - Redux source (upstream): https://github.com/ample-samples/tyre-thermals-and-wear
 
 ## Layout

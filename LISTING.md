@@ -79,6 +79,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 [HR][/HR]
 [B]Links[/B]
 Source: [URL]https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin[/URL]
+Discussion (ReSpin): [URL]https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/[/URL]
 Discussion (upstream Redux thread): [URL]https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/[/URL]
 Original: [URL]https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/[/URL]
 Redux: [URL]https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/[/URL]
@@ -134,6 +135,7 @@ BeamNG mounts vehicle-classified packages at [I]vehicles/[/I] only. Compat tires
 • Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 • Pigniteon ETK Racing — credit per that pack’s Repo listing
 • AGPL-3.0 — same lineage as core ReSpin. Source: [URL]https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin[/URL]
+• Discussion / feedback & compat suggestions: [URL]https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/[/URL]
 ```
 
 Gallery for this listing: `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`).
@@ -162,8 +164,9 @@ Yes — BeamNG Repo listings support **multiple images** with **captions/descrip
 | `mod_info/TWTRS_RESPIN/images/ui_four_apps.jpg` | **Core** ReSpin | **Four UI tiers in one shot** — Pitwall (full engineer), Crew (carcass + stint fade), Driver (quick read), and Classic (compact I/C/O temps). Pick the density you need. |
 | `mod_info/TWTRS_RESPIN/images/ducts.jpg` | **Core** ReSpin | **Brake cooling ducts** — Tuning → Brakes → Front/Rear Cooling Ducts (1% = closed, 100% = open). Saved with the vehicle `.pc`. |
 | `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`) | **Compat Tires** companion | **ReSpin Tires** — Optional selectable `*_Respin` GT3 tire JBeams (meshes stay in the car mods). Install beside core ReSpin. |
+| `mod_info/TWTRS_RESPIN/images/tire_thermal_map.jpg` (draft) | **Core** ReSpin (optional 4th gallery) | **Tire thermal map** — Inner / center / outer tread + surface, carcass, and rim-soak callouts (same Hirochi / ring language as the hero). |
 
-Masters (do not restyle without unlock): `tools/listing/locked/respin-core-hero.jpg`, `respin-compat-hero.jpg`, `respin-ui-four-apps.jpg`, `respin-ducts.jpg`.
+Masters (do not restyle without unlock): `tools/listing/locked/respin-core-hero.jpg`, `respin-compat-hero.jpg`, `respin-ui-four-apps.jpg`, `respin-ducts.jpg`. Draft (not locked): `tools/listing/drafts/respin-tire-thermal-map.jpg`.
 
 ### Gallery captions — the four apps (from `ui_four_apps.jpg`)
 
