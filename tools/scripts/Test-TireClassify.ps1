@@ -90,6 +90,10 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'drag'; $classifyReason = 'standalone_drag'; $descriptor = 'Drag'
   } elseif ($nameLower -match 'drift') {
     $purpose = 'drift'; $classifyReason = 'standalone_drift'; $descriptor = 'Drift'
+  } elseif ($nameLower -like '*track_day*') {
+    $purpose = 'street'; $classifyReason = 'track_day_name'; $descriptor = 'Track Day'
+  } elseif ($nameLower -like '*sport_plus*') {
+    $purpose = 'street'; $classifyReason = 'sport_plus_name'; $descriptor = 'Sport Plus'
   } elseif ($nameLower -match 'rain|wet|inter') {
     $purpose = 'wet'; $classifyReason = 'standalone_rain'; $descriptor = 'Wet'
   } elseif ($nameLower -match 'vintage|biasply|bias_ply|whitewall') {
@@ -101,8 +105,10 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
   } elseif ($treadCoef -le 0.20) {
     $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
-  } elseif ($treadCoef -le 0.42) {
+  } elseif ($treadCoef -le 0.32) {
     $purpose = 'street'; $classifyReason = 'street_spectrum'; $descriptor = 'Sport Plus'
+  } elseif ($treadCoef -le 0.42) {
+    $purpose = 'street'; $classifyReason = 'street_spectrum'; $descriptor = 'Track Day'
   } elseif ($treadCoef -le 0.58) {
     $purpose = 'street'; $classifyReason = 'street_spectrum'; $descriptor = 'Sport'
   } elseif ($treadCoef -le 0.72) {
@@ -218,12 +224,24 @@ $cases = @(
   @{ name='Street sport'; tire='tire_F_225_45_17_sport'; tread=0.50
     parts=@()
     expectDesc='Sport'; expectPurpose='street'; expectReason='street_spectrum' }
-  @{ name='Street sport_plus'; tire='tire_F_245_40_18_sport'; tread=0.35
+  @{ name='Street sport_plus'; tire='tire_F_245_40_18_sport_plus'; tread=0.40
     parts=@()
-    expectDesc='Sport Plus'; expectPurpose='street'; expectReason='street_spectrum' }
-  @{ name='Street sport_tour anchor'; tire='tire_F_235_40_18_sport'; tread=0.40
+    expectDesc='Sport Plus'; expectPurpose='street'; expectReason='sport_plus_name' }
+  @{ name='Street track_day name'; tire='tire_F_235_40_18_Respin_track_day'; tread=0.40
     parts=@()
-    expectDesc='Sport Plus'; expectPurpose='street'; expectReason='street_spectrum' }
+    expectDesc='Track Day'; expectPurpose='street'; expectReason='track_day_name' }
+  @{ name='Street track_day JBeam tread 0.18'; tire='tire_F_235_40_18_Respin_track_day'; tread=0.18
+    parts=@()
+    expectDesc='Track Day'; expectPurpose='street'; expectReason='track_day_name' }
+  @{ name='Street track_day tread'; tire='tire_F_235_40_18_sport'; tread=0.40
+    parts=@()
+    expectDesc='Track Day'; expectPurpose='street'; expectReason='street_spectrum' }
+  @{ name='Street Respin hard_slick C2'; tire='tire_F_235_40_18_Respin_hard_slick'; tread=0.00
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
+  @{ name='Street Respin medium_slick C3'; tire='tire_F_235_40_18_Respin_medium_slick'; tread=0.00
+    parts=@()
+    expectDesc='Slick'; expectPurpose='circuit'; expectReason='slick_spectrum' }
   @{ name='Street standard mid'; tire='tire_F_205_55_16_standard'; tread=0.60
     parts=@()
     expectDesc='Standard'; expectPurpose='street'; expectReason='street_spectrum' }

@@ -237,8 +237,47 @@ angular.module("beamng.apps")
                     ctx.fillText(footerText, cx, y + rowH - footerH * 0.25);
                 }
 
+                var boundVehId = null;
+                var boundResetGen = null;
+                function resetRespinStreamBind() {
+                    boundVehId = null;
+                    boundResetGen = null;
+                }
+                function acceptRespinStream(dataStream) {
+                    if (!dataStream || !dataStream.data || dataStream.mpRemote) return false;
+                    var id = dataStream.vehId;
+                    if (id === undefined || id === null) return true;
+                    if (boundVehId === null) {
+                        boundVehId = id;
+                        if (dataStream.resetGen !== undefined && dataStream.resetGen !== null) {
+                            boundResetGen = dataStream.resetGen;
+                        }
+                        return true;
+                    }
+                    if (id !== boundVehId) return false;
+                    var gen = dataStream.resetGen;
+                    if (gen !== undefined && gen !== null && boundResetGen !== null && gen < boundResetGen) {
+                        return false;
+                    }
+                    return true;
+                }
+                function isRespinLifeReset(dataStream) {
+                    var gen = dataStream.resetGen;
+                    if (gen === undefined || gen === null) return false;
+                    if (boundResetGen === null) {
+                        boundResetGen = gen;
+                        return false;
+                    }
+                    if (gen > boundResetGen) {
+                        boundResetGen = gen;
+                        return true;
+                    }
+                    return false;
+                }
+
                 function renderData(dataStream) {
-                    if (!dataStream || !dataStream.data) return;
+                    if (!acceptRespinStream(dataStream)) return;
+                    isRespinLifeReset(dataStream);
 
                     ctx.setTransform(1, 0, 0, 1, 0, 0); 
                     ctx.clearRect(0, 0, c.width, c.height);
@@ -253,6 +292,8 @@ angular.module("beamng.apps")
                     }
                 }
 
+                scope.$on("VehicleChange", resetRespinStreamBind);
+                scope.$on("VehicleFocusChanged", resetRespinStreamBind);
                 scope.$on("TyreWearThermals", function (event, dataStream) {
                     renderData(dataStream);
                 });

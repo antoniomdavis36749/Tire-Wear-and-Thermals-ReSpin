@@ -121,13 +121,13 @@ function Get-DynamicPsi([double]$initialPsi, [double]$airTempC, [double]$initial
   return [math]::Max(0.1, $warmAbs - 14.696)
 }
 
-# sport_plus live anchors (PROFILE_POINTS tread 0.30) -- feel lock
+# sport_plus live anchors (PROFILE_POINTS tread 0.30) -- HEAT PASS #7
 $sp = @{
   Name = 'sport_plus'
   OptP = 31.0; Sens = 0.75; Compliance = 0.45; CamberSens = 1.1; ScrubSens = 1.15
-  WearRate = 0.0006; SlipHeat = 8.2; WorkHeat = 3.8; RollingRes = 0.70
-  TOpt = 76.0; AirCool = 0.029; StaticCool = 0.095; SkinCore = 0.088
-  React = 1.3; TreadInertia = 0.441; GripMult = 1.02; LatMult = 0.97; DryGrip = 1.02
+  WearRate = 0.0006; SlipHeat = 19.5; WorkHeat = 12.0; RollingRes = 0.70
+  TOpt = 76.0; AirCool = 0.016; StaticCool = 0.055; SkinCore = 0.088
+  React = 1.3; TreadInertia = 0.441; GripMult = 1.00; LatMult = 0.97; DryGrip = 1.00
   Baseline = 1.12 + 0.22 - 0.08  # continuum peak coeffs for sport_plus
 }
 

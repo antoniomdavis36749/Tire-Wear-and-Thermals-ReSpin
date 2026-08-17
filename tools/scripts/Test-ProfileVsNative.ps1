@@ -34,8 +34,8 @@ $SOFTCAP_OFF        = @{ heatMin = 1.00; propMin = 1.00; highV = 1.00; label = '
 
 # Character cold/hot grip powers (live CHARACTER_*)
 $CHAR_NEUTRAL     = @{ coldP = 1.35; hotP = 2.00 }
-$CHAR_SPORT_MID   = @{ coldP = 1.33; hotP = 2.06 }
-$CHAR_SPORT_PLUS  = @{ coldP = 1.32; hotP = 2.12 }
+$CHAR_SPORT_MID   = @{ coldP = 1.33; hotP = 2.20 }
+$CHAR_SPORT_PLUS  = @{ coldP = 1.32; hotP = 2.28 }
 $CHAR_SLICK_HARD  = @{ coldP = 1.40; hotP = 2.15 }
 $CHAR_SLICK_MED   = @{ coldP = 1.38; hotP = 2.20 }
 $CHAR_SLICK_SOFT  = @{ coldP = 1.36; hotP = 2.28 }
@@ -145,8 +145,8 @@ $profiles = New-Object System.Collections.Generic.List[object]
 
 # ===== PROFILE_POINTS (street continuum) =====
 $pp = @(
-  @{ a=0.30; p='sport_plus';  gm=1.02; dry=1.02; lat=0.97; long=1.0; tOpt=76; plat=14; wc=52; wh=50; fl=0.24; ad=0.52; comp=0.45; slip=7.75; work=3.6; sc=$SOFTCAP_SPORT_PLUS; ch=$CHAR_SPORT_PLUS },
-  @{ a=0.40; p='sport_tour';   gm=1.01; dry=1.02; lat=0.985; long=1.0; tOpt=71; plat=16; wc=63; wh=52.5; fl=0.29; ad=0.47; comp=0.475; slip=8.15; work=4.25; sc=$SOFTCAP_SPORT_MID; ch=$CHAR_SPORT_MID },
+  @{ a=0.30; p='sport_plus';  gm=1.04; dry=1.04; lat=1.02; long=1.05; tOpt=76; plat=14; wc=52; wh=32; fl=0.24; ad=0.52; comp=0.45; slip=19.5; work=12.0; sc=$SOFTCAP_SPORT_PLUS; ch=$CHAR_SPORT_PLUS },
+  @{ a=0.40; p='track_day';    gm=1.02; dry=1.02; lat=1.0; long=1.04; tOpt=76; plat=16; wc=64; wh=52; fl=0.28; ad=0.444; comp=0.42; slip=10.53; work=6.09; sc=$SOFTCAP_SPORT_MID; ch=$CHAR_SPORT_MID },
   @{ a=0.50; p='sport';       gm=1.00; dry=1.02; lat=1.0; long=1.0; tOpt=66; plat=18; wc=74; wh=55; fl=0.34; ad=0.42; comp=0.50; slip=8.55; work=4.95; sc=$SOFTCAP_STREET; ch=$CHAR_SPORT_MID },
   @{ a=0.60; p='standard';    gm=1.00; dry=1.01; lat=1.0; long=1.0; tOpt=63; plat=17; wc=66; wh=55; fl=0.30; ad=0.41; comp=0.55; slip=8.25; work=4.85; sc=$SOFTCAP_STREET; ch=$CHAR_NEUTRAL },
   @{ a=0.70; p='standard';    gm=1.00; dry=1.00; lat=1.0; long=1.0; tOpt=60; plat=16; wc=58; wh=55; fl=0.26; ad=0.40; comp=0.60; slip=7.9; work=4.8; sc=$SOFTCAP_STREET; ch=$CHAR_NEUTRAL },
@@ -340,7 +340,7 @@ foreach ($fam in @('PROFILE','SLICK','UTILITY','COMMERCIAL','ATV_UTV','VINTAGE',
 # ---- Special callouts ----
 Out ''
 Out '--- SPECIAL: STREET CONTINUUM vs native ---'
-foreach ($id in @('PP_t0.70_standard','PP_t0.50_sport','PP_t0.40_sport_tour','PP_t0.30_sport_plus')) {
+foreach ($id in @('PP_t0.70_standard','PP_t0.50_sport','PP_t0.40_track_day','PP_t0.30_sport_plus')) {
   $r = $rows | Where-Object { $_.Id -eq $id } | Select-Object -First 1
   if ($r) {
     Out ("  {0}: peak={1:n3} ({2}) cold20={3:n3} polyPk={4:n3} slip/work={5:n2}/{6:n2}" -f `
