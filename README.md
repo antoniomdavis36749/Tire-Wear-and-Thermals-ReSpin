@@ -31,20 +31,20 @@ BeamNG requires the runtime folders below; do not rename them.
 | `lua/common/extensions/` | Shared utilities |
 | `scripts/luukstyrethermalsandwear/` | Mod entry (`modscript.lua`) |
 | `ui/modules/apps/` | In-game tyre HUD apps |
-| `vehicles/common/` | Optional compatibility tire JBeams (`*_Respin`) — companion zip only; see `COMPAT_TIRES.md` |
+| `vehicles/common/` | Optional compatibility tire JBeams (`*_Respin`) — companion zip only; public source is **[ReSpin Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)** |
 | `mod_info/TWTRS_RESPIN/` | Core ReSpin resource metadata |
-| `mod_info/TWTRS_COMPAT/` | Compat-tires companion metadata |
+| `mod_info/TWTRS_COMPAT/` | Compat-tires companion metadata (mirrors the tires repo) |
 | `tools/` | Dev soft-sims, WC lap triggers, fixtures — not required to play |
 | `.vscode/settings.json` | Editor Lua language-server config only |
 
 See `tools/README.md` for soft-sim / telemetry workflow.  
-Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`**.
+Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`** and **[Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)**.
 
 ## Publishing
 
 BeamNG Repo prep: polish on `testing/main`, merge to `main` for the public source link. See **`PUBLISH_CHECKLIST.md`**.
 
-Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a **second Repo resource** from the same git tree:
+Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a **second Repo resource**; public JBeam source is the **[ReSpin Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)** repo (this tree still vendors a copy for unpacked / Pack-Release):
 
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'

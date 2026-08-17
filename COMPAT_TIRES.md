@@ -19,16 +19,16 @@ Until upstream authors adopt stock-compatible values, these `…_Respin` parts a
 
 Enable **core ReSpin**, this companion, and the car mod. Author factory configs still mount author tires. **Scintilla extra configs** (`GT3 ReSpin Endurance/Qualify …`) appear in the Scintilla config list and already mount Respin compounds. Other cars: Parts → tires → name ending in **Respin**.
 
-## Packaging (two Repo resources — one git tree)
+## Packaging (two Repo resources — two git repos)
 
 Compat tires **cannot** ship inside the core ReSpin zip. BeamNG classifies any package that contains `vehicles/` as a vehicle mod and mounts only that folder — `ui/` / `lua/` / `scripts/` vanish and Apps disappear.
 
-**Publish plan:** upload **two** new Repo resources from the same git revision:
+Public JBeam source: **[Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)**. This core tree still vendors `vehicles/` so unpacked mono-folder installs and `Pack-Release.ps1` work.
 
-| Repo resource | Zip | Contents |
-| --- | --- | --- |
-| Tire Wear and Thermals ReSpin | `TireWearThermalsReSpin_antoniomdavis36749.zip` | `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` |
-| Tire Wear and Thermals ReSpin — Compat Tires | `TireWearThermalsReSpin_CompatTires.zip` | `vehicles/`, `mod_info/TWTRS_COMPAT/`, docs |
+| Repo resource | GitHub | Zip | Contents |
+| --- | --- | --- | --- |
+| Tire Wear and Thermals ReSpin | [Tire-Wear-and-Thermals-ReSpin](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin) | `TireWearThermalsReSpin_antoniomdavis36749.zip` | `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` |
+| Tire Wear and Thermals ReSpin — Compat Tires | [Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires) | `TireWearThermalsReSpin_CompatTires.zip` | `vehicles/`, `mod_info/TWTRS_COMPAT/`, docs |
 
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_antoniomdavis36749.zip'
@@ -36,7 +36,7 @@ Compat tires **cannot** ship inside the core ReSpin zip. BeamNG classifies any p
 # -SkipCompatTires  → core only
 ```
 
-Keep both packages on the same git revision so JBeam clones stay in sync with thermals calibration. Unpacked mono-folder installs still work for local dev (whole tree mounts). Listing copy-paste: **`LISTING.md`** (core + Compat sections).
+Unpacked mono-folder installs still work for local dev (whole tree mounts). Listing copy-paste: **`LISTING.md`** (core + Compat sections).
 
 | `vehicles/common/tires_respin_street/*.jbeam` | Gap-fill on vanilla wheels: Sport Plus / Track Day / Hard C2 / Medium C3 |
 

@@ -39,6 +39,10 @@ This is a [B]new[/B] resource (not an update to Redux). It continues the AGPL li
 
 Full attribution is also in CREDITS.md / NOTICE inside the package.
 
+[B]Listing images[/B]
+Hero / gallery stills show the [I]Civetta Scintilla GT3[/I] from [B]Scintilla GT3 Racing Parts[/B] (Exchy / Turbo49 / Cyborella et al.). Used with [B]courtesy permission[/B] from the pack authors. ReSpin does not ship that pack’s meshes, textures, or sounds.
+Vehicle mod: [URL]https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/[/URL]
+
 [HR][/HR]
 [B]Features[/B]
 • Tyre thermals driven by slip, load, camber, brakes, and surface
@@ -83,6 +87,7 @@ Discussion (ReSpin): [URL]https://www.beamng.com/threads/tire-wear-and-thermals-
 Discussion (upstream Redux thread): [URL]https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/[/URL]
 Original: [URL]https://www.beamng.com/resources/luuks-tyre-thermals-and-wear-mod.26947/[/URL]
 Redux: [URL]https://www.beamng.com/resources/tyre-wear-and-thermals-redux.29934/[/URL]
+Scintilla GT3 Racing Parts (listing vehicle / optional compat meshes): [URL]https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/[/URL]
 
 [B]License[/B]
 GNU Affero General Public License v3 — see the [I]license[/I] file in the package. Source must remain available for network-use derivatives under AGPL.
@@ -134,7 +139,8 @@ BeamNG mounts vehicle-classified packages at [I]vehicles/[/I] only. Compat tires
 [B]Legal[/B]
 • Does [B]not[/B] redistribute companion meshes, textures, or sounds.
 • Upstream car/tire authors are optional companions — not ReSpin contributors.
-• Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
+• Listing stills show the [I]Civetta Scintilla GT3[/I] with [B]courtesy permission[/B] from the pack authors.
+• Scintilla GT3 Racing Parts — [URL]https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/[/URL]
 • Pigniteon ETK Racing — credit per that pack’s Repo listing
 • AGPL-3.0 — same lineage as core ReSpin. Source: [URL]https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin[/URL]
 • Discussion / feedback & compat suggestions: [URL]https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/[/URL]
@@ -162,7 +168,7 @@ Yes — BeamNG Repo listings support **multiple images** with **captions/descrip
 
 | Image | Resource | Caption / description (paste on upload) |
 | --- | --- | --- |
-| `mod_info/TWTRS_RESPIN/images/listing_hero.jpg` (icon: `icon.jpg`) | **Core** ReSpin | **ReSpin** — Tire wear, thermals & grip for BeamNG.drive. Open-source continuation of Luuk + Redux. Vehicle: Scintilla GT3 Racing Parts (listing stills used with author permission). |
+| `mod_info/TWTRS_RESPIN/images/listing_hero.jpg` (icon: `icon.jpg`) | **Core** ReSpin | **ReSpin** — Tire wear, thermals & grip for BeamNG.drive. Vehicle: Scintilla GT3 Racing Parts (listing stills used with author permission) — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/ |
 | `mod_info/TWTRS_RESPIN/images/ui_four_apps.jpg` | **Core** ReSpin | **Four UI tiers in one shot** — Pitwall (full engineer), Crew (carcass + stint fade), Driver (quick read), and Classic (compact I/C/O temps). Pick the density you need. |
 | `mod_info/TWTRS_RESPIN/images/ducts.jpg` | **Core** ReSpin | **Brake cooling ducts** — Tuning → Brakes → Front/Rear Cooling Ducts (1% = closed, 100% = open). Saved with the vehicle `.pc`. |
 | `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon: `icon.jpg`) | **Compat Tires** companion | **ReSpin Tires** — Optional selectable `*_Respin` GT3 tire JBeams (meshes stay in the car mods). Install beside core ReSpin. |
@@ -198,7 +204,7 @@ Locked poster icons replace the older tyre/pit thumbnail:
 
 - **lucky4luuk** — original work released as open source; cite authorship.
 - **Zesty_Maple98** — Redux expansion; permission received for this ReSpin.
-- **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — courtesy permission for listing photo-mode stills that show that vehicle. Meshes stay in their pack.
+- **Scintilla GT3 Racing Parts** (Exchy / Turbo49 / Cyborella et al.) — courtesy permission for listing photo-mode stills that show that vehicle. Meshes stay in their pack: https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 
 ## Compatibility tires (optional companions — not ReSpin authors)
 
@@ -207,4 +213,4 @@ Mention on the listing when advertising the stop-gap parts; full inventory in `C
 - Scintilla GT3 Racing Parts — https://www.beamng.com/resources/scintilla-gt3-racing-parts.23027/
 - Pigniteon ETK Racing — credit the pack author as on that Repo listing
 
-Do not ship their meshes/textures inside either ReSpin zip. Compat tires are a **second BeamNG Repo resource** from the same git tree (`vehicles/common/` + `mod_info/TWTRS_COMPAT/`).
+Do not ship their meshes/textures inside either ReSpin zip. Compat tires are a **second BeamNG Repo resource**. Public JBeam source: https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires (`vehicles/common/` + `mod_info/TWTRS_COMPAT/`).
