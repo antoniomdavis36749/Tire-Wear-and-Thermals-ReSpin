@@ -60,7 +60,7 @@ Full attribution is also in CREDITS.md / NOTICE inside the package.
 2. Spawn a vehicle.
 3. Apps menu → add [B]Tyre Wear & Thermals[/B] (Driver, Classic, Crew, or Pitwall).
 4. Optional: Tuning → Brakes → Front/Rear duct opening (1% = closed, 100% = fully open).
-5. Optional (compatibility tires): install the separate Repo resource [B]Tire Wear and Thermals ReSpin — Compat Tires[/B], plus [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] for meshes. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick). Author configs still default to upstream tires.
+5. Optional (compatibility tires): install the separate Repo resource [B]Tire Wear and Thermals ReSpin — Compat Tires[/B], plus [I]Scintilla GT3[/I] or [I]Pigniteon ETK Racing[/I] for meshes. Scintilla: pick a [B]GT3 ReSpin[/B] config, or Parts → tires → [B]Respin[/B]. Author configs still default to upstream tires.
 
 [HR][/HR]
 [B]Requirements[/B]
@@ -116,7 +116,7 @@ This is [B]not[/B] a standalone thermals mod — install [B]core ReSpin[/B] firs
 1. Install / enable [B]Tire Wear and Thermals ReSpin[/B] (core — thermals + UI apps).
 2. Install / enable [B]this[/B] Compat Tires resource.
 3. Install the matching car mod for meshes (Scintilla GT3 Racing Parts and/or Pigniteon ETK Racing).
-4. Parts → tires → pick a name ending in [B]Respin[/B] (Scintilla also has Hard/Medium/Soft Slick).
+4. Scintilla: pick a [B]GT3 ReSpin[/B] config (Endurance Hard/Medium/Soft, or Qualify Supersoft). Other cars: Parts → tires → pick a name ending in [B]Respin[/B].
 
 [HR][/HR]
 [B]Why a separate Repo listing?[/B]
@@ -124,9 +124,11 @@ BeamNG mounts vehicle-classified packages at [I]vehicles/[/I] only. Compat tires
 
 [HR][/HR]
 [B]Includes[/B]
-• Scintilla GT3 Respin tires (default Soft + Hard/Medium/Soft Slick SKUs)
+• Scintilla GT3 Respin tires (Hard C2 / Medium C3 / Soft C4 / Supersoft C5)
+• Scintilla extra configs: [B]GT3 ReSpin Endurance[/B] (Hard/Medium/Soft) and [B]Qualify Supersoft[/B] — race-ready tuning + compounds, stock public restrictor
 • Pigniteon ETKC Grip-All GT3 Respin tires
 • Stock-like friction / softness for ReSpin thermal windows — author tire files unchanged
+• Car credit: Scintilla GT3 Racing Parts by Exchy / Turbo49 / Cyborella (configs are extra content, not official pack files)
 
 [HR][/HR]
 [B]Legal[/B]
@@ -148,7 +150,7 @@ Gallery for this listing: `mod_info/TWTRS_COMPAT/images/listing_hero.jpg` (icon:
 - FWD Soft-like driven-front damp locked (top of usable ~95–105)
 - AWD Soft-like driven-front damp locked (FR usable; FL harsh/brake ceiling)
 - Pitwall: stint km / odo km + heat-knob chips; capture-friendly contrast
-- Respin GT3 Hard/Medium/Soft selectable SKUs documented for companions
+- Respin GT3 Hard/Medium/Soft/Supersoft selectable SKUs + public Scintilla extra configs
 
 ---
 

@@ -17,7 +17,7 @@ Until upstream authors adopt stock-compatible values, these `…_Respin` parts a
 | Scintilla GT3 Racing Parts | `scintilla_gt3` (Exchy / MXD7VGO9K) | Scintilla Corsa S GT3 Respin tires (meshes under that mod) |
 | Pigniteon ETK Racing | `pigniteon_etk_racing` | ETKC Grip-All GT3 Respin tires (meshes under `vehicles/etkc/tires_gt3/`) |
 
-Enable **both** ReSpin and the companion. Configs still mount author tires by default — swap in Parts → Wheels/Tires.
+Enable **core ReSpin**, this companion, and the car mod. Author factory configs still mount author tires. **Scintilla extra configs** (`GT3 ReSpin Endurance/Qualify …`) appear in the Scintilla config list and already mount Respin compounds. Other cars: Parts → tires → name ending in **Respin**.
 
 ## Packaging (two Repo resources — one git tree)
 
@@ -68,6 +68,8 @@ All under `vehicles/common/`:
 | `tires_R_gt3_Respin_medium_slick.jbeam` | Scintilla GT3 — Medium Slick (C3) |
 | `tires_F_gt3_Respin_soft_slick.jbeam` | Scintilla GT3 — Soft Slick (C4) |
 | `tires_R_gt3_Respin_soft_slick.jbeam` | Scintilla GT3 — Soft Slick (C4) |
+| `tires_F_gt3_Respin_supersoft_slick.jbeam` | Scintilla GT3 — Supersoft Slick (C5) |
+| `tires_R_gt3_Respin_supersoft_slick.jbeam` | Scintilla GT3 — Supersoft Slick (C5) |
 | `tires_F_etkc_gt3_Respin.jbeam` | Pigniteon ETKC GT3 |
 | `tires_R_etkc_gt3_Respin.jbeam` | Pigniteon ETKC GT3 |
 
@@ -83,6 +85,7 @@ Author sizes use motorsport OD naming (`325/660`, `325/680`, `325/705`). Balance
 | `_Respin_hard_slick` | `… Respin Hard Slick (C2)` | `0.50` | Hard slick (~90 °C) |
 | `_Respin_medium_slick` | `… Respin Medium Slick (C3)` | `0.65` | Medium slick (~84 °C) |
 | `_Respin_soft_slick` | `… Respin Soft Slick (C4)` | `1.00` | Soft slick (~82 °C) |
+| `_Respin_supersoft_slick` | `… Respin Supersoft Slick (C5)` | `0.875` | Supersoft slick (~80 °C, qualify) |
 
 Examples:
 
@@ -106,12 +109,38 @@ Default Respin friction target (all of the above except compound variants only c
 - `treadCoef` = `0` (slick / race-like)
 - Carcass beams / radius / width / meshes copied from upstream
 
+## Public Scintilla configs (extra content)
+
+Shipped under `vehicles/scintilla/` in the Compat zip. Author permission (Turbo49 / Exchy): extra configs are fine; do **not** reuse GT3 meshes/textures. These `.pc` files target the **public Repo GT3 pack**, not a locally edited copy.
+
+| File | Compound | Notes |
+| --- | --- | --- |
+| `gt3_respin_endurance_hard.pc` | Hard C2 | Race-ready chassis (springs/ARB/dampers/rake/camber/toe/PSI) |
+| `gt3_respin_endurance_medium.pc` | Medium C3 | Same chassis, tire swap |
+| `gt3_respin_endurance_soft.pc` | Soft C4 | Same chassis, tire swap |
+| `gt3_respin_qualify_supersoft.pc` | Supersoft C5 | Same chassis; small tanks; 10 L/side; 25.5/25 PSI |
+
+Credit in each `info_*.json` Description (car authors + ReSpin setup).
+
+**Cannot carry from a local GT3 edit** (would be modifying/reusing pack assets, or the public slider/part does not exist):
+
+| Local-only | Public configs |
+| --- | --- |
+| BoP restrictor 0.92 | Stock plate (`…_full`, 0.86) |
+| Ballast 95 kg + driver 80 kg (max raised to 100) | Driver **67 kg** + ballast **80 kg** (same 80:95 ratio, public ballast cap) |
+| Steering hydro damp / damper split | Public steering (can still shake) |
+| Hood/floor aero triangle edits | Public aero |
+| Custom SSC / live TC–ABS controller | Public electronics; saved TC/ABS **numbers** still apply if those sliders exist |
+| FL/FR perch as a pad-weight tool | Perch 0; unknown vars ignored |
+
+**Does carry:** Respin tire SKUs, 220/245 springs, ARB 115k/40k, dampers, 6° wing, camber/toe/caster, 27/26.5 PSI (qualify 25.5/25), ducts, fuel, driver 67 kg + ballast 80 kg.
+
 ## Player instructions (listing-ready)
 
 1. Install **core** ReSpin (thermals + UI) **and** the **Compat Tires** companion zip.
-2. Install the matching car mod (meshes).
-3. Spawn the GT3 config.
-4. Vehicle config → Parts → tires → choose a name ending in **Respin** (and optional Hard/Medium/Soft Slick for Scintilla).
+2. Install the matching **public** car mod (meshes) — Scintilla GT3 Racing Parts from the Repo, not a private unpack with extra jbeam parts.
+3. Scintilla: pick **GT3 ReSpin Endurance Hard/Medium/Soft** or **Qualify Supersoft** in the config list.
+4. Other cars: Parts → tires → name ending in **Respin**.
 5. Save a personal `.pc` if you want it sticky.
 
 ## Legal / attribution (publish)
@@ -127,7 +156,8 @@ Default Respin friction target (all of the above except compound variants only c
 
 - Prefer unique filenames under `vehicles/common/` (`*_Respin.jbeam`) — never overwrite upstream paths.
 - Part IDs must stay unique (`*_Respin`, `*_Respin_hard_slick`, …).
-- After adding a new tire clone: update this file, `CREDITS.md`, `LISTING.md`, and rebuild **both** zips from the same commit.
+- After adding a new tire clone or public `.pc`: update this file, `CREDITS.md`, `LISTING.md`, and rebuild **both** zips from the same commit.
+- Public Scintilla configs must not reference local-only part IDs (no `…_bop` restrictor, no private meshes).
 - Smoke-test: enable core + compat zip + car mod → select Respin tire → no missing-mesh errors → HUD shows soft/medium/hard slick as expected → green window reachable on a short hotlap.
 - Author mods must remain **unmodified** in player installs; only the compat zip ships the clones.
 - Never merge `vehicles/` into the core release zip.
@@ -136,6 +166,6 @@ Default Respin friction target (all of the above except compound variants only c
 
 ```text
 Compatibility tires: optional Respin-selectable clones for Scintilla GT3 and Pigniteon ETKC GT3
-(requires those mods for meshes). Stock-like friction/softness for ReSpin thermal windows;
-author tire files unchanged.
+(requires those mods for meshes). Scintilla extra configs: GT3 ReSpin Endurance Hard/Medium/Soft
+and Qualify Supersoft (public GT3 pack + Respin compounds; stock restrictor). Author tire files unchanged.
 ```

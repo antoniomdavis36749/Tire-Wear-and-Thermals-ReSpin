@@ -24,15 +24,15 @@ function Test-HasPlainRallyDamper([string[]]$parts) {
   return $false
 }
 
-# Mirrors F.remapSlickSoftness - BeamNG 0.5/0.8/1.0 -> densified 0.50/0.65/0.80
+# Mirrors F.remapSlickSoftness - BeamNG 0.5/0.8/1.0 -> densified 0.50/0.65/0.80; 0.875 is C5
 function Get-RemapSlickSoftness([double]$softnessCoef) {
   $s = $softnessCoef
   if ($s -ne $s) { $s = 0.5 }
   if ($s -ge 0.99) { return 0.80 }
   if ([math]::Abs($s - 0.8) -le 0.012) { return 0.65 }
-  if ($s -ge 0.50 -and $s -le 0.80) { return $s }
+  if ($s -ge 0.50 -and $s -le 0.875) { return $s }
   if ($s -lt 0.50) { return 0.50 }
-  return 0.65 + (($s - 0.80) / 0.19) * 0.15
+  return 0.80 + (($s - 0.875) / 0.115) * 0.075
 }
 
 function Get-SlickBand([double]$sc) {
@@ -40,7 +40,8 @@ function Get-SlickBand([double]$sc) {
   if ($sc -le 0.6125) { return 'hard-mid' }
   if ($sc -le 0.6875) { return 'medium' }
   if ($sc -le 0.7625) { return 'medium-soft' }
-  return 'soft'
+  if ($sc -le 0.8375) { return 'soft' }
+  return 'supersoft'
 }
 
 # Returns hashtable: descriptor, purpose, classifyReason
@@ -343,6 +344,8 @@ $softCases = @(
     beforeNote='clamp 0.725 densified mid' }
   @{ name='soft=1.2 -> soft end'; soft=1.2; expectSc=0.80; expectBand='soft'
     beforeNote='clamp 0.80 soft_slick' }
+  @{ name='soft=0.875 -> supersoft C5'; soft=0.875; expectSc=0.875; expectBand='supersoft'
+    beforeNote='explicit C5 SKU (1.0 stays C4)' }
 )
 $softFail = 0
 foreach ($c in $softCases) {

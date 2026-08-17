@@ -1,9 +1,10 @@
-# Generate Hard / Medium / Soft GT3 Respin tire SKUs from the stop-gap templates.
+# Generate Hard / Medium / Soft / Supersoft GT3 Respin tire SKUs from the stop-gap templates.
 # Softness values land on distinct SLICK_SPECTRUM anchors after remapSlickSoftness:
-#   Soft   softnessCoef=1.00 -> remap 0.80 -> soft_slick
-#   Medium softnessCoef=0.65 -> remap 0.65 -> medium_slick
-#   Hard   softnessCoef=0.50 -> remap 0.50 -> hard_slick
-# Friction stays at stock race norms (1.0).
+#   Supersoft softnessCoef=0.875 -> remap 0.875 -> supersoft_slick (C5)
+#   Soft      softnessCoef=1.00  -> remap 0.80  -> soft_slick
+#   Medium    softnessCoef=0.65  -> remap 0.65  -> medium_slick
+#   Hard      softnessCoef=0.50  -> remap 0.50  -> hard_slick
+# Friction stays at stock race norms (1.0). Stock 1.0 stays C4; C5 is explicit 0.875.
 
 param(
     [string]$ModRoot = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main'
@@ -14,6 +15,15 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $common = Join-Path $ModRoot 'vehicles\common'
 
 $Band = @(
+    @{
+        Id       = 'supersoft_slick'
+        Label    = 'Supersoft Slick (C5)'
+        Softness = '0.875'
+        Pressure = '25.5'
+        Friction = '1.0'
+        ValueAdd = 10
+        Comment  = 'soft=0.875 -> supersoft_slick (C5 qualify; 1.0 stays C4)'
+    },
     @{
         Id       = 'soft_slick'
         Label    = 'Soft Slick (C4)'
@@ -114,7 +124,7 @@ foreach ($axle in @('F', 'R')) {
 }
 
 Write-Output ""
-Write-Output "Generated $generated JBeam files (3 compounds x F/R)."
-Write-Output "Part selector: ... Respin Soft/Medium/Hard Slick."
+Write-Output "Generated $generated JBeam files (4 compounds x F/R)."
+Write-Output "Part selector: ... Respin Supersoft/Soft/Medium/Hard Slick."
 Write-Output "Original tires_*_gt3_Respin.jbeam left as soft-end stop-gap (soft=1)."
-Write-Output "Classify: Soft->soft_slick, Medium->medium_slick, Hard->hard_slick."
+Write-Output "Classify: Supersoft->supersoft_slick, Soft->soft_slick, Medium->medium_slick, Hard->hard_slick."

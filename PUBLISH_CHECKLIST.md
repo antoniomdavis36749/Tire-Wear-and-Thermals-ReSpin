@@ -49,7 +49,7 @@ Player zip should contain only runtime content. Dev tooling must not ship.
 
 | Include in **core** zip | Include in **compat** zip | Exclude from both |
 | --- | --- | --- |
-| `lua/` (no lap harness) | `vehicles/` (`*_Respin` JBeams only) | `tools/`, `.vscode/`, `.git/` |
+| `lua/` (no lap harness) | `vehicles/` (`*_Respin` JBeams + public Scintilla `.pc`) | `tools/`, `.vscode/`, `.git/` |
 | `ui/`, `scripts/` | `mod_info/TWTRS_COMPAT/` | Companion car meshes/textures |
 | `mod_info/TWTRS_RESPIN/` | `COMPAT_TIRES.md`, `license`, `NOTICE`, `CREDITS.md` | `tools/output/`, soft-sim dumps |
 | docs + `COMPAT_TIRES.md` pointer | — | Old Redux `resource_id` leftovers |
@@ -101,10 +101,10 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 
 - [x] Use `tools/scripts/Pack-Release.ps1` (POSIX paths; core without `vehicles/`; auto companion zip)
 - [x] Core zip roots: `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` — **no** `vehicles/`
-- [x] Compat zip roots: `vehicles/`, `mod_info/TWTRS_COMPAT/` — JBeams only, no meshes
+- [x] Compat zip roots: `vehicles/`, `mod_info/TWTRS_COMPAT/` — JBeams + extra Scintilla `.pc`, no meshes
 - [x] Install **core + compat** → Apps still appear; Respin tires selectable (Scintilla confirmed 2026-08-14)
 - [x] No missing meshes on Respin tire swap; HUD classifies Soft/Med/Hard correctly
-- [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam`
+- [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam` plus `vehicles/scintilla/gt3_respin_*.pc`
 - [x] Tag / commit both artifacts from the same git revision before Repo upload (packed from 7735a6e / main merge)
 - [ ] Optional: Pigniteon ETKC Respin parts smoke before advertising that companion specifically
 
