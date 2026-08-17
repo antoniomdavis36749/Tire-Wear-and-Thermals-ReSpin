@@ -54,7 +54,17 @@ local function readSavedDucts(vehID)
     return front, rear
 end
 
+local function isOwnVehicle(vehID)
+    local MP = (extensions and extensions.MPVehicleGE) or _G.MPVehicleGE
+    if MP and type(MP.isOwn) == "function" and vehID then
+        local ok, own = pcall(MP.isOwn, vehID)
+        if ok and own == false then return false end
+    end
+    return true
+end
+
 local function onVehicleSpawned(vehID)
+    if not isOwnVehicle(vehID) then return end
     if not core_vehicle_manager or type(core_vehicle_manager.getVehicleData) ~= "function" then return end
     local vehicleData = core_vehicle_manager.getVehicleData(vehID)
     if not vehicleData or not vehicleData.vdata then return end

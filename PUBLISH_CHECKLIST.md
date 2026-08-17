@@ -39,6 +39,7 @@ Live Belasco / WCU Track ~15°C protocol (~4 laps / ~22 km). Soft compound knobs
 - [x] Credit **lucky4luuk** (original, open source — cite authorship) and **Zesty_Maple98** (Redux) — `CREDITS.md`, `NOTICE`, README, app authors, listing text
 - [x] Luuk: open-source release; authorship citation required (stated in listing)
 - [x] Zesty_Maple98 official permission received (stated in listing)
+- [x] Scintilla GT3 listing photo-mode stills — courtesy permission obtained (stated in `CREDITS.md` / `LISTING.md`)
 - [x] Confirm BeamNG forum username: `antoniomdavis36749`
 - [x] Link **your** GitHub source on the listing (`LISTING.md` / `info.json`)
 
@@ -46,20 +47,20 @@ Live Belasco / WCU Track ~15°C protocol (~4 laps / ~22 km). Soft compound knobs
 
 Player zip should contain only runtime content. Dev tooling must not ship.
 
-| Include in **core** zip | Include in **compat** zip | Exclude from both |
+| Include in **core** zip | Include in **compat** zip (tires repo) | Exclude from both |
 | --- | --- | --- |
-| `lua/` (no lap harness) | `vehicles/` (`*_Respin` JBeams only) | `tools/`, `.vscode/`, `.git/` |
+| `lua/` (no lap harness) | `vehicles/` (`*_Respin` JBeams + public Scintilla `.pc`) | `tools/`, `.vscode/`, `.git/` |
 | `ui/`, `scripts/` | `mod_info/TWTRS_COMPAT/` | Companion car meshes/textures |
-| `mod_info/TWTRS_RESPIN/` | `COMPAT_TIRES.md`, `license`, `NOTICE`, `CREDITS.md` | `tools/output/`, soft-sim dumps |
+| `mod_info/TWTRS_RESPIN/` | tires-repo `COMPAT_TIRES.md`, `license`, `NOTICE`, `CREDITS.md` | `tools/output/`, soft-sim dumps |
 | docs + `COMPAT_TIRES.md` pointer | — | Old Redux `resource_id` leftovers |
 
-**Why two zips:** a package that contains `vehicles/` is mounted as vehicle-only — core UI/Lua never load. Same git repo; two artifacts from `Pack-Release.ps1`.
+**Why two zips / two git repos:** a package that contains `vehicles/` is mounted as vehicle-only — core UI/Lua never load. Core testers clone this repo; vehicle parts come from [Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires).
 
 - [x] Document exclude list (this file + packer)
 - [x] Stop loading `tyreWestCoastLapTest` for players
 - [x] Ship **Pitwall** UI app (full engineer) alongside Driver / Classic / Crew
 - [x] Optional: omit `tyreWestCoastLapTest.lua` from release zip (packer excludes it; file remains in git for tools)
-- [x] Document compatibility tires (`COMPAT_TIRES.md`); companion zip + `TWTRS_COMPAT` metadata
+- [x] Document compatibility tires (`COMPAT_TIRES.md` pointer); companion lives in the tires repo
 - [x] Clean-zip smoke: core Apps visible when `vehicles/` is **not** in the core package
 - [x] Smoke-test Respin Soft/Med/Hard on Scintilla GT3 (WCU Track 15°C) — band locked
 - [ ] Smoke-test Pigniteon ETKC Respin parts before advertising that companion specifically (optional; Scintilla path confirmed)
@@ -98,18 +99,18 @@ Correct zip root = top-level game folders, **not** a parent `Tire-Wear-and-Therm
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_antoniomdavis36749.zip'
 ```
 
-- [x] Use `tools/scripts/Pack-Release.ps1` (POSIX paths; core without `vehicles/`; auto companion zip)
+- [x] Use `tools/scripts/Pack-Release.ps1` (POSIX paths; core only — no `vehicles/`)
 - [x] Core zip roots: `lua/`, `ui/`, `scripts/`, `mod_info/TWTRS_RESPIN/` — **no** `vehicles/`
-- [x] Compat zip roots: `vehicles/`, `mod_info/TWTRS_COMPAT/` — JBeams only, no meshes
+- [x] Compat zip: pack from [Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires) (`vehicles/`, `mod_info/TWTRS_COMPAT/`)
 - [x] Install **core + compat** → Apps still appear; Respin tires selectable (Scintilla confirmed 2026-08-14)
 - [x] No missing meshes on Respin tire swap; HUD classifies Soft/Med/Hard correctly
-- [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam`
-- [ ] Tag / commit both artifacts from the same git revision before Repo upload
+- [x] Confirm compat zip has **no** third-party meshes — only `vehicles/common/*_Respin*.jbeam` plus `vehicles/scintilla/gt3_respin_*.pc`
+- [x] Tag / commit both artifacts from the same git revision before Repo upload (packed from 7735a6e / main merge)
 - [ ] Optional: Pigniteon ETKC Respin parts smoke before advertising that companion specifically
 
 ## F. Repo submission (two resources)
 
-Upload **both** as **new** resources (not updates to Redux 29934). Same git revision for both zips.
+Upload **both** as **new** resources (not updates to Redux 29934). Core zip from this repo; Compat zip from the tires repo.
 
 ### F1. Core — Tire Wear and Thermals ReSpin
 
@@ -122,7 +123,7 @@ Upload **both** as **new** resources (not updates to Redux 29934). Same git revi
 
 - [x] Decision: Compat is a **second Repo resource** (not bundled / not “later only”)
 - [ ] Upload `TireWearThermalsReSpin_CompatTires.zip`
-- [ ] Paste Compat BBCode from `LISTING.md`; gallery: Compat hero
+- [ ] Paste Compat BBCode from the tires repo `LISTING.md`; gallery: Compat hero
 - [ ] Category confirmed on form (Vehicles/Parts likely)
 - [ ] After approval: note Compat URL; cross-link core ↔ Compat in both descriptions
 - [ ] Optional: Pigniteon ETKC smoke before advertising that companion in Compat listing
@@ -130,7 +131,7 @@ Upload **both** as **new** resources (not updates to Redux 29934). Same git revi
 ## G. Post-publish maintenance
 
 - [ ] Keep `main` for ongoing development; merge publish polish selectively
-- [ ] Updates: same zip filenames, bump version on **both** resources when JBeams or thermals change together
+- [ ] Updates: bump version on **both** resources when JBeams or thermals change together (core repo + tires repo)
 - [ ] When changing physics: re-test clean zip install before each update
 
 ---

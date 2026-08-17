@@ -266,12 +266,15 @@ local THERMAL_TOPOLOGY = {
     brakeCoreSoak = 0.0032,          -- was 0.0025; lag path still ≪ surf
     brakeEffSoakFloor = 0.92,        -- glazed/low-efficiency floor on soak scale (η soft only)
     brakeRadiantCoef = 2.8e-11,      -- was 2.2e-11; mild radiant bump with surf soak
-    pressureColdRefreshTau = 2.5,    -- s; soft cold-fill refresh toward native when cold
+    pressureColdRefreshTau = 2.5,    -- s; soft cold-fill refresh toward native when parked
     pressureTpmsDeadbandPsiS = 8.0,  -- |dP/dt| above this → active inflate/TPMS; skip cold refresh / hot WB
+    pressureColdRefreshParkedOnly = true, -- never adopt native while rolling (cold slicks never leave 8K window)
+    pressureColdRefreshMaxSpeed = 4.0, -- m/s vehicle speed; hop/airborne frames are NOT "parked"
     -- Safe hot PSI → native pressure-group write-back (Gay-Lussac → soft-body stiffness).
     -- Native BeamNG has no thermo→PSI; ReSpin rate-limits so warm tires stiffen without slam/TPMS fight.
     pressureHotWritebackEnable = true,       -- master switch (ON with conservative rate/deadband)
     pressureHotWritebackMaxPsiS = 0.35,      -- max |ΔPSI|/s toward Lua hot target (slow approach)
+    pressureHotWritebackRecoverPsiS = 2.5,   -- faster pull-down when native is well above thermal PSI
     pressureHotWritebackDeadbandPsi = 0.15,  -- skip setGroupPressure when |Lua−Nat| below this
 }
 local topo = THERMAL_TOPOLOGY -- module-level alias; avoids one function local in CalcTyreWear
@@ -341,9 +344,10 @@ local scratchCarcassWeights = { 0, 0, 0 }
 
   SPECTRUM INVENTORY (anchors; interpolateSpectrum lerps between neighbors)
     PROFILE_POINTS          tread 0.30/0.40/0.50/0.60/0.70/0.80/0.85/0.90/1.00
-                            sport_plus → sport_tour → sport → standard → …
-    SLICK_SPECTRUM_POINTS   softness 0.50/0.575/0.65/0.725/0.80
-                            (JBeam soft 0.5/0.8/1.0 remapped onto hard/med/soft anchors)
+                            sport_plus → track_day → sport → standard → …
+    SLICK_SPECTRUM_POINTS   softness 0.50/0.575/0.65/0.725/0.80/0.875
+                            (JBeam soft 0.5/0.8/1.0 remapped onto hard/med/soft;
+                             0.875 is supersoft C5 — stock 1.0 still remaps to 0.80)
     UTILITY_SPECTRUM        tread 0.50/0.60/0.70/0.85/0.95
     COMMERCIAL_SPECTRUM     tread 0.50/0.60/0.70/0.80/0.90
     ATV_UTV_SPECTRUM        tread 0.50/0.60/0.70/0.85
@@ -430,8 +434,13 @@ local scratchCarcassWeights = { 0, 0, 0 }
     -- no torque-fade ownership; tire-side soak/duct/read only.
     pressureColdRefreshTau / pressureTpmsDeadbandPsiS
                           Cold fill soft-refresh vs native; skip on TPMS inflate.
-    pressureHotWritebackEnable / MaxPsiS / DeadbandPsi
+    pressureColdRefreshParkedOnly / MaxSpeed
+                          Garage/pit only, using vehicle speed (not per-wheel hop).
+                          Rolling cold slicks stay in the 8K window; hop frames
+                          used to look parked and pumped Cold (27→40 PSI on fronts).
+    pressureHotWritebackEnable / MaxPsiS / RecoverPsiS / DeadbandPsi
                           Rate-limited Gay-Lussac hot PSI → setGroupPressure (soft-body).
+                          RecoverPsiS pulls native down faster when it is above thermal.
     freeBeltCoolMult      Free-belt convection bias on average skin.
     flexWarmGain (+gates) Gated flex energy into carcass (load/speed/g·slip).
     drivePropCruiseNm / ExcessFullNm / SkinCoef / Hyst* / Flex*
@@ -473,6 +482,7 @@ local scratchCarcassWeights = { 0, 0, 0 }
     blisterTempRatio    Blistering starts above opt × this (e.g. 1.55).
     grainRate           Cold-scrub grain accumulation rate (onset stays grainTempRatio).
     blisterRate         Overheat blister accumulation rate (onset stays blisterTempRatio).
+                        Sport plus/tour: brief light-slip or loaded Hot corner; not a 4s drift.
     flatSpotRate        Lockup flat-spot accumulation scale (heal stays global).
     stintFadeRate       Hot-stint fade + heat-cycle wear/grip kinetics scale (1.0 = today).
     camberWearMult      Excess-camber wear scale only (grip camber stays camberSensitivity).
@@ -551,14 +561,20 @@ local CHARACTER_NEUTRAL = {
     flatSpotRate = 0.025, stintFadeRate = 1.0, camberWearMult = 1.0,
 }
 local CHARACTER_SPORT_MID = {
-    coldGripPower = 1.33, hotGripPower = 2.06,
-    grainRate = 0.00043, blisterRate = 0.00030,
-    flatSpotRate = 0.026, stintFadeRate = 1.08, camberWearMult = 1.06,
+    coldGripPower = 1.33, hotGripPower = 2.20,
+    grainRate = 0.00043, blisterRate = 0.00045,
+    flatSpotRate = 0.026, stintFadeRate = 1.15, camberWearMult = 1.06,
+}
+-- Pass #7e blister on plus only. Track Day starts at MID (not Scintilla lock).
+local CHARACTER_TRACK_DAY = {
+    coldGripPower = 1.33, hotGripPower = 2.20,
+    grainRate = 0.00043, blisterRate = 0.00045,
+    flatSpotRate = 0.026, stintFadeRate = 1.15, camberWearMult = 1.06,
 }
 local CHARACTER_SPORT_PLUS = {
-    coldGripPower = 1.32, hotGripPower = 2.12,
-    grainRate = 0.00045, blisterRate = 0.00033,
-    flatSpotRate = 0.027, stintFadeRate = 1.15, camberWearMult = 1.10,
+    coldGripPower = 1.32, hotGripPower = 2.28,
+    grainRate = 0.00045, blisterRate = 0.00090,
+    flatSpotRate = 0.027, stintFadeRate = 1.22, camberWearMult = 1.10,
 }
 local CHARACTER_SLICK_HARD = {
     coldGripPower = 1.40, hotGripPower = 2.15,
@@ -574,6 +590,11 @@ local CHARACTER_SLICK_SOFT = {
     coldGripPower = 1.36, hotGripPower = 2.28,
     grainRate = 0.00050, blisterRate = 0.00040,
     flatSpotRate = 0.030, stintFadeRate = 1.35, camberWearMult = 1.18,
+}
+local CHARACTER_SLICK_SUPERSOFT = {
+    coldGripPower = 1.34, hotGripPower = 2.36,
+    grainRate = 0.00056, blisterRate = 0.00048,
+    flatSpotRate = 0.032, stintFadeRate = 1.50, camberWearMult = 1.22,
 }
 local CHARACTER_DRAG = {
     coldGripPower = 1.32, hotGripPower = 2.10,
@@ -604,7 +625,10 @@ end
 -- Baseline grip polynomial coeffs: grip = a + x*(b + x*(c + x*d)) with x = condition 0–1.
 -- Order matters: more specific tags BEFORE shorter substrings (sport_plus before sport).
 local DEFAULT_GRIP_COEFFS = {
-    { "sport_plus", { 1.12, 0.22, -0.08 } },  -- Semi-slick / track day peak ~1.26
+    { "sport_plus", { 1.12, 0.22, -0.08 } },  -- Semi-slick / Scintilla lock peak ~1.26
+    { "track_day", { 1.15, 0.22, -0.08 } },   -- 40% sport→hard C2 poly (~1.29)
+    { "sport_tour", { 1.15, 0.22, -0.08 } },  -- alias: renamed Track Day
+    { "supersoft_slick", { 1.46, 0.36, -0.12 } },
     { "soft_slick", { 1.42, 0.34, -0.12 } },
     { "medium_slick", { 1.38, 0.32, -0.12 } },
     { "hard_slick", { 1.34, 0.30, -0.11 } },
@@ -812,33 +836,32 @@ local STANDALONE_MODIFIERS = {
 -- Intermediate anchors (0.40 / 0.60 / 0.85) densify sport↔standard and AT↔MT leaps.
 local PROFILE_POINTS = {
     { tread = 0.30, profile = "sport_plus", mods = {
-        -- v7: tiny mechanical μ bump after Scintilla Belasco v6 retest ("a bit more grip").
-        -- gm+dry only; lat held 0.97 (not tippier); loadSens unchanged; ~+2% μ at treadCoef 0.4 blend.
-        -- Pass 5: modest slip/work cut (~5%); keep race character.
-        adhesion = 0.52, airConductionRate = 0.015, airCoolingRate = 0.029, brakeGainRate = 1.35,
+        -- Scintilla sport plus LOCKED (Belasco). HEAT #7, BLISTER #7e, GRIP v4: gm/dry 1.04,
+        -- long 1.05, lat 1.02, loadSens 0.040. HS ~2% RWD slip is accept. Do not nudge.
+        adhesion = 0.52, airConductionRate = 0.015, airCoolingRate = 0.011, brakeGainRate = 1.35,
         casingCompliance = 0.45, coreCoolRate = 0.038, coreVelCoolRate = 0.0095, skinCoreConductance = 0.088,
-        gripMultiplier = 1.02, longGripMult = 1.0, latGripMult = 0.97, loadSensitivity = 0.078,
+        gripMultiplier = 1.04, longGripMult = 1.05, latGripMult = 1.02, loadSensitivity = 0.040,
         optimalPressure = 31, optimalTemp = 76, pressureSensitivity = 0.75, rollingRes = 0.70,
-        staticCoolingRate = 0.095, slipHeatRate = 7.75, workHeatRate = 3.6, wearRate = 0.0006,
+        staticCoolingRate = 0.044, slipHeatRate = 19.5, workHeatRate = 12.0, wearRate = 0.0006,
         treadInertia = 0.441, carcassInertia = 0.714, thermalReactionRate = 1.3, tempPlateau = 14,
-        coldWidth = 52, hotWidth = 50, gripFloor = 0.24, coldWearMult = 1.908,
-        hotWearMult = 4.44, grainTempRatio = 0.78, blisterTempRatio = 1.50, waterDrainage = 0.58,
-        wetGripScale = 0.995, dryGripScale = 1.02, trackConductivityMult = 1.15, camberSensitivity = 1.1,
-        bottomOutSensitivity = 1, scrubSensitivity = 1.15
+        coldWidth = 52, hotWidth = 32, gripFloor = 0.24, coldWearMult = 1.908,
+        hotWearMult = 5.60, grainTempRatio = 0.78, blisterTempRatio = 1.22, waterDrainage = 0.58,
+        wetGripScale = 0.995, dryGripScale = 1.04, trackConductivityMult = 0.75, camberSensitivity = 1.1,
+        bottomOutSensitivity = 1, scrubSensitivity = 1.15, skinVelCoolScale = 0.35, workHeatG0 = 0.04
     } },
-    { tread = 0.40, profile = "sport_tour", mods = {
-        -- Mid sport_plus↔sport (common JBeam tread ~0.35–0.45 semislick / track-day street).
-        -- Pass 5: modest slip/work cut (~6%).
-        adhesion = 0.47, airConductionRate = 0.015, airCoolingRate = 0.0265, brakeGainRate = 1.275,
-        casingCompliance = 0.475, coreCoolRate = 0.0365, coreVelCoolRate = 0.00875, skinCoreConductance = 0.082,
-        gripMultiplier = 1.01, longGripMult = 1.0, latGripMult = 0.985, loadSensitivity = 0.057,
-        optimalPressure = 32, optimalTemp = 71, pressureSensitivity = 0.65, rollingRes = 0.76,
-        staticCoolingRate = 0.084, slipHeatRate = 8.15, workHeatRate = 4.25, wearRate = 0.000525,
-        treadInertia = 0.462, carcassInertia = 0.748, thermalReactionRate = 1.25, tempPlateau = 16,
-        coldWidth = 63, hotWidth = 52.5, gripFloor = 0.29, coldWearMult = 1.869,
-        hotWearMult = 3.71, grainTempRatio = 0.765, blisterTempRatio = 1.525, waterDrainage = 0.65,
-        wetGripScale = 1.012, dryGripScale = 1.02, trackConductivityMult = 1.075, camberSensitivity = 1.05,
-        bottomOutSensitivity = 1, scrubSensitivity = 1.125
+    { tread = 0.40, profile = "track_day", mods = {
+        -- Track Day START heat locked. GRIP v1: HS slip matched Plus (~2.1%); aim ~1.0–1.2%.
+        -- long 1.0→1.04; gm/dry 1.00→1.02; loadSens 0.066→0.048. Lat/heat/blister held.
+        adhesion = 0.444, airConductionRate = 0.015, airCoolingRate = 0.020, brakeGainRate = 1.32,
+        casingCompliance = 0.42, coreCoolRate = 0.036, coreVelCoolRate = 0.0083, skinCoreConductance = 0.090,
+        gripMultiplier = 1.02, longGripMult = 1.04, latGripMult = 1.0, loadSensitivity = 0.048,
+        optimalPressure = 31, optimalTemp = 76, pressureSensitivity = 0.71, rollingRes = 0.88,
+        staticCoolingRate = 0.068, slipHeatRate = 10.53, workHeatRate = 6.09, wearRate = 0.00073,
+        treadInertia = 0.471, carcassInertia = 0.763, thermalReactionRate = 1.22, tempPlateau = 16,
+        coldWidth = 64, hotWidth = 52, gripFloor = 0.28, coldWearMult = 1.84,
+        hotWearMult = 3.05, grainTempRatio = 0.76, blisterTempRatio = 1.59, waterDrainage = 0.43,
+        wetGripScale = 0.90, dryGripScale = 1.02, trackConductivityMult = 0.90, camberSensitivity = 1.18,
+        bottomOutSensitivity = 1.04, scrubSensitivity = 1.28, skinVelCoolScale = 0.80, workHeatG0 = 0.148
     } },
     { tread = 0.50, profile = "sport", mods = {
         -- v6: medium mechanical μ bump (mirror sport_plus v6→v7 step; Kingsnake continuum ~0.50).
@@ -1014,6 +1037,21 @@ local SLICK_SPECTRUM_POINTS = {
         hotWearMult = 4.70, grainTempRatio = 0.78, blisterTempRatio = 1.62, waterDrainage = 0,
         wetGripScale = 0.72, dryGripScale = 0.98, trackConductivityMult = 0.75, camberSensitivity = 1.55,
         bottomOutSensitivity = 1.2, scrubSensitivity = 1.75, skinVelCoolScale = 0.85, workHeatG0 = 0.04
+    } },
+    { softness = 0.875, profile = "supersoft_slick", mods = {
+        -- Supersoft C5: one 0.075 step past Soft C4 (qualify). Peakier, hotter, shorter life.
+        -- Stock JBeam 1.0 still remaps to 0.80 C4; this anchor is only softnessCoef=0.875.
+        adhesion = 0.565, airConductionRate = 0.017625, airCoolingRate = 0.014, brakeGainRate = 1.5,
+        casingCompliance = 0.205, coreCoolRate = 0.031, coreVelCoolRate = 0.0078, skinCoreConductance = 0.138,
+        gripMultiplier = 1.11, longGripMult = 1, latGripMult = 0.69, loadSensitivity = 0.135,
+        optimalPressure = 25.5, optimalTemp = 80, pressureSensitivity = 1.275, rollingRes = 1.39,
+        staticCoolingRate = 0.060, slipHeatRate = 19.5, workHeatRate = 10.7, wearRate = 0.00355,
+        rollingWearCoef = 92,
+        treadInertia = 0.3171, carcassInertia = 0.5134, thermalReactionRate = 1.615, tempPlateau = 14,
+        coldWidth = 43, hotWidth = 43, gripFloor = 0.17, coldWearMult = 2.73,
+        hotWearMult = 6.025, grainTempRatio = 0.78, blisterTempRatio = 1.59, waterDrainage = 0,
+        wetGripScale = 0.72, dryGripScale = 0.98, trackConductivityMult = 0.75, camberSensitivity = 1.60,
+        bottomOutSensitivity = 1.25, scrubSensitivity = 1.80, skinVelCoolScale = 1.00, workHeatG0 = 0.04
     } }
 }
 
@@ -1243,7 +1281,7 @@ local VINTAGE_SPECTRUM_POINTS = {
 -- (specialty / purpose-gated — Phase 5 enable pack skips circuit/drag/drift/tarmac_rally/gravel).
 stampSpectrumDriveSoftcap(PROFILE_POINTS, function(name)
     if name == "sport_plus" then return DRIVE_SOFTCAP_SPORT_PLUS end
-    if name == "sport_tour" then return DRIVE_SOFTCAP_SPORT_MID end
+    if name == "track_day" or name == "sport_tour" then return DRIVE_SOFTCAP_SPORT_MID end
     return DRIVE_SOFTCAP_STREET
 end)
 stampSpectrumDriveSoftcap(SLICK_SPECTRUM_POINTS, DRIVE_SOFTCAP_OFF)
@@ -1273,12 +1311,13 @@ end
 -- sport/slick climb blister/stint/hot cliff; winter/rain stay NEUTRAL (wet behavior intact).
 stampSpectrumCharacter(PROFILE_POINTS, function(name)
     if name == "sport_plus" then return CHARACTER_SPORT_PLUS end
-    if name == "sport_tour" then return CHARACTER_SPORT_MID end
+    if name == "track_day" or name == "sport_tour" then return CHARACTER_TRACK_DAY end
     if name == "sport" then return CHARACTER_SPORT_MID end
     return CHARACTER_NEUTRAL
 end)
 stampSpectrumCharacter(SLICK_SPECTRUM_POINTS, function(name, pt)
     local soft = (pt and pt.softness) or 0.65
+    if soft >= 0.84 or name == "supersoft_slick" then return CHARACTER_SLICK_SUPERSOFT end
     if soft >= 0.75 or name == "soft_slick" then return CHARACTER_SLICK_SOFT end
     if soft >= 0.62 or name == "medium_slick" then return CHARACTER_SLICK_MED end
     return CHARACTER_SLICK_HARD
@@ -1365,10 +1404,13 @@ local rawEnvMax = -100
 local trackEnv = { timeOfDay = 0.5, cloudCover = 0.2 }
 -- One track-surface sample per GFX frame (CalcTyreWear runs ~4×/frame; tod/cloud are slow)
 local frameTrackTemp = 21
+local frameChassisSpeed = 0 -- m/s from obj:getVelocity(); garage PSI gates must not use per-wheel hop
 
 -- High Performance Pre-allocated GUI Data Structures (Reduces GC allocations to 0 per frame)
 local guiStream = { data = {} }
 local wheelIndexMap = {}
+-- Increments on vehicle spawn / reset / deserialize so HUD drops lerp of the previous life.
+local resetGen = 0
 
 -- Local Cache states to prevent constant pattern matching / deserialization overhead
 local cachedVehicleType = nil
@@ -1380,6 +1422,44 @@ local lastEnvMailbox = nil
 
 -- Function table: one chunk local instead of N forward decls (Lua ~200 local cap)
 local F = {}
+
+-- BeamMP: own cars are "L", remotes are "R". Nil in singleplayer → full sim.
+-- Remotes must not write grip/pressure (local interpolated physics) or HUD-stream
+-- (every auto-extension was publishing TyreWearThermals with no vehicle id).
+F.isRemoteMpVehicle = function()
+    local t = (v and v.mpVehicleType) or (obj and obj.mpVehicleType)
+    return t == "R" or t == "r"
+end
+
+-- Only the vehicle the local player is seated in should feed Apps.
+F.isHudPublisher = function()
+    if F.isRemoteMpVehicle() then return false end
+    if playerInfo ~= nil and type(playerInfo.anyPlayerSeated) == "boolean" then
+        return playerInfo.anyPlayerSeated
+    end
+    return true
+end
+
+F.streamVehicleId = function()
+    return objectId or (obj and obj.getID and obj:getID()) or 0
+end
+
+-- HUD instance tag for this vehicle Lua VM (BeamNG game object id).
+F.streamTag = function()
+    return "TWTRS-" .. tostring(F.streamVehicleId())
+end
+
+F.bumpResetGen = function()
+    resetGen = (tonumber(resetGen) or 0) + 1
+    guiStream.resetGen = resetGen
+end
+
+F.stampStreamIdentity = function()
+    guiStream.vehId = F.streamVehicleId()
+    guiStream.streamTag = F.streamTag()
+    guiStream.resetGen = resetGen
+    guiStream.mpRemote = false
+end
 
 -- Dynamic Spectrum Interpolator Helper (0-Allocation In-Place Table Updates)
 F.interpolateSpectrum = function(spectrum, searchKey, value, targetTable)
@@ -1438,6 +1518,14 @@ F.copyMods = function(src, target)
     if type(src) ~= "table" then return t end
     for k, v in pairs(src) do t[k] = v end
     return t
+end
+
+F.getProfilePointMods = function(profileName)
+    for i = 1, #PROFILE_POINTS do
+        local pt = PROFILE_POINTS[i]
+        if pt and pt.profile == profileName then return pt.mods end
+    end
+    return nil
 end
 
 -- Fills missing knobs from DEFAULT_MODS (keeps spectrum interpolation stable)
@@ -1866,6 +1954,11 @@ F.getFreestreamAirspeed = function()
 end
 
 F.getVehicleAirspeedRef = function()
+    -- Chassis velocity first: electrics.airspeed can read 0 in a hop/wake while the car is at 170 mph,
+    -- which made Cold fill think we were in the garage and pump fronts 27→38 PSI.
+    if frameChassisSpeed and frameChassisSpeed > 0.5 then
+        return frameChassisSpeed
+    end
     local ev = electrics and electrics.values
     if ev then
         local a = tonumber(ev.airspeed)
@@ -2072,6 +2165,7 @@ end
 -- Used for ReSpin-owned thermal/wear leaks ONLY. Spike-strip / wd.isPunctured
 -- leaks are owned by stock wheels.lua — never call this while isPunctured.
 F.applyPressureLeakPa = function(wd, leakPaPerSec, dt)
+    if F.isRemoteMpVehicle() then return nil end
     if not wd or leakPaPerSec <= 0 or not obj then return nil end
     -- Native owns spike/puncture setGroupPressure while isPunctured (wheels.lua).
     if wd.isPunctured then return nil end
@@ -2099,6 +2193,35 @@ F.getNativeGroupPressurePSI = function(wd)
     return max(0.1, (absPa - 101325) / 6894.757)
 end
 
+-- Tuning-menu cold fill ($tirepressure_F / _R, else $tirepressure). nil if unset.
+F.getTuneColdFillPSI = function(isFront)
+    if not (v and v.data and type(v.data.variables) == "table") then return nil end
+    local keys = isFront and { "$tirepressure_F", "$tirepressure" } or { "$tirepressure_R", "$tirepressure" }
+    for _, key in ipairs(keys) do
+        local var = v.data.variables[key]
+        if type(var) == "table" and var.val ~= nil then
+            local n = tonumber(var.val)
+            if n and n > 1.0 then return n end
+        elseif type(var) == "number" and var > 1.0 then
+            return var
+        end
+    end
+    return nil
+end
+
+-- One-shot native restore (spawn / leftover write-back). Gauge PSI → absolute Pa.
+F.setNativeGroupPressurePSI = function(wd, gaugePSI)
+    if F.isRemoteMpVehicle() then return nil end
+    if not wd or not obj or type(gaugePSI) ~= "number" then return nil end
+    if type(obj.setGroupPressure) ~= "function" then return nil end
+    if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
+    local pg = v.data.pressureGroups[wd.pressureGroup]
+    if not pg then return nil end
+    local absPa = max(105000, (gaugePSI + 14.696) * 6894.757)
+    pcall(obj.setGroupPressure, obj, pg, absPa)
+    return gaugePSI
+end
+
 -- True when TPMS / tirePressureControl / inflate electrics look active (don't fight user/AI fill).
 F.isTirePressureInflateActive = function()
     local ev = electrics and electrics.values
@@ -2115,6 +2238,7 @@ end
 -- Rate-limited Gay-Lussac hot absolute Pa → native pressure group (soft-body stiffness).
 -- Deadband skips tiny deltas; min floor matches BeamNG puncture path. nil if unavailable / no-op.
 F.applyHotPressureWriteback = function(wd, targetAbsPa, dt, maxPsiPerSec, deadbandPsi)
+    if F.isRemoteMpVehicle() then return nil end
     if not wd or not obj or type(targetAbsPa) ~= "number" or not dt or dt <= 0 then return nil end
     if type(obj.getGroupPressure) ~= "function" or type(obj.setGroupPressure) ~= "function" then return nil end
     if not wd.pressureGroup or not v or not v.data or not v.data.pressureGroups then return nil end
@@ -2140,6 +2264,7 @@ end
 
 -- Safe 8-arg friction API (BeamNG stage2 signature; ignore legacy 9th arg)
 F.applyWheelFriction = function(wheel, longGrip, latGrip)
+    if F.isRemoteMpVehicle() then return end
     if not wheel or type(wheel.setFrictionThermalSensitivity) ~= "function" then return end
     local mid = (longGrip + latGrip) * 0.5
     -- Disable native thermal curve; grip comes from this mod
@@ -2299,18 +2424,19 @@ F.getVehicleType = function()
 end
 
 -- BeamNG race tires often ship softnessCoef=1.0 (and discrete 0.5/0.8/1.0 tiers).
--- Densified SLICK_SPECTRUM_POINTS live in 0.50–0.80; remap common JBeam values onto that band.
+-- Densified SLICK_SPECTRUM_POINTS live in 0.50–0.875; remap common JBeam values onto that band.
 -- Soft=0 / very low floors to hard (do not treat fantasy 0 as soft). Continuous midpoints
--- already in 0.50–0.80 (0.575/0.725/…) keep interpolating unchanged.
+-- already in 0.50–0.875 (0.575/0.725/0.875/…) keep interpolating unchanged.
+-- Stock 1.0 still maps to C4 (0.80); C5 supersoft is an explicit 0.875 SKU.
 F.remapSlickSoftness = function(softnessCoef)
     local s = tonumber(softnessCoef) or 0.5
     if s ~= s then s = 0.5 end
-    if s >= 0.99 then return 0.80 end                 -- 1.0 and above → soft anchor
+    if s >= 0.99 then return 0.80 end                 -- 1.0 and above → soft C4 (not C5)
     if abs(s - 0.8) <= 0.012 then return 0.65 end      -- ~0.8 → medium anchor
-    if s >= 0.50 and s <= 0.80 then return s end       -- densified continuum
+    if s >= 0.50 and s <= 0.875 then return s end      -- densified continuum incl. supersoft
     if s < 0.50 then return 0.50 end                  -- hard floor (incl. soft=0)
-    -- (0.80, 0.99): approach soft from medium
-    return 0.65 + ((s - 0.80) / 0.19) * 0.15
+    -- (0.875, 0.99): approach supersoft from soft
+    return 0.80 + ((s - 0.875) / 0.115) * 0.075
 end
 
 -- Hybrid Profile Resolving Engine (With Dynamic Dimensional Scaling & All Continuous Spectrums)
@@ -2405,8 +2531,18 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
     elseif string.find(nameLower, "drift") then
         rawProfile1, rawProfile2, interpFactor = "drift", "drift", 0; F.copyMods(STANDALONE_MODIFIERS.drift, mods)
         purpose, classifyReason = "drift", "standalone_drift"
+    elseif string.find(nameLower, "track_day", 1, true) then
+        rawProfile1, rawProfile2, interpFactor = "track_day", "track_day", 0
+        F.copyMods(F.getProfilePointMods("track_day"), mods)
+        purpose, classifyReason = "street", "track_day_name"
+    elseif string.find(nameLower, "sport_plus", 1, true) then
+        -- Native Sport Plus JBeam is treadCoef 0.40; name still owns the Scintilla plus lock.
+        rawProfile1, rawProfile2, interpFactor = "sport_plus", "sport_plus", 0
+        F.copyMods(F.getProfilePointMods("sport_plus"), mods)
+        purpose, classifyReason = "street", "sport_plus_name"
     elseif isRaceLikeName and not string.find(nameLower, "gravel", 1, true) then
         -- Remap BeamNG 0.5/0.8/1.0 soft tiers onto densified 0.50/0.65/0.80 spectrum
+        -- (explicit 0.875 SKU is C5 supersoft; 1.0 stays C4)
         local sc = F.remapSlickSoftness(softnessCoef)
         rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(SLICK_SPECTRUM_POINTS, "softness", sc, mods)
         purpose, classifyReason = "circuit", "slick_spectrum"
@@ -2512,12 +2648,14 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
         end
     else
         -- Passenger, sport, and sport plus definitions matching official JBeams
-        -- Anchors: sport_plus@0.30, sport_tour@0.40, sport@0.50, standard@0.60/0.70,
+        -- Anchors: sport_plus@0.30, track_day@0.40, sport@0.50, standard@0.60/0.70,
         -- allterrain@0.80/0.85, mudterrain@0.90, crawler@1.00
         if treadCoef <= 0.20 then
             descriptor = "Slick"
-        elseif treadCoef <= 0.42 then
+        elseif treadCoef <= 0.32 then
             descriptor = "Sport Plus"
+        elseif treadCoef <= 0.42 then
+            descriptor = "Track Day"
         elseif treadCoef <= 0.58 then
             descriptor = "Sport"
         elseif treadCoef <= 0.72 then
@@ -2531,7 +2669,12 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
         end
     end
 
-    -- Low-tread street-spectrum path still shows Slick compound but stays circuit purpose
+    -- Name-owned compounds keep their descriptor/purpose. Do not remap Track Day
+    -- (JBeam tread 0.18 sits in the ≤0.20 Slick band) or Sport Plus onto circuit.
+    if classifyReason == "sport_plus_name" then descriptor = "Sport Plus" end
+    if classifyReason == "track_day_name" then descriptor = "Track Day" end
+
+    -- Unnamed low-tread street-spectrum path still shows Slick but stays circuit purpose
     if descriptor == "Slick" and purpose == "street" then
         purpose, classifyReason = "circuit", "slick_spectrum"
     end
@@ -2574,16 +2717,21 @@ F.initTyreData = function()
         local preheatBlend = isRacingTire and SLICK_PREHEAT_BLEND or STREET_PREHEAT_BLEND
         local carcassStart = lerp(ENV_TEMP, optTemp, preheatBlend)
         local skinStart = lerp(ENV_TEMP, optTemp, preheatBlend * SKIN_PREHEAT_FRAC)
+        local wheelNameLower = string.lower(tostring(wheelName))
+        local isFront = not not string.match(wheelNameLower, "^f")
         local coldPSI = max(1.0, wd.pressure or 25.0)
-        -- Prefer live pressure-group fill when available (matches stock TPMS / cold set)
+        -- Prefer live pressure-group fill when available (matches stock TPMS / cold set).
+        -- If native is still pumped from a previous hop/write-back loop, restore the
+        -- tuning-menu slider so a respawn/reload does not inherit 40 PSI Cold.
         do
             local nativeCold = F.getNativeGroupPressurePSI(wd)
             if nativeCold then coldPSI = max(1.0, nativeCold) end
+            local sliderPSI = F.getTuneColdFillPSI(isFront)
+            if sliderPSI and nativeCold and (nativeCold - sliderPSI) > 2.5 then
+                coldPSI = sliderPSI
+                F.setNativeGroupPressurePSI(wd, sliderPSI)
+            end
         end
-        
-        -- Axle side from wheel rotator name (FL/FR/RL/RR), not tire part (tire_R_* is rear axle compound)
-        local wheelNameLower = string.lower(tostring(wheelName))
-        local isFront = not not string.match(wheelNameLower, "^f")
         local baseFactors = F.collectBaseWheelFactors(wd)
 
         tyreData[i] = {
@@ -2597,6 +2745,7 @@ F.initTyreData = function()
             surfaceDamage = 0, -- Max of distinct damage modes (UI aggregate)
             heatCycles = 0, cycleHeated = false, coolTimer = 0,
             hotStintTime = 0, stintFade = 0,
+            stintMaxAvgTemp = 0, -- Pitwall: peak EffectiveTyreTemp this stint (resets with initTyreData)
             leakRatePa = 0, punctureSeverity = 0,
             lastGrip = 1, lastLongGrip = 1, lastLatGrip = 1,
             coldPressurePSI = coldPSI,
@@ -2911,12 +3060,22 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
 
     data.working_temp = current_optimal_temp
 
-    local vehNotParked = (safeAirspeed < 1 and angularVel < 0.4) and 0 or 1
+    -- Vehicle speed, not per-wheel contact: a hopping front at 170 mph used to look
+    -- "parked" (airborne → angularVel 0, airflow can drop) and pumped Cold fill.
+    local vehicleSpeed = F.getVehicleAirspeedRef()
+    local vehNotParked = (vehicleSpeed < 1.0 and safeAirspeed < 1.0 and angularVel < 0.4 and not isAirborne) and 0 or 1
     local initialTempK = w.initialTempK or (localEnvTemp + 273.15)
     
     local currentTempK = (data.temp[8] or localEnvTemp) + 273.15
-    -- Dynamic pressure rise from hard bump / bottom-out carcass volume loss
-    local warmAbsolutePressurePSI = (initialPressurePSI + 14.696) * (1.0 + (currentTempK / initialTempK - 1.0) * (1.0 - casing_compliance)) * (1.0 + min(0.35, (w.suspStress or 0) * 0.08 * bottomOutSens))
+    -- Gay-Lussac from cavity air only. Do NOT fold suspStress / damper chatter into PSI:
+    -- that term was meant for hard bottom-out volume loss, but at speed it treated aero
+    -- squat and hub-Z noise as a sustained +7 PSI (fronts 27→34 with ~30°C rubber).
+    -- Real bump volume is a brief spike; write-back must stay on thermal PSI so native
+    -- groups don't get pumped up on a straight.
+    local thermalAbsPSI = (initialPressurePSI + 14.696) * (1.0 + (currentTempK / initialTempK - 1.0) * (1.0 - casing_compliance))
+    local hardBumpM = max(0, (w.suspCompression or 0) - (susp.hardBumpM or 0.065))
+    local bumpVol = min(0.04, hardBumpM * 0.7 * bottomOutSens)
+    local warmAbsolutePressurePSI = thermalAbsPSI * (1.0 + bumpVol)
     local dynamicPressurePSI = max(0.1, warmAbsolutePressurePSI - 14.696)
     
     local pressureRatio = max(0.01, dynamicPressurePSI / initialPressurePSI)
@@ -2991,9 +3150,8 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     local slickCarcassScale = 1.0
     local p1Lower = data.profile1Lower or ""
     local p2Lower = data.profile2Lower or ""
-    -- Milder soft-cap duty id for sport_plus continuum (incl. densified sport_tour anchor).
-    local isSportPlusProf = not not (string.find(p1Lower, "sport_plus", 1, true) or string.find(p2Lower, "sport_plus", 1, true)
-        or string.find(p1Lower, "sport_tour", 1, true) or string.find(p2Lower, "sport_tour", 1, true))
+    -- Milder soft-cap duty id for sport_plus only (Track Day uses MID stamp).
+    local isSportPlusProf = not not (string.find(p1Lower, "sport_plus", 1, true) or string.find(p2Lower, "sport_plus", 1, true))
     if string.find(p1Lower, "slick", 1, true) or string.find(p2Lower, "slick", 1, true) then
         slickDriveScale = topo.drivePropSlickScale or 1.0
         slickCarcassScale = topo.drivePropSlickCarcassScale or 1.0
@@ -3286,6 +3444,7 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         ctw.workHeatRate = workHeatRate
         ctw.currentTempK = currentTempK
         ctw.initialTempK = initialTempK
+        ctw.thermalAbsPSI = thermalAbsPSI
         ctw.warmAbsolutePressurePSI = warmAbsolutePressurePSI
     end
 
@@ -3709,6 +3868,7 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     ctw.isDirtGrassSurface = isDirtGrassSurface
     ctw.isIceSurface = isIceSurface
     ctw.vehNotParked = vehNotParked
+    ctw.vehicleSpeed = vehicleSpeed
 end
 
 -- CalcTyreWear wear / damage / pressure (own local scope)
@@ -3722,6 +3882,7 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     local loadRaw = ctw.loadRaw or 0
     local slipEnergy = ctw.slipEnergy or 0
     local sideSlipEnergy = ctw.sideSlipEnergy or 0
+    local g_mag = ctw.g_mag or 0
     local tyreWidthCoeff = ctw.tyreWidthCoeff or 1
     local propulsionTorque = ctw.propulsionTorque or 0
     local brakeTorque = ctw.brakeTorque or 0
@@ -3752,10 +3913,12 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     local isDirtGrassSurface = ctw.isDirtGrassSurface
     local isIceSurface = ctw.isIceSurface
     local vehNotParked = ctw.vehNotParked or 0
+    local vehicleSpeed = ctw.vehicleSpeed or 0
     local sf = ctw.sf or {}
     local currentTempK = ctw.currentTempK
     local initialTempK = ctw.initialTempK
     local warmAbsolutePressurePSI = ctw.warmAbsolutePressurePSI
+    local thermalAbsPSI = ctw.thermalAbsPSI or warmAbsolutePressurePSI
     local groundModel = ctw.groundModel or DOESNT_EXIST_DATA
     local dynamicPressurePSI = ctw.dynamicPressurePSI
 
@@ -3914,14 +4077,26 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     end
     data.graining = max(0, min(1.0, grain))
 
-    -- Blistering: sustained overheat + aggressive slip only (does not heal).
-    -- Old path used slip>0.15 with uncapped slip/0.15 scaling — mild hot corners blistered too fast.
+    -- Blistering: overheat + (light slip OR loaded Hot corner). Does not heal.
+    -- Pass #7e: half #7d rate for this run. Gate + rumble damp unchanged.
     local blister = data.blistering or 0
     local blisterStart = current_working_temp * blisterTempRatio
-    if avgWeightedTemp > blisterStart and slipEnergy > 0.32 and not isAirborne then
+    local blisterSlipStart = 0.14
+    local slipForBlister = max(slipEnergy, sideSlipEnergy * 0.85)
+    local slipAbuse = (slipForBlister > blisterSlipStart) and min(2.0, slipForBlister / blisterSlipStart) or 0
+    local workAbuse = 0
+    if g_mag > 0.70 then
+        workAbuse = min(1.25, (g_mag - 0.70) / 0.40) * 0.85
+    end
+    local blisterAbuse = max(slipAbuse, workAbuse)
+    local rumbleBlisterScale = 1.0
+    if string.find(gmName, "rumble") or string.find(gmName, "kickplate") or string.find(gmName, "spike") then
+        rumbleBlisterScale = 0.15
+    end
+    if avgWeightedTemp > blisterStart and blisterAbuse > 0 and not isAirborne then
+        local tempExcess = min(2.0, (avgWeightedTemp - blisterStart) / max(5.0, current_working_temp * 0.07))
         blister = blister + (mods.blisterRate or DEFAULT_MODS.blisterRate or 0.00028) * scaleWearModifier
-            * min(2.0, (avgWeightedTemp - blisterStart) / max(12.0, current_working_temp * 0.18))
-            * min(2.2, slipEnergy / 0.32) * dt
+            * tempExcess * blisterAbuse * rumbleBlisterScale * dt
     end
     data.blistering = min(1.0, blister)
 
@@ -3978,29 +4153,57 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         -- Prefer live BeamNG pressure-group reading when leaking or native spike-puncture owns writes
         if (data.leakRatePa or 0) > 0 or nativeOwnsSpikeLeak then
             data.currentPressurePSI = nativePSI
-        elseif (data.leakRatePa or 0) <= 0
-            and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)
-            and abs(currentTempK - initialTempK) < 8.0 then
-            -- Soft refresh cold fill toward native when tire is still cold (stock fill / garage)
-            local coldAlpha = min(1.0, dt / max(0.5, topo.pressureColdRefreshTau or 2.5))
-            data.coldPressurePSI = (data.coldPressurePSI or nativePSI) * (1.0 - coldAlpha) + nativePSI * coldAlpha
+        else
+            -- User/TPMS fill: only treat as a garage setpoint when the CAR is slow.
+            -- Hop/airborne fronts at 170 mph used to look parked (angularVel forced 0)
+            -- and PV/contact spikes tripped dP/dt ≥ 8 PSI/s, so Cold chased native to ~40.
+            local tpmsPsiS = topo.pressureTpmsDeadbandPsiS or 8.0
+            local garageSpeed = topo.pressureColdRefreshMaxSpeed or 4.0
+            local inGarage = vehicleSpeed < garageSpeed
+            if inGarage and (F.isTirePressureInflateActive() or dPdt >= tpmsPsiS) then
+                data.coldFillAdopt = true
+            end
+            local parkedOk = (topo.pressureColdRefreshParkedOnly == false) or inGarage
+            if parkedOk
+                and inGarage
+                and dPdt < tpmsPsiS
+                and currentTempK and initialTempK
+                and abs(currentTempK - initialTempK) < 8.0 then
+                local coldNow = data.coldPressurePSI or nativePSI
+                -- Follow native down always (deflate). Follow up only after a real user fill.
+                if nativePSI <= (coldNow + 0.25) or data.coldFillAdopt then
+                    local coldAlpha = min(1.0, dt / max(0.5, topo.pressureColdRefreshTau or 2.5))
+                    data.coldPressurePSI = coldNow * (1.0 - coldAlpha) + nativePSI * coldAlpha
+                    if abs((data.coldPressurePSI or nativePSI) - nativePSI) < 0.2 then
+                        data.coldFillAdopt = nil
+                    end
+                end
+            end
         end
 
         -- Safe hot PSI write-back: Lua Gay-Lussac absolute → native group (rate-limited).
-        -- Leak path / native spike puncture owns writes; TPMS/inflate |dP/dt| or electrics skip WB.
+        -- Skip UP-writes while rubber is still cold (straight-line fronts never leave ~28°C).
+        -- Always allow pull-down: hop/PV chatter trips dP/dt ≥ 8 and used to freeze native at 38 PSI.
+        local luaGauge = (thermalAbsPSI or warmAbsolutePressurePSI or 0) - 14.696
+        local pullingDown = nativePSI and (nativePSI - luaGauge) > 2.0
+        local tireHot = currentTempK and initialTempK and (currentTempK - initialTempK) > 15.0
         if (topo.pressureHotWritebackEnable ~= false)
             and (data.leakRatePa or 0) <= 0
             and not nativeOwnsSpikeLeak
             and not (w.isBroken or w.isTireDeflated)
-            and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)
             and not F.isTirePressureInflateActive()
+            and (pullingDown or (tireHot and dPdt < (topo.pressureTpmsDeadbandPsiS or 8.0)))
         then
-            local targetAbsPa = warmAbsolutePressurePSI * 6894.757
+            local targetAbsPa = (thermalAbsPSI or warmAbsolutePressurePSI) * 6894.757
+            local maxPsiS = topo.pressureHotWritebackMaxPsiS or 0.35
+            if pullingDown then
+                maxPsiS = max(maxPsiS, topo.pressureHotWritebackRecoverPsiS or 2.5)
+            end
             local newAbs = F.applyHotPressureWriteback(
                 wd,
                 targetAbsPa,
                 dt,
-                topo.pressureHotWritebackMaxPsiS or 0.35,
+                maxPsiS,
                 topo.pressureHotWritebackDeadbandPsi or 0.15
             )
             if newAbs then
@@ -4561,7 +4764,10 @@ F.CalculateTyreGrip = function(wheelID, localEnvTemp)
             or string.find(p1r, "sport_plus", 1, true) or string.find(p2r, "sport_plus", 1, true)
         if isRaceLat then
             local latCap = 1.12 -- sport_plus
-            if string.find(p1r, "soft_slick", 1, true) or string.find(p2r, "soft_slick", 1, true) then
+            -- supersoft_slick contains "soft_slick" — check C5 first.
+            if string.find(p1r, "supersoft_slick", 1, true) or string.find(p2r, "supersoft_slick", 1, true) then
+                latCap = 1.20
+            elseif string.find(p1r, "soft_slick", 1, true) or string.find(p2r, "soft_slick", 1, true) then
                 latCap = 1.18
             elseif string.find(p1r, "medium_slick", 1, true) or string.find(p2r, "medium_slick", 1, true) then
                 latCap = 1.16
@@ -4614,6 +4820,7 @@ F.initGuiStream = function()
     guiStream.envTempRange = 0
     guiStream.stintKm = 0
     guiStream.odoKm = 0
+    F.stampStreamIdentity()
     wheelIndexMap = {}
     local idx = 1
     for i, wd in pairs(wheels.wheelRotators) do
@@ -4626,7 +4833,7 @@ F.initGuiStream = function()
             initialPressure = 25, optimalPressure = 25, coldPressure = 25, targetHotPressure = 25,
             luaPressure = 25, nativePressure = 25, pressureDelta = 0,
             pressureRatio = 1, skinCarcassGap = 0, driveHeatGate = 0, driveHeatGateCarcass = 0,
-            streetSlipScale = 1,
+            streetSlipScale = 1, stintMaxAvgTemp = 0, avgTemp = ENV_TEMP,
             airCoolRate = 0, skinVelCoolScale = 1, workHeatG0 = 0.22,
             slipHeatRate = 0, workHeatRate = 0, trackCondMult = 1, staticCoolRate = 0,
             clog = 0, cycles = 0, graining = 0, blistering = 0, flatspot = 0,
@@ -4994,6 +5201,11 @@ F.flushGuiStream = function(localizedEnvTemp)
                     entry.tempCategory = "Normal"
                 end
                 entry.avgTemp = math.floor(avgT * 10) / 10
+                -- Stint peak avg (same EffectiveTyreTemp as live avg); resets on vehicle reload / initTyreData
+                if not w.isBroken and avgT > (data.stintMaxAvgTemp or 0) then
+                    data.stintMaxAvgTemp = avgT
+                end
+                entry.stintMaxAvgTemp = math.floor((data.stintMaxAvgTemp or 0) * 10) / 10
                 local hotTgt = max(1.0, entry.targetHotPressure or entry.optimalPressure or 25)
                 entry.pressureRatio = math.floor((entry.pressure / hotTgt) * 1000) / 1000
                 local skinAvg = ((entry.temp[1] or 0) + (entry.temp[2] or 0) + (entry.temp[3] or 0)) / 3.0
@@ -5216,6 +5428,8 @@ F.writeTelemetryIfEnabled = function(dt)
 end
 
 F.updateGFX = function(dt)
+    -- BeamMP remotes: do not integrate thermals or write native friction/pressure.
+    if F.isRemoteMpVehicle() then return end
     if not wheels or not wheels.wheelRotators then return end
     if not next(wheelIndexMap) then F.initGuiStream() end
     if not next(tyreData) then F.initTyreData() end
@@ -5330,6 +5544,14 @@ F.updateGFX = function(dt)
 
     -- Sample track surface once per GFX frame (physics + UI share this)
     frameTrackTemp = F.getTrackTemp(localizedEnvTemp, trackEnv.timeOfDay, trackEnv.cloudCover)
+    frameChassisSpeed = 0
+    if obj and type(obj.getVelocity) == "function" then
+        local vel = obj:getVelocity()
+        if vel then
+            local ok, len = pcall(function() return vel:length() end)
+            if ok and type(len) == "number" then frameChassisSpeed = max(0, len) end
+        end
+    end
     
     local upVector = (obj and obj.getDirectionVectorUp) and obj:getDirectionVectorUp() or nil
     local frontVector = (obj and obj.getDirectionVector) and obj:getDirectionVector() or nil
@@ -5398,14 +5620,18 @@ F.updateGFX = function(dt)
             end
         end
         F.flushGuiStream(localizedEnvTemp)
+        F.stampStreamIdentity()
 
         -- 0.39+: queueStream feeds StreamsManager / streamsUpdate. Prefer it alone so apps
         -- do not process the same payload twice (queueStream + trigger). Older builds keep trigger.
         -- Presence cached in onInit (hasQueueStream / hasGuiTrigger).
-        if hasQueueStream then
-            pcall(guihooks.queueStream, "TyreWearThermals", guiStream)
-        elseif hasGuiTrigger then
-            pcall(guihooks.trigger, "TyreWearThermals", guiStream)
+        -- Seated vehicle only — extra spawned cars / BeamMP remotes must not overwrite HUD.
+        if F.isHudPublisher() then
+            if hasQueueStream then
+                pcall(guihooks.queueStream, "TyreWearThermals", guiStream)
+            elseif hasGuiTrigger then
+                pcall(guihooks.trigger, "TyreWearThermals", guiStream)
+            end
         end
     end
 
@@ -5415,6 +5641,8 @@ end
 F.onInit = function()
     local t0 = (os and os.clock and os.clock()) or 0
     local ok, err = pcall(function()
+        -- onReset calls onInit; bump once per spawn/reset so HUD snaps instead of lerping stale heat.
+        F.bumpResetGen()
         print("luukstyrethermalsandwear vehicle extension onInit")
         -- BeamNG 0.39+: native inter-vehicle aero authority (do NOT call setWindAero)
         draft.hasNativeInterAero = obj and type(obj.setWindAero) == "function"
@@ -5503,6 +5731,8 @@ end
 
 -- Vehicle deserialize / hard reload: flush if somehow still buffered, then restore arm.
 F.onDeserialized = function(_data)
+    -- Same object id after a hard reload — new thermal life for HUD bind.
+    F.bumpResetGen()
     F.flushTelemetryBuffer()
     if not telem.csvEnabled then
         F.restoreTelemetryAfterReload("onDeserialized")
@@ -5533,6 +5763,10 @@ M.update = F.update
 M.updateGFX = F.updateGFX
 M.setGroundModels = F.setGroundModels
 M.setDraftWake = F.setDraftWake
+M.isRemoteMpVehicle = F.isRemoteMpVehicle
+M.isHudPublisher = F.isHudPublisher
+M.streamTag = F.streamTag
+M.resetGen = function() return resetGen end
 M.hasNativeInterAero = function() return draft.hasNativeInterAero end
 M.getInferredWake = function() return draft.inferredWake end
 M.flushTelemetryCsv = function()

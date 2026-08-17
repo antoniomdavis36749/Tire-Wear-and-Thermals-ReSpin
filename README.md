@@ -15,7 +15,8 @@ Source lineage remains AGPL-3.0 (see `license`). Thank you to both authors for r
 
 ### Related links
 
-- Redux / discussion: https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/
+- ReSpin discussion: https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/
+- Redux / upstream discussion: https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/
 - Redux source (upstream): https://github.com/ample-samples/tyre-thermals-and-wear
 
 ## Layout
@@ -30,28 +31,25 @@ BeamNG requires the runtime folders below; do not rename them.
 | `lua/common/extensions/` | Shared utilities |
 | `scripts/luukstyrethermalsandwear/` | Mod entry (`modscript.lua`) |
 | `ui/modules/apps/` | In-game tyre HUD apps |
-| `vehicles/common/` | Optional compatibility tire JBeams (`*_Respin`) — companion zip only; see `COMPAT_TIRES.md` |
 | `mod_info/TWTRS_RESPIN/` | Core ReSpin resource metadata |
-| `mod_info/TWTRS_COMPAT/` | Compat-tires companion metadata |
 | `tools/` | Dev soft-sims, WC lap triggers, fixtures — not required to play |
 | `.vscode/settings.json` | Editor Lua language-server config only |
 
 See `tools/README.md` for soft-sim / telemetry workflow.  
-Optional third-party tire stop-gaps: **`COMPAT_TIRES.md`**.
+Optional vehicle parts (JBeam clones / extra configs): **[Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)** — not shipped in this repo. See **`COMPAT_TIRES.md`**.
 
 ## Publishing
 
 BeamNG Repo prep: polish on `testing/main`, merge to `main` for the public source link. See **`PUBLISH_CHECKLIST.md`**.
 
-Build release zips (excludes `tools/` and the WC lap harness). Core never includes `vehicles/` (BeamNG would hide UI). Compat tires pack as a **second Repo resource** from the same git tree:
+Build release zips (excludes `tools/` and the WC lap harness). This repo is **core only** — no `vehicles/`. Companion tires pack from **[ReSpin Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)**:
 
 ```powershell
 .\tools\scripts\Pack-Release.ps1 -ZipName 'TireWearThermalsReSpin_YourName.zip'
-# → core zip + TireWearThermalsReSpin_CompatTires.zip (when vehicles/ exists)
 ```
 
-Repo listing copy-paste (core + Compat): **`LISTING.md`**.  
-Compatibility tires inventory / packing: **`COMPAT_TIRES.md`**.
+Repo listing copy-paste (core): **`LISTING.md`**.  
+Companion tires: **`COMPAT_TIRES.md`**.
 
 ## Brake coupling (non-goals)
 

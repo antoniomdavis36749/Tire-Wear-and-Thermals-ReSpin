@@ -291,6 +291,13 @@ angular.module("beamng.apps")
                                     <span style="color:#cbd5e1;"> · avg {{ (w.avgTemp||0).toFixed(2) }}° / opt {{ (w.working_temp||0).toFixed(2) }}°</span>
                                 </span>
                             </div>
+                            <div class="tth-stat-row">
+                                <span class="tth-label">Stint max:</span>
+                                <span class="tth-value" ng-style="{'color': getTempColor(w.stintMaxAvgTemp, w.working_temp)}">
+                                    {{ (w.stintMaxAvgTemp||0).toFixed(1) }}°
+                                    <span style="color:#94a3b8; font-size: 13px;" ng-if="(w.stintMaxAvgTemp||0) > (w.working_temp||0) * 1.20"> · Hot flash</span>
+                                </span>
+                            </div>
 
                             <!-- SURFACE CONTACT + TEST CHANNELS (capture-sized fonts) -->
                             <div class="tth-test-channels">
@@ -973,12 +980,51 @@ angular.module("beamng.apps")
                 }
                 document.addEventListener("visibilitychange", onVisibilityChange);
 
+                var boundVehId = null;
+                var boundResetGen = null;
+                function resetRespinStreamBind() {
+                    boundVehId = null;
+                    boundResetGen = null;
+                }
+                function acceptRespinStream(dataStream) {
+                    if (!dataStream || !dataStream.data || dataStream.mpRemote) return false;
+                    var id = dataStream.vehId;
+                    if (id === undefined || id === null) return true;
+                    if (boundVehId === null) {
+                        boundVehId = id;
+                        if (dataStream.resetGen !== undefined && dataStream.resetGen !== null) {
+                            boundResetGen = dataStream.resetGen;
+                        }
+                        return true;
+                    }
+                    if (id !== boundVehId) return false;
+                    var gen = dataStream.resetGen;
+                    if (gen !== undefined && gen !== null && boundResetGen !== null && gen < boundResetGen) {
+                        return false;
+                    }
+                    return true;
+                }
+                function isRespinLifeReset(dataStream) {
+                    var gen = dataStream.resetGen;
+                    if (gen === undefined || gen === null) return false;
+                    if (boundResetGen === null) {
+                        boundResetGen = gen;
+                        return false;
+                    }
+                    if (gen > boundResetGen) {
+                        boundResetGen = gen;
+                        return true;
+                    }
+                    return false;
+                }
+
                 function ingestStream(dataStream) {
-                    if (!dataStream || !dataStream.data) return;
+                    if (!acceptRespinStream(dataStream)) return;
 
                     var src = dataStream.data;
                     var count = src.length;
-                    var structural = (scope.wheels.length !== count);
+                    var lifeReset = isRespinLifeReset(dataStream);
+                    var structural = lifeReset || (scope.wheels.length !== count);
                     var i, w;
 
                     for (i = 0; i < count; i++) {
@@ -1003,6 +1049,8 @@ angular.module("beamng.apps")
                     if (dataStream.streamHz !== undefined) scope.streamHz = dataStream.streamHz;
 
                     if (structural) {
+                        // Wheel-count change or same-id resetGen bump: snap cold, drop RAF lerp.
+                        stopRaf();
                         targetWheels = [];
                         var wheels = [];
                         for (i = 0; i < count; i++) {
@@ -1033,8 +1081,8 @@ angular.module("beamng.apps")
                         for (i = 0; i < count; i++) {
                             setTargetWheel(targetWheels[i], src[i] || {});
                         }
+                        startRaf();
                     }
-                    startRaf();
                 }
 
                 scope.$on("$destroy", function () {
@@ -1045,6 +1093,8 @@ angular.module("beamng.apps")
                     }
                 });
 
+                scope.$on("VehicleChange", resetRespinStreamBind);
+                scope.$on("VehicleFocusChanged", resetRespinStreamBind);
                 scope.$on("TyreWearThermals", function (event, dataStream) {
                     ingestStream(dataStream);
                 });
