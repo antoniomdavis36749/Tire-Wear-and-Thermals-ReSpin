@@ -15,6 +15,8 @@ Source lineage remains AGPL-3.0 (see `license`). Thank you to both authors for r
 
 ### Related links
 
+- **BeamNG Repo (core):** https://www.beamng.com/resources/tire-wear-and-thermals-respin.39082/
+- **BeamNG Repo (Compat Tires):** https://www.beamng.com/resources/tire-wear-and-thermals-respin-%E2%80%94-compat-tires.39083/
 - ReSpin discussion: https://www.beamng.com/threads/tire-wear-and-thermals-respin-%E2%80%94-discussion-feedback-compat.111238/
 - Redux / upstream discussion: https://www.beamng.com/threads/tyre-wear-and-thermals-mod-discussion.97035/
 - Redux source (upstream): https://github.com/ample-samples/tyre-thermals-and-wear
@@ -37,6 +39,17 @@ BeamNG requires the runtime folders below; do not rename them.
 
 See `tools/README.md` for soft-sim / telemetry workflow.  
 Optional vehicle parts (JBeam clones / extra configs): **[Tire-Wear-and-Thermals-ReSpin-Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires)** — not shipped in this repo. See **`COMPAT_TIRES.md`**.
+
+## Local dev install (unpacked)
+
+Use **`-dev`** folder names under `mods/unpacked/` so Repo release zips never collide with git-synced copies:
+
+| Repo | Unpacked folder |
+| --- | --- |
+| Core (this repo) | `Tire-Wear-and-Thermals-ReSpin-dev` |
+| [ReSpin Tires](https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires) | `Tire-Wear-and-Thermals-ReSpin-Tires-dev` |
+
+Enable **only one** core thermals unpack at a time (disable Luuk/Redux). **Testers stay on `-dev` files** — disable the BeamNG Repo copies of ReSpin (core **39082** / Compat **39083**) while git-unpacked mods are enabled, so Repo zips cannot overwrite local work. Public listing is for other players; tester feedback should come from `-dev`.
 
 ## Publishing
 

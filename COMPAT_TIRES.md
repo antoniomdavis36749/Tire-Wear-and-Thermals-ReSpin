@@ -6,6 +6,10 @@ Testers who only want thermals / UI should clone this repo and skip the companio
 
 https://github.com/antoniomdavis36749/Tire-Wear-and-Thermals-ReSpin-Tires
 
+BeamNG Repo: https://www.beamng.com/resources/tire-wear-and-thermals-respin-%E2%80%94-compat-tires.39083/
+
+Core thermals/UI (required): https://www.beamng.com/resources/tire-wear-and-thermals-respin.39082/
+
 Do **not** copy `vehicles/` into core ReSpin. BeamNG treats a zip that contains `vehicles/` as a vehicle mod and hides `ui/` / `lua/` (apps disappear). Unpacked core stays thermals-only so testers are not forced to load extra parts.
 
 Inventory, generators, listing copy, and `Pack-Release.ps1` for the companion zip live in the tires repo.

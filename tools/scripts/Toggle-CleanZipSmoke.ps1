@@ -15,8 +15,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $mods = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods'
-$unpacked = Join-Path $mods 'unpacked\Tire-Wear-and-Thermals-ReSpin-main'
-$park = 'C:\Users\anton\AppData\Local\Temp\Tire-Wear-and-Thermals-ReSpin-main.__smoke_off'
+$unpacked = Join-Path $mods 'unpacked\Tire-Wear-and-Thermals-ReSpin-dev'
+$park = 'C:\Users\anton\AppData\Local\Temp\Tire-Wear-and-Thermals-ReSpin-dev.__smoke_off'
 $zipName = 'TireWearThermalsReSpin_antoniomdavis36749.zip'
 $zipDst = Join-Path $mods $zipName
 

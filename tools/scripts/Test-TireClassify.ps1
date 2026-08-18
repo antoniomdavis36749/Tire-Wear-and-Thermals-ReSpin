@@ -44,8 +44,15 @@ function Get-SlickBand([double]$sc) {
   return 'supersoft'
 }
 
+function Test-IsNamedStreetSportCompound([string]$nameLower) {
+  if ($nameLower -like '*sport_plus*') { return $true }
+  if ($nameLower -like '*track_day*' -or $nameLower -like '*sport_tour*') { return $true }
+  if ($nameLower -like '*supersport*') { return $false }
+  return $nameLower -like '*sport*'
+}
+
 # Returns hashtable: descriptor, purpose, classifyReason
-function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
+function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts, [double]$radius = 0.0) {
   $nameLower = $tireName.ToLowerInvariant()
   $isAsphaltName = ($nameLower -like '*tarmac*') -or (($nameLower -like '*asphalt*') -and ($nameLower -notlike '*supersport*'))
   $isAsphaltRallyRaceSku = ($nameLower -like '*race*') -and (
@@ -91,10 +98,14 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'drag'; $classifyReason = 'standalone_drag'; $descriptor = 'Drag'
   } elseif ($nameLower -match 'drift') {
     $purpose = 'drift'; $classifyReason = 'standalone_drift'; $descriptor = 'Drift'
-  } elseif ($nameLower -like '*track_day*') {
+  } elseif ($nameLower -like '*track_day*' -or $nameLower -like '*sport_tour*') {
     $purpose = 'street'; $classifyReason = 'track_day_name'; $descriptor = 'Track Day'
   } elseif ($nameLower -like '*sport_plus*') {
     $purpose = 'street'; $classifyReason = 'sport_plus_name'; $descriptor = 'Sport Plus'
+  } elseif ($isRaceLikeName -and ($nameLower -notlike '*gravel*')) {
+    $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
+  } elseif (Test-IsNamedStreetSportCompound $nameLower) {
+    $purpose = 'street'; $classifyReason = 'sport_name'; $descriptor = 'Sport'
   } elseif ($nameLower -match 'rain|wet|inter') {
     $purpose = 'wet'; $classifyReason = 'standalone_rain'; $descriptor = 'Wet'
   } elseif ($nameLower -match 'vintage|biasply|bias_ply|whitewall') {
@@ -102,8 +113,6 @@ function Get-Classify([string]$tireName, [double]$treadCoef, [string[]]$parts) {
     $purpose = 'street'; $classifyReason = 'standalone_vintage'; $descriptor = 'Vintage'
   } elseif ($nameLower -match 'classic_radial') {
     $purpose = 'street'; $classifyReason = 'vintage_spectrum'; $descriptor = 'Vintage'
-  } elseif ($isRaceLikeName -and ($nameLower -notlike '*gravel*')) {
-    $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
   } elseif ($treadCoef -le 0.20) {
     $purpose = 'circuit'; $classifyReason = 'slick_spectrum'; $descriptor = 'Slick'
   } elseif ($treadCoef -le 0.32) {
@@ -224,17 +233,29 @@ $cases = @(
   # Street spectrum
   @{ name='Street sport'; tire='tire_F_225_45_17_sport'; tread=0.50
     parts=@()
-    expectDesc='Sport'; expectPurpose='street'; expectReason='street_spectrum' }
+    expectDesc='Sport'; expectPurpose='street'; expectReason='sport_name' }
+  @{ name='Street sport tread 0.40 still sport name'; tire='tire_F_235_40_18_sport'; tread=0.40
+    parts=@()
+    expectDesc='Sport'; expectPurpose='street'; expectReason='sport_name' }
+  @{ name='Scintilla sport 275/40R20 not utility radius'; tire='tire_F_275_40_20_sport'; tread=0.40
+    parts=@(); radius=0.364
+    expectDesc='Sport'; expectPurpose='street'; expectReason='sport_name' }
+  @{ name='Scintilla sport 305/35R20 not utility radius'; tire='tire_R_305_35_20_sport'; tread=0.40
+    parts=@(); radius=0.361
+    expectDesc='Sport'; expectPurpose='street'; expectReason='sport_name' }
   @{ name='Street sport_plus'; tire='tire_F_245_40_18_sport_plus'; tread=0.40
     parts=@()
     expectDesc='Sport Plus'; expectPurpose='street'; expectReason='sport_plus_name' }
   @{ name='Street track_day name'; tire='tire_F_235_40_18_Respin_track_day'; tread=0.40
     parts=@()
     expectDesc='Track Day'; expectPurpose='street'; expectReason='track_day_name' }
+  @{ name='Legacy sport_tour name maps to Track Day'; tire='tire_F_235_40_18_sport_tour'; tread=0.40
+    parts=@()
+    expectDesc='Track Day'; expectPurpose='street'; expectReason='track_day_name' }
   @{ name='Street track_day JBeam tread 0.18'; tire='tire_F_235_40_18_Respin_track_day'; tread=0.18
     parts=@()
     expectDesc='Track Day'; expectPurpose='street'; expectReason='track_day_name' }
-  @{ name='Street track_day tread'; tire='tire_F_235_40_18_sport'; tread=0.40
+  @{ name='Street track_day tread unnamed'; tire='tire_F_235_40_18_standard'; tread=0.40
     parts=@()
     expectDesc='Track Day'; expectPurpose='street'; expectReason='street_spectrum' }
   @{ name='Street Respin hard_slick C2'; tire='tire_F_235_40_18_Respin_hard_slick'; tread=0.00
@@ -399,9 +420,16 @@ if (Test-Path $luaPath) {
   Out ("{0}: CHARACTER packs + 49-knob schema comment" -f ($(if ($stampOk) { 'PASS' } else { 'FAIL' })))
   # Soft-cap magnitudes present (Pass 6 floors toward 1.0); vintage pack distinct
   $softOk = ($lua -match 'driveSlipHeatMin\s*=\s*0\.90') -and ($lua -match 'DRIVE_SOFTCAP_SPORT_PLUS') `
-    -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.95')
+    -and ($lua -match 'DRIVE_SOFTCAP_TRACK_DAY') -and ($lua -match 'DRIVE_SOFTCAP_VINTAGE') `
+    -and ($lua -match 'driveSlipHeatMin\s*=\s*0\.95')
   if (-not $softOk) { $charFail++ }
-  Out ("{0}: soft-cap packs still present (street 0.90 + vintage 0.95)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
+  Out ("{0}: soft-cap packs still present (street 0.90 + track_day + vintage 0.95)" -f ($(if ($softOk) { 'PASS' } else { 'FAIL' })))
+  $noMid = ($lua -notmatch 'DRIVE_SOFTCAP_SPORT_MID') -and ($lua -notmatch 'CHARACTER_SPORT_MID')
+  if (-not $noMid) { $charFail++ }
+  Out ("{0}: sport_mid packs removed" -f ($(if ($noMid) { 'PASS' } else { 'FAIL' })))
+  $noTour = $lua -notmatch '\{\s*"sport_tour"'
+  if (-not $noTour) { $charFail++ }
+  Out ("{0}: sport_tour is not a fourth GRIP/profile tag" -f ($(if ($noTour) { 'PASS' } else { 'FAIL' })))
   $remapOk = ($lua -match 'remapSlickSoftness') -and ($lua -match 'modernrace')
   if (-not $remapOk) { $charFail++ }
   Out ("{0}: remapSlickSoftness + strong race tokens present" -f ($(if ($remapOk) { 'PASS' } else { 'FAIL' })))
