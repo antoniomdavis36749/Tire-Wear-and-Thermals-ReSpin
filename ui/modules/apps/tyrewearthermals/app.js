@@ -26,7 +26,7 @@ angular.module("beamng.apps")
                     c.height = data.height || 220;
                 });
 
-                // Standard border-radius drawing utility
+
                 function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
                     if (radius === undefined) radius = 5;
                     if (fill === undefined) fill = false;
@@ -56,21 +56,21 @@ angular.module("beamng.apps")
                     }
                 }
 
-                // Resolves HSL thermal gradient with smoothstep transitions
+
                 function getTempColor(tempVal, working_temp) {
                     var r = tempVal / (working_temp || 85);
                     var hue;
                     
                     if (r < 0.75) {
-                        // Cold to Optimal transition: Blue (240) to Green (120)
+
                         var t = Math.min(Math.max((r - 0.4) / 0.35, 0), 1);
                         t = t * t * (3 - 2 * t);
                         hue = 240 + t * (120 - 240);
                     } else if (r <= 1.15) {
-                        // Optimal zone (Green)
+
                         hue = 120;
                     } else {
-                        // Overheated transition: Green to Red (120 to 0)
+
                         var t = Math.min(1.0, (r - 1.15) / 0.35);
                         t = t * t * (3 - 2 * t);
                         hue = 120 - t * 120;
@@ -99,7 +99,7 @@ angular.module("beamng.apps")
 
                     ctx.textAlign = 'center';
 
-                    // Robust horizontal coordinate (Left/Right Side detection)
+
                     var right = (tyreNumber % 2 === 1) ? 1 : 0;
                     var nameUpper = name.toUpperCase();
                     var testStr = nameUpper;
@@ -114,7 +114,7 @@ angular.module("beamng.apps")
                         right = 0;
                     }
 
-                    // Robust dynamic axle coordinate assignment (Row detection)
+
                     var back = 0;
                     if (nameUpper.indexOf("F") === 0) {
                         back = 0;
@@ -140,7 +140,7 @@ angular.module("beamng.apps")
                     var y = pad + back * (rowH + gapY);
                     var cx = x + colW * 0.5;
 
-                    // Reserve vertical bands inside the cell so text/triangles never collide
+
                     var headerH = Math.max(12, rowH * 0.16);
                     var footerH = Math.max(12, rowH * 0.16);
                     var camberGap = Math.max(5, rowH * 0.05);
@@ -148,14 +148,14 @@ angular.module("beamng.apps")
                     var treadH = Math.max(18, rowH - headerH - footerH - camberGap * 2);
                     var treadW = colW;
 
-                    // 1. Header Text: Wheel Name & Condition (e.g., FL | 98%)
+
                     ctx.fillStyle = "#ffffff";
                     var headerSize = Math.max(Math.min(colW / 12.0, 10.0), 7.0);
                     ctx.font = 'bold ' + headerSize + 'pt "Lucida Console", Monaco, monospace';
                     var headerText = name.toUpperCase() + " | " + Math.ceil(condition) + "%";
                     ctx.fillText(headerText, cx, y + headerH * 0.72);
 
-                    // 2. Draw Tyre Tread Rings
+
                     var segGap = 2;
                     var sectionWidth = (treadW - segGap * 2) / 3.0;
                     for (var i = 0; i < 3; i++) {
@@ -172,13 +172,13 @@ angular.module("beamng.apps")
 
                         var sectionXOffset = (sectionWidth + segGap) * i;
                         
-                        // Draw empty background representing tread loss
+
                         ctx.fillStyle = "rgba(15, 23, 42, 0.65)";
                         ctx.beginPath();
                         ctx.rect(x + sectionXOffset, treadY, sectionWidth, treadH);
                         ctx.fill();
 
-                        // Fill color representing remaining tread
+
                         if (condition > 1) {
                             var ft = 1.0 - (condition / 100);
                             ctx.fillStyle = sectionColor;
@@ -191,14 +191,14 @@ angular.module("beamng.apps")
                         ctx.strokeStyle = "rgba(0,0,0,1)";
                         roundRect(ctx, x + sectionXOffset, treadY, sectionWidth, treadH, radius, false, true);
 
-                        // Overlay Temperature centered vertically inside the block
+
                         ctx.fillStyle = "#ffffff";
                         var font_size = Math.max(Math.min(colW / 16.0 * 2.6, 11.0), 7.0);
                         ctx.font = 'bold ' + font_size + 'pt "Lucida Console", Monaco, monospace';
                         ctx.fillText("" + Math.floor(tempVal), x + sectionXOffset + (sectionWidth / 2), treadY + treadH / 2 + (font_size / 2.2));
                     }
 
-                    // 3. Draw Camber Triangle Indicators (bound-clamped within the tread width)
+
                     var triX = x + treadW * 0.5 + treadW * (camber * 0.2 * 0.5);
                     var safetyMargin = Math.max(5, sectionWidth * 0.15);
                     triX = Math.max(x + safetyMargin, Math.min(x + treadW - safetyMargin, triX));
@@ -216,7 +216,7 @@ angular.module("beamng.apps")
                     ctx.lineTo(triX + 4, treadY + treadH + 6);
                     ctx.fill();
 
-                    // 4. Footer Text: Pressure with Context-Aware Highlight
+
                     var pres = (pressure !== undefined) ? pressure : 25;
                     var initPres = initialPressure || 25;
                     var isLow = (pres < initPres * 0.8) || (pres < 10);
@@ -226,7 +226,7 @@ angular.module("beamng.apps")
                     var infoFontSize = Math.max(Math.min(colW / 18.0 * 2.4, 10.0), 6.5);
                     ctx.font = 'bold ' + infoFontSize + 'pt "Lucida Console", Monaco, monospace';
                     
-                    // Show a warning indicator if flat spots or surface damage are severe
+
                     var warningTag = "";
                     if ((surfaceDamage && surfaceDamage > 25) || (flatspot && flatspot > 25) || (condition < 35)) {
                         warningTag = "⚠ ";

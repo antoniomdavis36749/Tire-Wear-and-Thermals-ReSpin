@@ -1,9 +1,6 @@
--- lua/vehicle/extensions/auto/htmlTools.lua
 local M = {}
 
---
---	START OF COPIED CODE (David Manura, MIT License)
---
+
 
 local coroutine = coroutine
 local next = next
@@ -17,7 +14,7 @@ local table = table
 
 local format = string.format
 
--- Escape string to make suitable for embedding in HTML.
+
 local function htmlize(s)
   s = s:gsub('&', '&amp;')
   s = s:gsub('<', '&lt;')
@@ -25,22 +22,20 @@ local function htmlize(s)
   return s
 end
 
--- iterator function for table pairs.
--- hash part, then array part.
--- used for display.
+
 local function table_pairs(t)
   local keys = {}
   for k in pairs(t) do keys[#keys+1] = k end
   
-  -- Prevent crashes when sorting tables with non-comparable key types (tables, functions, etc.)
+
   table.sort(keys, function(a,b)
     local ta, tb = type(a), type(b)
     if ta ~= tb then
-      return ta < tb -- Sort by type name if types are different
+      return ta < tb
     elseif ta == 'number' or ta == 'string' then
-      return a < b   -- Safe direct comparison for primitives
+      return a < b
     else
-      return tostring(a) < tostring(b) -- Safe string fallback for complex types
+      return tostring(a) < tostring(b)
     end
   end)
   
@@ -52,7 +47,7 @@ local function table_pairs(t)
   end
 end
 
--- Serialize object o.  Writes one or more substrings to function append.
+
 local function obj_serialize(o, append)
   if type(o) == 'table' then
     append('{')
@@ -71,7 +66,7 @@ local function obj_serialize(o, append)
   end
 end
 
--- Returns serialization of o, not exceeding maxlen characters.
+
 local function obj_tostring_short(o, maxlen)
   local s = ''
   local function append(ss)
@@ -162,7 +157,7 @@ function show(id) {
 ]]
 local footer = [[</body></html>]]
 
--- Safe Logging Fallback (Allows execution outside of the BeamNG sandbox)
+
 local function logSafe(level, category, message)
   if log then
     log(level, category, message)
@@ -171,8 +166,7 @@ local function logSafe(level, category, message)
   end
 end
 
--- Writes HTML representations of object o as one or more strings to
--- function output.
+
 local function object_to_html(o, output)
   local ids, count, from = analyze_tree(o)
 
@@ -198,7 +192,7 @@ local function object_to_html(o, output)
     if type(o) == 'table' then
       output(format('<div class="table" style="display:none" id="id%s">\n', ids[o]))
 
-      -- xref
+
       if from[o] and next(from[o]) and next(from[o], next(from[o])) then
         output('<div>Referenced from: ')
         for _,from_id in pairs(from[o]) do
@@ -208,7 +202,7 @@ local function object_to_html(o, output)
         output('</div>')
       end
 
-      -- key/values
+
       for k,v in table_pairs(o) do
         local function prepare_output(oo)
           local f, is_long
@@ -266,13 +260,11 @@ local function object_to_html(o, output)
   output(footer)
 end
 
---
---	END OF COPIED CODE
---
 
---[[ Dumps the contents to the console ]]--
+
+
 local function dump(obj)
-  -- Safely fall back to print() if standard output is sandboxed
+
   if io and io.stdout and type(io.stdout.write) == 'function' then
     object_to_html(obj, function(s) io.stdout:write(s) end)
   else
@@ -280,9 +272,9 @@ local function dump(obj)
   end
 end
 
---[[ Writes the contents to the file with the specified name ]]--
+
 local function dumpToFile(obj, filename)
-  -- High Performance array collection of substrings (Bypasses GC-heavy quadratic string allocations)
+
   local parts = {}
   object_to_html(obj, function(s)
     parts[#parts + 1] = s
@@ -290,7 +282,7 @@ local function dumpToFile(obj, filename)
   local str = table.concat(parts)
   local fullFilename = filename .. ".html"
   
-  -- PLATFORM INTEGRATION: Check for native BeamNG virtual file system writer
+
   if type(writeFile) == "function" then
     writeFile(fullFilename, str)
   elseif io and type(io.open) == "function" then

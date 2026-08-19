@@ -1,48 +1,33 @@
--- West Coast Raceway (Belasco) lap / telemetry harness.
--- Default vehicle: ETK K-Series GT-IV DCT (etkc/race_DCT).
--- Override via trigger body key=value (see applyRunProfileFromTrigger).
--- Kingsnake sport-tire pass: vehicle=barstow/kingsnake (ESC not required).
--- Scintilla sport_plus pass: vehicle=scintilla/gts (ESC optional).
---
--- Modes:
---   auto   — slow sensor-aided learn lap (≤10 mph) → repair → 10 aggressive AI laps
---   manual — teleport once, arm tyre CSV telemetry, AI disabled (user drives)
---
--- Triggers (under mods/unpacked/Tire-Wear-and-Thermals-ReSpin-dev/tools/):
---   RUN_WC_MANUAL_TEL          → manual telemetry-only
---   RUN_WC_GT4_TEST            → auto AI test (default)
---   RUN_WC_GT4_TEST contents containing "manual" → manual telemetry-only
--- Outputs (CSV / status / result) go under tools/output/.
 local M = {}
 
 local logTag = 'tyreWestCoastLapTest'
 local TARGET_LAPS = 10
 local LEARN_LAPS = 1
-local LEARN_AGGRESSION = 0.30          -- gentle crawl; sensors + speed limit do the work
+local LEARN_AGGRESSION = 0.30
 local RACE_AGGRESSION = 0.95
-local LEARN_MAX_SPEED_MPS = 4.4704     -- 10 mph hard cap during learn
-local LEARN_SPEED_ENFORCE_MPS = 5.0    -- soft brake if AI exceeds ~11.2 mph
+local LEARN_MAX_SPEED_MPS = 4.4704
+local LEARN_SPEED_ENFORCE_MPS = 5.0
 local DAMAGE_RESET_THRESHOLD = 1200
-local STUCK_SPEED = 2.5               -- m/s (race)
-local STUCK_TIME = 8.0                -- seconds (race)
-local STUCK_SPEED_LEARN = 0.35        -- m/s — crawling is normal under 10 mph
-local STUCK_TIME_LEARN = 25.0         -- seconds before learn recover
-local OFFTRACK_DIST = 95.0            -- m from script polyline (race)
-local OFFTRACK_DIST_LEARN = 55.0      -- polyline distance; densified path stays close
-local RECOVER_COOLDOWN = 12.0         -- seconds between recovers
-local REENABLE_DELAY = 1.5            -- seconds after reset before AI restart
-local LEARN_SPEED_SAMPLE_MAX = 12.0   -- ignore teleport/reset velocity spikes above this (m/s)
-local MIN_LEARN_LAP_SEC = 180.0       -- ≤10 mph Belasco is many minutes; sub-3min is bogus
-local MIN_RACE_LAP_SEC = 60.0         -- Belasco is ~90–110s; anything under 60s is invalid
-local LAP_ARM_GRACE_SEC = 25.0        -- after recover/teleport, ignore finish until out-and-back
-local FINISH_ENTER_M = 28.0           -- enter finish gate radius
-local FINISH_EXIT_M = 48.0            -- hysteresis: must leave before next count
-local ARM_MIN_NODES = 8               -- must hit this many checkpoints before finish counts
-local NODE_HIT_RADIUS_EXTRA = 28      -- m beyond waypoint radius to register a hit
+local STUCK_SPEED = 2.5
+local STUCK_TIME = 8.0
+local STUCK_SPEED_LEARN = 0.35
+local STUCK_TIME_LEARN = 25.0
+local OFFTRACK_DIST = 95.0
+local OFFTRACK_DIST_LEARN = 55.0
+local RECOVER_COOLDOWN = 12.0
+local REENABLE_DELAY = 1.5
+local LEARN_SPEED_SAMPLE_MAX = 12.0
+local MIN_LEARN_LAP_SEC = 180.0
+local MIN_RACE_LAP_SEC = 60.0
+local LAP_ARM_GRACE_SEC = 25.0
+local FINISH_ENTER_M = 28.0
+local FINISH_EXIT_M = 48.0
+local ARM_MIN_NODES = 8
+local NODE_HIT_RADIUS_EXTRA = 28
 local MPH_PER_MPS = 2.2369362920544
 
 local function getToolsDir()
-  -- Relative to BeamNG user folder (io.open works here; absolute Windows paths often fail in GELUA)
+
   return 'mods/unpacked/Tire-Wear-and-Thermals-ReSpin-dev/tools'
 end
 
@@ -58,10 +43,10 @@ local state = {
   phase = 'boot',
   finished = false,
   failReason = nil,
-  runKind = 'auto',     -- auto | manual
-  lap = 0,              -- timed aggressive laps only
+  runKind = 'auto',
+  lap = 0,
   learnLap = 0,
-  mode = 'learning',    -- learning | racing | manual
+  mode = 'learning',
   aggression = LEARN_AGGRESSION,
   startTime = 0,
   raceStartTime = 0,
@@ -78,20 +63,20 @@ local state = {
   reenableTimer = 0,
   stuckTimer = 0,
   aiMode = nil,
-  lapGraceUntil = 0,       -- os.clock deadline: no lap scoring
-  lastLapTime = 0,         -- os.clock of last accepted lap cross
+  lapGraceUntil = 0,
+  lastLapTime = 0,
   lapArmed = false,
   insideFinish = false,
-  nextNode = 2,            -- sequential checkpoint index (1 = finish)
-  nodesHit = 0,            -- checkpoints hit since last finish
-  lapTimes = {},           -- accepted race lap times (sec)
+  nextNode = 2,
+  nodesHit = 0,
+  lapTimes = {},
   learnLapTimes = {},
   lastDist = nil,
   learnMaxSpeedMps = 0,
   learnSpeedViolations = 0,
   learnSpeedOk = true,
   currentSpeedMps = 0,
-  -- Run profile (overridable from trigger body; GT-IV defaults keep old scripts working)
+
   vehicle = 'etkc/race_DCT',
   vehicleLabel = 'ETK GT-IV DCT',
   telemetryCsvName = 'wc-gt4-lap-telemetry.csv',
@@ -111,8 +96,7 @@ local function telemetryPath()
   return pathJoin(getOutDir(), state.telemetryCsvName or 'wc-gt4-lap-telemetry.csv')
 end
 
--- Parse optional key=value lines from a trigger file body into the run profile.
--- Always resets to GT-IV defaults first so a prior Kingsnake session cannot stick.
+
 local function applyRunProfileFromTrigger(body)
   state.vehicle = 'etkc/race_DCT'
   state.vehicleLabel = 'ETK GT-IV DCT'
@@ -155,7 +139,7 @@ end
 local function writeJson(path, tbl)
   local ok, err = pcall(function()
     local encoded = jsonEncode(tbl)
-    -- Prefer BeamNG writeFile (user-folder aware); fall back to io.open
+
     if type(writeFile) == 'function' then
       writeFile(path, encoded)
       return
@@ -182,7 +166,7 @@ local function appendResult(line)
     local path = resultPath()
     local text = tostring(line) .. '\n'
     if type(writeFile) == 'function' and FS and FS:fileExists(path) then
-      -- read-append-write when writeFile can't append
+
       local prev = ''
       pcall(function()
         local rf = io.open(path, 'r')
@@ -205,7 +189,7 @@ end
 
 local function setPhase(p, extra)
   state.phase = p
-  -- Manual sessions use 4 timed laps; auto uses TARGET_LAPS (10 aggressive)
+
   local timedTarget = (state.runKind == 'manual') and 4 or TARGET_LAPS
   if extra and type(extra.targetLaps) == 'number' then
     timedTarget = extra.targetLaps
@@ -260,23 +244,22 @@ local function getPlayerVeh()
   return nil
 end
 
--- Checkpoint positions from levels/west_coast_usa/quickrace/race_track.prefab (lap order).
--- Index 1 = Checkpoint_finish; 2..13 = Checkpoint_1 .. Checkpoint_12.
+
 local BELASCO_FINISH = vec3(391.869995, -252.528, 144.863998)
 local BELASCO_SCRIPT = {
-  { x = 391.8700, y = -252.5280, z = 144.8640, r = 12.0 }, -- finish / start
-  { x = 33.3243,  y = -199.2640, z = 123.9135, r = 10.8 }, -- Checkpoint_1
-  { x = 167.4147, y = -469.5417, z = 142.5712, r = 9.6 },  -- Checkpoint_2
-  { x = -7.5180,  y = -657.8444, z = 131.8818, r = 9.0 },  -- Checkpoint_3
-  { x = -110.8354,y = -427.7834, z = 123.8155, r = 13.7 }, -- Checkpoint_4
-  { x = -278.6839,y = -198.5779, z = 119.1800, r = 9.0 },  -- Checkpoint_5
-  { x = 368.6414, y = 293.2215,  z = 119.6627, r = 8.7 },  -- Checkpoint_6
-  { x = 723.2717, y = 659.9144,  z = 130.3621, r = 10.9 }, -- Checkpoint_7
-  { x = 785.1316, y = 315.8590,  z = 158.5645, r = 11.1 }, -- Checkpoint_8
-  { x = 869.9496, y = 168.1190,  z = 159.0081, r = 10.4 }, -- Checkpoint_9
-  { x = 848.1912, y = 121.1950,  z = 149.4293, r = 11.0 }, -- Checkpoint_10
-  { x = 729.1861, y = -148.1200, z = 146.7421, r = 8.0 },  -- Checkpoint_11
-  { x = 680.0966, y = -225.3247, z = 146.7461, r = 11.4 }, -- Checkpoint_12
+  { x = 391.8700, y = -252.5280, z = 144.8640, r = 12.0 },
+  { x = 33.3243,  y = -199.2640, z = 123.9135, r = 10.8 },
+  { x = 167.4147, y = -469.5417, z = 142.5712, r = 9.6 },
+  { x = -7.5180,  y = -657.8444, z = 131.8818, r = 9.0 },
+  { x = -110.8354,y = -427.7834, z = 123.8155, r = 13.7 },
+  { x = -278.6839,y = -198.5779, z = 119.1800, r = 9.0 },
+  { x = 368.6414, y = 293.2215,  z = 119.6627, r = 8.7 },
+  { x = 723.2717, y = 659.9144,  z = 130.3621, r = 10.9 },
+  { x = 785.1316, y = 315.8590,  z = 158.5645, r = 11.1 },
+  { x = 869.9496, y = 168.1190,  z = 159.0081, r = 10.4 },
+  { x = 848.1912, y = 121.1950,  z = 149.4293, r = 11.0 },
+  { x = 729.1861, y = -148.1200, z = 146.7421, r = 8.0 },
+  { x = 680.0966, y = -225.3247, z = 146.7461, r = 11.4 },
 }
 
 local function nearestScriptIndex(pos)
@@ -288,9 +271,7 @@ local function nearestScriptIndex(pos)
   return bestI, bestD
 end
 
--- Distance to the closed polyline of checkpoint centers (not just nearest node).
--- Sparse Belasco nodes are hundreds of metres apart; mid-segment cars look "offtrack"
--- if we only measure node distance.
+
 local function distToScriptPolyline(pos)
   local best = 1e12
   local nCount = #BELASCO_SCRIPT
@@ -315,7 +296,7 @@ local function distToScriptPolyline(pos)
   return best
 end
 
--- Densify checkpoint script for AI pathing (~35 m spacing) so crawl stays on track.
+
 local function densifyScript(nodes, spacing)
   spacing = spacing or 35.0
   local out = {}
@@ -379,20 +360,16 @@ local function teleportToNearestNode(veh, pos)
   return idx
 end
 
--- Vehicle auto/ modules register as basename via loadAtRoot(..., "").
--- Short-name extensions.luukstyrethermalsandwear lazy-loads the NON-auto path and
--- logs "extension unavailable" if auto load was skipped — never call that blindly.
+
 local VEH_TEL_EXT_PATH = 'lua/vehicle/extensions/auto/luukstyrethermalsandwear'
 local VEH_TEL_EXT_NAME = 'luukstyrethermalsandwear'
 
 local function armTelemetry(veh, intervalSec)
   if not veh then return end
   local telPath = telemetryPath()
-  -- Buffered CSV I/O allows denser sampling; default 1.0s (manual was 3.0s for open/close lag)
-  -- Header: legacy wall..film + appended UI-stream cols (profile/purpose/patch/aero/dutyMods/gates).
-  -- Parsers that only read legacy indices remain valid; new fields are suffix-only.
+
   local interval = intervalSec or 1.0
-  -- Always re-queue: vehicle onReset used to clear path; keep CSV alive for full stint
+
   local cmd = string.format([[
     local ext = rawget(_G, %q)
     if not (ext and type(ext.setTelemetryCsv) == 'function') then
@@ -415,7 +392,7 @@ local function armTelemetry(veh, intervalSec)
     end
   ]], VEH_TEL_EXT_NAME, VEH_TEL_EXT_PATH, VEH_TEL_EXT_NAME, telPath, tostring(interval))
   veh:queueLuaCommand(cmd)
-  -- Do NOT set telemetryArmed=true here — wait for vehicle onTelemetryArmResult
+
   state.telemetryArmPending = true
   state.telemetryArmRequestedAt = os.clock()
   state.telemetryIntervalSec = interval
@@ -439,7 +416,7 @@ local function flushTelemetry(veh)
   ]], VEH_TEL_EXT_NAME, VEH_TEL_EXT_PATH, VEH_TEL_EXT_NAME))
 end
 
--- Vehicle → GE confirmation after setTelemetryCsv attempt (avoids optimistic false positives)
+
 local function onTelemetryArmResult(ok)
   state.telemetryArmPending = false
   if ok then
@@ -497,7 +474,7 @@ local function buildClosedScript(densify)
   end
   local script = {}
   for _, n in ipairs(base) do
-    -- Do NOT set node.v: BeamNG docs say forced v skips awareness + routeSpeedLimit.
+
     table.insert(script, { x = n.x, y = n.y, z = n.z, r = n.r })
   end
   local first = base[1]
@@ -505,12 +482,12 @@ local function buildClosedScript(densify)
   return script
 end
 
--- opts.learn = true → ≤10 mph, sensor-aided (avoidCars awareness + IMU + routeSpeed limit)
+
 local function queueAiDrive(veh, aggression, laps, opts)
   if not veh then return end
   opts = opts or {}
   local learn = opts.learn == true
-  -- Learn uses densified path so AI follows track arc; race uses sparse checkpoints.
+
   local script = buildClosedScript(learn)
 
   if learn then
@@ -578,7 +555,7 @@ local function startAiLaps(veh)
     state.prefabSpawned = true
   end
 
-  -- Slow sensor-aided learn lap first (≤10 mph), then aggressive timed laps.
+
   state.mode = 'learning'
   state.aggression = LEARN_AGGRESSION
   state.learnLap = 0
@@ -611,7 +588,7 @@ local function recoverVehicle(veh, reason)
   state.lastRecoverTime = now
   state.resetCount = state.resetCount + 1
   state.stuckTimer = 0
-  -- Drop poisoned max from teleport spike if any
+
   if state.learnMaxSpeedMps > LEARN_SPEED_SAMPLE_MAX then
     state.learnMaxSpeedMps = 0
   end
@@ -619,16 +596,16 @@ local function recoverVehicle(veh, reason)
 
   local pos = veh:getPosition() or BELASCO_FINISH
   local nodeIdx = teleportToNearestNode(veh, pos)
-  -- Prefer a mid-track node if recovery put us on finish (avoids instant lap cross)
+
   if nodeIdx == 1 then
     nodeIdx = teleportToNearestNode(veh, vec3(BELASCO_SCRIPT[3].x, BELASCO_SCRIPT[3].y, BELASCO_SCRIPT[3].z))
   end
-  -- Continue forward from recovered node, but do NOT credit pre-crash progress
+
   state.nodesHit = 0
   state.lapArmed = false
   state.insideFinish = false
   if nodeIdx >= #BELASCO_SCRIPT then
-    state.nextNode = 1 -- approaching finish; still unarmed until a full loop
+    state.nextNode = 1
   elseif nodeIdx > 1 then
     state.nextNode = nodeIdx + 1
   else
@@ -735,7 +712,7 @@ local function beginAggressiveStint(veh)
   state.stuckTimer = 0
   armLapGrace(LAP_ARM_GRACE_SEC)
 
-  -- Repair + place at start, then aggressive AI after short delay
+
   teleportToRacetrack(veh)
   if be and be.resetVehicle then
     pcall(function() be:resetVehicle(0) end)
@@ -770,7 +747,7 @@ local function clearTriggers()
   pcall(function() os.remove(pathJoin(getToolsDir(), 'STOP_WC_TEST')) end)
 end
 
--- User/harness abort: kill AI, disarm CSV, mark stopped (does not quit BeamNG).
+
 local function abortUserStop(reason)
   reason = reason or 'user_abort'
   clearTriggers()
@@ -811,8 +788,7 @@ local function pollStopTrigger()
   return true
 end
 
--- Returns runKind ('auto'|'manual') and trigger name, or nil,nil if none.
--- Also applies vehicle/CSV profile from trigger body (key=value / profile=kingsnake).
+
 local function readTriggerMode()
   local manPath = pathJoin(getToolsDir(), 'RUN_WC_MANUAL_TEL')
   local mf = io.open(manPath, 'r')
@@ -961,7 +937,7 @@ local function isActiveRunPhase()
       or state.phase == 'manual_telemetry'
 end
 
--- Hot-switch / idle poll: consume trigger and start (or switch to) the right mode.
+
 local function tryConsumeTrigger(reasonPrefix)
   local kind, trigName = readTriggerMode()
   if not kind then return false end
@@ -970,7 +946,7 @@ local function tryConsumeTrigger(reasonPrefix)
       clearTriggers()
       return false
     end
-    -- If an AI run is mid-flight, stop AI and flip to telemetry-only without full relaunch.
+
     if state.aiStarted or state.phase == 'learning' or state.phase == 'racing'
         or state.phase == 'start_ai' or state.phase == 'arming' then
       clearTriggers()
@@ -981,9 +957,9 @@ local function tryConsumeTrigger(reasonPrefix)
     beginSequence((reasonPrefix or 'trigger') .. ' via ' .. tostring(trigName), 'manual')
     return true
   end
-  -- auto
+
   if state.runKind == 'manual' and state.phase == 'manual_telemetry' then
-    -- ignore auto trigger while user is mid manual session unless they relaunch
+
     clearTriggers()
     appendResult('ignored auto trigger while manual_telemetry active')
     return false
@@ -991,7 +967,7 @@ local function tryConsumeTrigger(reasonPrefix)
   beginSequence((reasonPrefix or 'trigger') .. ' via ' .. tostring(trigName), 'auto')
   return true
 end
--- Advance sequential checkpoint progress; arm only after most of the lap.
+
 local function updateLapProgress(pos)
   local guard = 0
   while guard < 3 do
@@ -1001,7 +977,7 @@ local function updateLapProgress(pos)
       state.nextNode = 2
       break
     end
-    -- While collecting checkpoints, skip finish (index 1) until armed + enter gate
+
     if idx == 1 then
       if state.nodesHit >= ARM_MIN_NODES then
         state.lapArmed = true
@@ -1015,7 +991,7 @@ local function updateLapProgress(pos)
       state.nodesHit = state.nodesHit + 1
       local nxt = idx + 1
       if nxt > #BELASCO_SCRIPT then
-        nxt = 1 -- approach finish after Checkpoint_12
+        nxt = 1
       end
       state.nextNode = nxt
       if state.nodesHit >= ARM_MIN_NODES then
@@ -1030,7 +1006,7 @@ end
 local function acceptFinishCross(veh, now, sinceLast)
   state.lastLapTime = now
   resetLapProgress()
-  -- After accepting, require a fresh loop (start looking for Checkpoint_1)
+
   state.nextNode = 2
   state.nodesHit = 0
   state.insideFinish = true
@@ -1068,7 +1044,7 @@ local function onUpdate(dt)
   if state.finished then return end
   dt = dt or 0.016
 
-  -- Always allow a manual trigger to abort AI mid-run and flip to telemetry-only.
+
   if state.phase ~= 'idle' and state.phase ~= 'mission_start' and state.phase ~= 'loaded' then
     local kind = readTriggerMode()
     if kind == 'manual' and state.phase ~= 'manual_telemetry' then
@@ -1100,8 +1076,7 @@ local function onUpdate(dt)
     return
   end
 
-  -- Manual mode: keep CSV armed, AI off, no learn/race/recover automation.
-  -- Manual does not run lap gates here — flush on safety timer / disarm / session end.
+
   if state.phase == 'manual_telemetry' or (state.runKind == 'manual' and state.phase ~= 'boot'
       and state.phase ~= 'teleport' and state.phase ~= 'arming') then
     if state.phase ~= 'manual_telemetry' then
@@ -1114,8 +1089,7 @@ local function onUpdate(dt)
       telemetryFlushTimer = 0
       flushTelemetry(veh)
     end
-    -- Slow heartbeat: re-arm every 8s so CSV stays armed across vehicle reloads;
-    -- also flush so disk catches up without waiting for the 45s safety timer.
+
     if sampleTimer > 8.0 then
       sampleTimer = 0
       disableAi(veh)
@@ -1157,7 +1131,7 @@ local function onUpdate(dt)
   end
 
   if state.aiStarted and not state.finished and state.runKind ~= 'manual' then
-    -- After recover / learn→race transition, re-enable AI
+
     if state.needReenableAi then
       state.reenableTimer = state.reenableTimer + dt
       if state.reenableTimer >= REENABLE_DELAY then
@@ -1190,18 +1164,18 @@ local function onUpdate(dt)
       setPhase(state.mode == 'learning' and 'learning' or 'racing')
     end
 
-    -- Learn-phase speed cap: track + reinforce AI limit; soft-brake if overshoot
+
     if state.mode == 'learning' and not state.needReenableAi then
       learnSpeedPollTimer = learnSpeedPollTimer + dt
       local speed = getVehSpeed(veh)
       state.currentSpeedMps = speed
-      -- Ignore physics spikes from teleport / reset (can be thousands of m/s for 1 frame)
+
       if speed <= LEARN_SPEED_SAMPLE_MAX and os.clock() >= state.lapGraceUntil then
         if speed > state.learnMaxSpeedMps then
           state.learnMaxSpeedMps = speed
         end
       elseif speed > LEARN_SPEED_SAMPLE_MAX then
-        -- Physics spike (teleport/reset) — never let it poison learnMax
+
         if state.learnMaxSpeedMps > LEARN_SPEED_SAMPLE_MAX then
           state.learnMaxSpeedMps = 0
         end
@@ -1231,7 +1205,7 @@ local function onUpdate(dt)
       state.currentSpeedMps = getVehSpeed(veh)
     end
 
-    -- Damage / stuck / off-track recovery
+
     recoverPollTimer = recoverPollTimer + dt
     if recoverPollTimer > 1.0 and not state.needReenableAi then
       recoverPollTimer = 0
@@ -1255,14 +1229,14 @@ local function onUpdate(dt)
         state.stuckTimer = 0
       end
 
-      -- Off-track vs densified polyline; learn uses wider gate + only when nearly stopped
+
       local offtrackSpeedGate = (state.mode == 'learning') and 0.8 or 8.0
       if nearDist > offDist and speed < offtrackSpeedGate then
         recoverVehicle(veh, string.format('offtrack dist=%.0f', nearDist))
       end
     end
 
-    -- Closed-loop lap gate: sequential checkpoints + finish hysteresis + min time
+
     lapPollTimer = lapPollTimer + dt
     if lapPollTimer > 0.25 then
       lapPollTimer = 0
@@ -1275,11 +1249,11 @@ local function onUpdate(dt)
         if now >= state.lapGraceUntil then
           updateLapProgress(pos)
 
-          -- Hysteresis around finish / script node 0
+
           if state.insideFinish then
             if d > FINISH_EXIT_M then
               state.insideFinish = false
-              -- Passed start/finish without scoring — keep collecting from Checkpoint_1
+
               if state.nextNode == 1 then
                 state.nextNode = 2
               end
@@ -1306,7 +1280,7 @@ local function onUpdate(dt)
       end
     end
 
-    -- Safety timeout (~75 min wall: slow learn can be 15–25 min + 10 race laps)
+
     if state.startTime > 0 and (os.clock() - state.startTime) > 4500 then
       finishTest('timeout')
     end

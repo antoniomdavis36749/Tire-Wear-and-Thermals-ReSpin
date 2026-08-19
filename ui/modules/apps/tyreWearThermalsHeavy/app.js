@@ -103,7 +103,7 @@ angular.module("beamng.apps")
                             margin-top: 7px;
                             margin-bottom: 1px;
                         }
-                        /* Segmented Thermal Display */
+                        
                         .tth-thermal-strip {
                             display: grid;
                             grid-template-columns: repeat(3, 1fr);
@@ -120,7 +120,7 @@ angular.module("beamng.apps")
                             border-radius: 3px;
                             text-shadow: 0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,1);
                         }
-                        /* Progress and Health Bars */
+                        
                         .tth-bar-container {
                             width: 100%;
                             background: rgba(255, 255, 255, 0.16);
@@ -132,7 +132,7 @@ angular.module("beamng.apps")
                         .tth-bar-fill {
                             height: 100%;
                         }
-                        /* Capture-focused test channels (Patch/Heat, drive gates, slip) */
+                        
                         .tth-test-channels .tth-stat-row {
                             font-size: 15px;
                             margin-bottom: 5px;
@@ -141,7 +141,7 @@ angular.module("beamng.apps")
                             font-size: 14px;
                             margin-top: 9px;
                         }
-                        /* Symmetrical Diagnostics Dashboard */
+                        
                         .tth-diagnostics-grid {
                             display: grid;
                             grid-template-columns: 1fr 1fr;
@@ -187,7 +187,7 @@ angular.module("beamng.apps")
 
                     <div class="tth-grid">
                         <div class="tth-card" ng-repeat="w in wheels">
-                            <!-- Wheel Header -->
+                            
                             <div class="tth-card-header">
                                 <span class="tth-wheel-name">{{ w.name }}</span>
                                 <span style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
@@ -220,7 +220,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- Structural Condition -->
+                            
                             <div class="tth-stat-row">
                                 <span class="tth-label">Tread Condition:</span>
                                 <span class="tth-value" ng-style="{'color': getConditionColor(w.condition)}">
@@ -231,7 +231,7 @@ angular.module("beamng.apps")
                                 <div class="tth-bar-fill" ng-style="{'width': (w.condition || 0) + '%', 'background-color': getConditionColor(w.condition)}"></div>
                             </div>
 
-                            <!-- Friction Grip Utilization -->
+                            
                             <div class="tth-stat-row">
                                 <span class="tth-label">Dynamic Grip:</span>
                                 <span class="tth-value" ng-style="{'color': getGripColor(w.tyreGrip)}">
@@ -239,7 +239,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- Pressure setup: cold set vs live vs target hot -->
+                            
                             <div class="tth-stat-row">
                                 <span class="tth-label">Tire Pressure:</span>
                                 <span class="tth-value">
@@ -265,7 +265,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- Zone wear O|M|I -->
+                            
                             <div class="tth-stat-row" style="margin-top: 4px;" ng-if="w.zoneCondition">
                                 <span class="tth-label">Zone Wear O|M|I:</span>
                                 <span class="tth-value" style="font-size: 13px;">
@@ -275,7 +275,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- Alignment Parameters -->
+                            
                             <div class="tth-stat-row">
                                 <span class="tth-label">Camber / Toe:</span>
                                 <span class="tth-value" ng-style="{'color': isExcessiveCamber(w.camber) ? '#ffaa44' : '#f1f5f9'}">
@@ -299,7 +299,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- SURFACE CONTACT + TEST CHANNELS (capture-sized fonts) -->
+                            
                             <div class="tth-test-channels">
                             <div class="tth-section-label">SURFACE CONTACT</div>
                             <div class="tth-stat-row">
@@ -341,7 +341,7 @@ angular.module("beamng.apps")
                             </div>
                             </div>
 
-                            <!-- Skin Thermal Distribution (Outer | Middle | Inner) -->
+                            
                             <div class="tth-section-label-muted">Surface Heat Map (O | M | I):</div>
                             <div class="tth-thermal-strip">
                                 <div class="tth-thermal-segment" 
@@ -351,7 +351,7 @@ angular.module("beamng.apps")
                                 </div>
                             </div>
 
-                            <!-- Carcass L/C/R (shoulders vs center) -->
+                            
                             <div class="tth-section-label-muted" style="margin-top: 5px;">Carcass Heat Map (O | M | I):</div>
                             <div class="tth-thermal-strip">
                                 <div class="tth-thermal-segment" 
@@ -402,7 +402,7 @@ angular.module("beamng.apps")
                                 </span>
                             </div>
 
-                            <!-- TEST / PHYSICS CHANNELS -->
+                            
                             <div class="tth-test-channels">
                             <div class="tth-section-label">TEST CHANNELS</div>
                             <div class="tth-stat-row">
@@ -453,7 +453,7 @@ angular.module("beamng.apps")
                             </div>
                             </div>
 
-                            <!-- Distinct surface modes -->
+                            
                             <div class="tth-diagnostics-grid">
                                 <div class="tth-diagnostic-item">
                                     <span class="tth-diag-label">CLOG</span>
@@ -510,11 +510,10 @@ angular.module("beamng.apps")
                     console.warn("tyreWearThermalsHeavy: StreamsManager service was not found in this injector context.");
                 }
 
-                // Client-side smooth motion: Lua ~30 Hz; RAF lerps display toward targets.
-                // Digest is throttled (~20 Hz): full $digest every RAF stalls CEF under Heavy binding load.
+
                 var LERP_K = 12;
                 var LERP_EPS = 0.05;
-                var DIGEST_INTERVAL_MS = 50; // ~20 Hz Angular updates; RAF still lerps at display rate
+                var DIGEST_INTERVAL_MS = 50;
                 var rafId = null;
                 var lastRafTs = 0;
                 var lastDigestTs = 0;
@@ -633,7 +632,7 @@ angular.module("beamng.apps")
                     return "HIGH";
                 };
 
-                // |Lua−Nat| for hot write-back convergence (green when tight, amber while catching up)
+
                 scope.pressureDeltaAbs = function (w) {
                     var d = (w && w.pressureDelta !== undefined)
                         ? w.pressureDelta
@@ -644,9 +643,9 @@ angular.module("beamng.apps")
                     var d = Math.abs((w && w.pressureDelta !== undefined)
                         ? w.pressureDelta
                         : ((w && w.luaPressure !== undefined ? w.luaPressure : 0) - (w && w.nativePressure !== undefined ? w.nativePressure : 0)));
-                    if (d <= 0.2) return "#10b981"; // converged (within ~deadband)
-                    if (d <= 1.0) return "#94a3b8"; // closing in
-                    return "#f59e0b"; // warm-up lag / write-back catching Nat
+                    if (d <= 0.2) return "#10b981";
+                    if (d <= 1.0) return "#94a3b8";
+                    return "#f59e0b";
                 };
 
                 scope.tempCategoryColor = function (cat) {
@@ -716,7 +715,7 @@ angular.module("beamng.apps")
                     return "";
                 };
 
-                // Cold-set vs hot-target band: short UNDER/OVER chip (hidden when empty).
+
                 scope.coldSetWarnChip = function (w) {
                     var warn = scope.getTuningWarning(
                         (w && (w.coldPressure || w.initialPressure)) || 0,
@@ -788,7 +787,7 @@ angular.module("beamng.apps")
                     return [a[0] || 0, a[1] || 0, a[2] || 0];
                 }
 
-                // Full shallow wheel copy so Heavy keeps every stream field; arrays are cloned.
+
                 function cloneWheel(src) {
                     var dst = {};
                     var k;
@@ -831,7 +830,7 @@ angular.module("beamng.apps")
                     if (document.hidden) return false;
                     var el = element[0];
                     if (!el) return false;
-                    // Detached / display:none apps have no layout box — skip RAF work.
+
                     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
                 }
 
@@ -959,7 +958,7 @@ angular.module("beamng.apps")
                     lastRafTs = ts;
                     var alpha = Math.min(1, LERP_K * dt);
                     var moved = lerpDisplay(alpha);
-                    // Throttle digests: RAF keeps lerping the model; Angular rebinds at ~20 Hz.
+
                     if (!moved || !lastDigestTs || (ts - lastDigestTs) >= DIGEST_INTERVAL_MS) {
                         lastDigestTs = ts;
                         digestDisplay();
@@ -1049,7 +1048,7 @@ angular.module("beamng.apps")
                     if (dataStream.streamHz !== undefined) scope.streamHz = dataStream.streamHz;
 
                     if (structural) {
-                        // Wheel-count change or same-id resetGen bump: snap cold, drop RAF lerp.
+
                         stopRaf();
                         targetWheels = [];
                         var wheels = [];

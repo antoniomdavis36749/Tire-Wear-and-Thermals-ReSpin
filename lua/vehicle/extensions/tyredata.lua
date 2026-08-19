@@ -1,22 +1,16 @@
 -- Credits: lucky4luuk (original), Zesty_Maple98 (Redux expansion). See CREDITS.md.
+
 local M = {}
 
--- Fast local cache of frequently accessed primitive functions and tables
+
 local abs = math.abs
 local max = math.max
 local exp = math.exp
 
---[[
-  LEGACY / FALLBACK thermal grip profiles for tyre_data.getGrip() callers only.
-  PRIMARY source of truth: vehicle extension profile schema in
-    lua/vehicle/extensions/auto/luukstyrethermalsandwear.lua
-    (PROFILE_POINTS / SLICK_SPECTRUM_POINTS / STANDALONE_MODIFIERS).
 
-  Keep these tables aligned with that schema's optimalTemp / plateau / coldWidth /
-  hotWidth / gripFloor. Do not tune thermals here for gameplay.
-]]
+
 local profiles = {
-    -- Slicks: match SLICK_SPECTRUM_POINTS cold cliffs (narrower than old w_cold=68)
+
     slicks          = { t_opt = 84.0,  plateau = 14.0, w_cold = 46.0, w_hot = 46.0, floor = 0.20 },
     supersoft_slick = { t_opt = 78.0,  plateau = 14.0, w_cold = 44.0, w_hot = 44.0, floor = 0.18 },
     soft_slick      = { t_opt = 78.0,  plateau = 14.0, w_cold = 44.0, w_hot = 44.0, floor = 0.18 },
@@ -42,11 +36,8 @@ local profiles = {
     vintage         = { t_opt = 58.0,  plateau = 16.0, w_cold = 58.0, w_hot = 55.0, floor = 0.26 }
 }
 
---[[
-  Evaluates compound thermal curves.
-  Optional 5th arg `overrides` may supply { t_opt, plateau, w_cold, w_hot, floor }
-  so callers can pass profile mods without duplicating tables.
-]]
+
+
 local function getGrip(p, temp, compliance, softness, overrides)
     temp = temp or 21 
     compliance = compliance or 0.5
