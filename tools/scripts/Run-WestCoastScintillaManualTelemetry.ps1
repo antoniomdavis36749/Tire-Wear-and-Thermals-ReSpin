@@ -37,7 +37,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $gameExe = 'C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\Bin64\BeamNG.drive.x64.exe'
-$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main\tools'
+$modVs = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-dev\tools'
 $modOut = Join-Path $modVs 'output'
 $status = Join-Path $modOut 'wc-scintilla-lap-status.json'
 $result = Join-Path $modOut 'wc-scintilla-lap-result.txt'

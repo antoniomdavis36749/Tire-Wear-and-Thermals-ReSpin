@@ -1,7 +1,7 @@
 # BeamNG Repo publish checklist
 
 Branches: **`testing/main`** (active polish) → merge to **`main`** (GitHub default / Repo source link)  
-Working folder: `Tire-Wear-and-Thermals-ReSpin-main`  
+Working folder: `Tire-Wear-and-Thermals-ReSpin-dev` (local git sync under `mods/unpacked/`)  
 Official packing docs: https://documentation.beamng.com/modding/mod-support/mod_packing/  
 Guidelines: https://www.beamng.com/game/support/policies/modding-guidelines/
 
@@ -12,6 +12,18 @@ Guidelines: https://www.beamng.com/game/support/policies/modding-guidelines/
 - `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` deferred / N/A
 
 ---
+
+## Calibration band (0.1.2) — locked
+
+Street Sport heat and Sport Plus heat+wear locked on the same Belasco Track ~15°C / ~22 km protocol. Race slick band from 0.1.1 still held.
+
+| Lock | Notes |
+| --- | --- |
+| Sport heat | HEAT v7 — cruise cooler than opt; do not chase 66°C on the highway |
+| Sport Plus heat + wear | HEAT #8 / wear 0.0028 — no FL blister on a ~22 km stint |
+| Track Day heat | Locked for now (between Plus and Hard) |
+
+- [x] Listing / `info.json` refreshed for 0.1.2 (everyday wording)
 
 ## Calibration band (0.1.1) — locked
 
@@ -29,7 +41,7 @@ Live Belasco / WCU Track ~15°C protocol (~4 laps / ~22 km). Soft compound knobs
 - [x] FWD Soft-like topology locked
 - [x] AWD Soft-like front damp locked
 - [x] Pitwall ships (engineer view + stint/odo + heat-knob chips)
-- [x] Listing / `info.json` refreshed for 0.1.1
+- [x] Listing / `info.json` refreshed for 0.1.1 (kept; 0.1.2 supersedes public copy)
 
 ---
 
@@ -71,14 +83,14 @@ Do **not** reuse Redux’s resource identity. This is a new listing derived from
 
 - [x] New title: `Tire Wear and Thermals ReSpin`
 - [x] Polished tagline + BBCode description (`LISTING.md`, `mod_info/TWTRS_RESPIN/info.json`)
-- [x] Version string `0.1.1` (no version in zip filename)
+- [x] Version string `0.1.2` (no version in zip filename; 0.1.1 was the first listed drop)
 - [x] Zip name draft: `TireWearThermalsReSpin.zip` (add `_YourBeamNGUser` before upload if needed)
 - [x] Removed Redux `resource_id` / `MXFQY32S5` / foreign owner fields / stale hashes
 - [x] Local placeholder tagid `TWTRS_RESPIN` (Repo will assign official tag on upload)
 - [x] BeamNG forum username confirmed: `antoniomdavis36749`
 - [x] Icon / preview images — locked heroes + four-UI gallery + ducts
 - [ ] Category confirmed on upload form
-- [x] Prefix: Alpha (street/wet still open; race Soft/Med/Hard band locked)
+- [x] Prefix: Alpha (street/truck/wet still open; race slicks + Sport / Sport Plus heat locked)
 
 ## D. Technical readiness
 
@@ -114,18 +126,19 @@ Upload **both** as **new** resources (not updates to Redux 29934). Core zip from
 
 ### F1. Core — Tire Wear and Thermals ReSpin
 
-- [ ] Upload `TireWearThermalsReSpin_antoniomdavis36749.zip`
-- [ ] Paste core BBCode from `LISTING.md`; gallery: hero → `ui_four_apps` → `ducts`
-- [ ] Category confirmed on form
-- [ ] After approval: note core resource URL; keep zip filename stable
+- [x] Upload `TireWearThermalsReSpin_antoniomdavis36749.zip`
+- [x] Paste core BBCode from `LISTING.md`; gallery: hero → `ui_four_apps` → `ducts`
+- [x] Category confirmed on form
+- [x] Approved / listed: https://www.beamng.com/resources/tire-wear-and-thermals-respin.39082/ (keep zip filename stable)
 
 ### F2. Compat Tires — second listing
 
 - [x] Decision: Compat is a **second Repo resource** (not bundled / not “later only”)
-- [ ] Upload `TireWearThermalsReSpin_CompatTires.zip`
-- [ ] Paste Compat BBCode from the tires repo `LISTING.md`; gallery: Compat hero
-- [ ] Category confirmed on form (Vehicles/Parts likely)
-- [ ] After approval: note Compat URL; cross-link core ↔ Compat in both descriptions
+- [x] Upload `TireWearThermalsReSpin_CompatTires.zip`
+- [x] Paste Compat BBCode from the tires repo `LISTING.md`; gallery: Compat hero
+- [x] Category confirmed on form (Vehicles/Parts likely)
+- [x] Approved / listed: https://www.beamng.com/resources/tire-wear-and-thermals-respin-%E2%80%94-compat-tires.39083/
+- [ ] Cross-link core ↔ Compat in both descriptions (BBCode in `LISTING.md`)
 - [ ] Optional: Pigniteon ETKC smoke before advertising that companion in Compat listing
 
 ## G. Post-publish maintenance

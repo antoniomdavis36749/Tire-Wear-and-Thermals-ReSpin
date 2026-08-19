@@ -478,7 +478,7 @@ local scratchCarcassWeights = { 0, 0, 0 }
     rollingWearCoef     Distance/rolling wear vs ω (1.0 = current tiny term; slick C4 >1).
     coldWearMult        Wear multiplier when well below opt.
     hotWearMult         Wear multiplier when above opt.
-    grainTempRatio      Graining starts below opt × this (e.g. 0.75).
+    grainTempRatio      Graining starts below opt × this (street Sport/Plus 0.88; default 0.75).
     blisterTempRatio    Blistering starts above opt × this (e.g. 1.55).
     grainRate           Cold-scrub grain accumulation rate (onset stays grainTempRatio).
     blisterRate         Overheat blister accumulation rate (onset stays blisterTempRatio).
@@ -525,8 +525,11 @@ local DEFAULT_MODS = {
 -- Phase 5: packs are magnitudes only; purposeAllowsStreetSoftcap() selects enable.
 -- Pass 5/6: floors moved toward 1.0 after root drive-heat cuts (debt paydown; enable rules unchanged).
 local DRIVE_SOFTCAP_STREET = { driveSlipHeatMin = 0.90, driveSlipPropMin = 0.93, driveHighVCarcassScale = 0.80 }
+-- Sport HEAT LOCKED (Belasco 22 km / Scintilla native sport). Between street and Plus.
+local DRIVE_SOFTCAP_SPORT = { driveSlipHeatMin = 0.92, driveSlipPropMin = 0.95, driveHighVCarcassScale = 0.87 }
 local DRIVE_SOFTCAP_SPORT_PLUS = { driveSlipHeatMin = 0.94, driveSlipPropMin = 0.97, driveHighVCarcassScale = 0.82 }
-local DRIVE_SOFTCAP_SPORT_MID = { driveSlipHeatMin = 0.92, driveSlipPropMin = 0.95, driveHighVCarcassScale = 0.81 }
+-- Track Day LOCKED: Plus (0.94/0.97/0.82) → Hard C2 OFF (1.0/1.0/1.0). Street gate still on.
+local DRIVE_SOFTCAP_TRACK_DAY = { driveSlipHeatMin = 0.97, driveSlipPropMin = 0.985, driveHighVCarcassScale = 0.91 }
 -- Vintage/bias-ply: gentler than street — historical rubber shouldn't need FWD soft-cap crutch.
 local DRIVE_SOFTCAP_VINTAGE = { driveSlipHeatMin = 0.95, driveSlipPropMin = 0.97, driveHighVCarcassScale = 0.88 }
 local DRIVE_SOFTCAP_OFF = { driveSlipHeatMin = 1.0, driveSlipPropMin = 1.0, driveHighVCarcassScale = 1.0 }
@@ -560,20 +563,21 @@ local CHARACTER_NEUTRAL = {
     grainRate = 0.00042, blisterRate = 0.00028,
     flatSpotRate = 0.025, stintFadeRate = 1.0, camberWearMult = 1.0,
 }
-local CHARACTER_SPORT_MID = {
+local CHARACTER_SPORT = {
     coldGripPower = 1.33, hotGripPower = 2.20,
-    grainRate = 0.00043, blisterRate = 0.00045,
+    grainRate = 0.00086, blisterRate = 0.00045,
     flatSpotRate = 0.026, stintFadeRate = 1.15, camberWearMult = 1.06,
 }
--- Pass #7e blister on plus only. Track Day starts at MID (not Scintilla lock).
+-- Track Day LOCKED: between Sport Plus and Hard C2 (not Plus and Sport).
+-- Plus blister #7e stays Plus-only; this pack is a Plus→Hard lerp.
 local CHARACTER_TRACK_DAY = {
-    coldGripPower = 1.33, hotGripPower = 2.20,
-    grainRate = 0.00043, blisterRate = 0.00045,
-    flatSpotRate = 0.026, stintFadeRate = 1.15, camberWearMult = 1.06,
+    coldGripPower = 1.36, hotGripPower = 2.22,
+    grainRate = 0.00042, blisterRate = 0.00062,
+    flatSpotRate = 0.0275, stintFadeRate = 1.20, camberWearMult = 1.11,
 }
 local CHARACTER_SPORT_PLUS = {
     coldGripPower = 1.32, hotGripPower = 2.28,
-    grainRate = 0.00045, blisterRate = 0.00090,
+    grainRate = 0.00090, blisterRate = 0.00090,
     flatSpotRate = 0.027, stintFadeRate = 1.22, camberWearMult = 1.10,
 }
 local CHARACTER_SLICK_HARD = {
@@ -626,8 +630,7 @@ end
 -- Order matters: more specific tags BEFORE shorter substrings (sport_plus before sport).
 local DEFAULT_GRIP_COEFFS = {
     { "sport_plus", { 1.12, 0.22, -0.08 } },  -- Semi-slick / Scintilla lock peak ~1.26
-    { "track_day", { 1.15, 0.22, -0.08 } },   -- 40% sport→hard C2 poly (~1.29)
-    { "sport_tour", { 1.15, 0.22, -0.08 } },  -- alias: renamed Track Day
+    { "track_day", { 1.15, 0.22, -0.08 } },   -- LOCKED ~Plus+2% peak (~1.29); 200TW-ish, not 40% Plus→Hard
     { "supersoft_slick", { 1.46, 0.36, -0.12 } },
     { "soft_slick", { 1.42, 0.34, -0.12 } },
     { "medium_slick", { 1.38, 0.32, -0.12 } },
@@ -836,47 +839,54 @@ local STANDALONE_MODIFIERS = {
 -- Intermediate anchors (0.40 / 0.60 / 0.85) densify sport↔standard and AT↔MT leaps.
 local PROFILE_POINTS = {
     { tread = 0.30, profile = "sport_plus", mods = {
-        -- Scintilla sport plus LOCKED (Belasco). HEAT #7, BLISTER #7e, GRIP v4: gm/dry 1.04,
-        -- long 1.05, lat 1.02, loadSens 0.040. HS ~2% RWD slip is accept. Do not nudge.
+        -- Scintilla sport plus HEAT+WEAR LOCKED (#8 accepted, Belasco Track 15°C).
+        -- #7 FL cook: 102°C / 60% blister / 83% tread. #8: 1-lap FL ~81, late stint ~70s–80s
+        -- Normal, blister 0, worst tread ~98.5% (~1.5% wear). Do not chase FL to 76 on rights.
+        -- velCool 0.50, slip/work 16.6/10.2, wearRate 0.0028. BLISTER #7e / GRIP v4 held.
+        -- Grain #1 (ratio 0.88) separate — cold out-lap only. Do not nudge heat/wear.
         adhesion = 0.52, airConductionRate = 0.015, airCoolingRate = 0.011, brakeGainRate = 1.35,
         casingCompliance = 0.45, coreCoolRate = 0.038, coreVelCoolRate = 0.0095, skinCoreConductance = 0.088,
         gripMultiplier = 1.04, longGripMult = 1.05, latGripMult = 1.02, loadSensitivity = 0.040,
         optimalPressure = 31, optimalTemp = 76, pressureSensitivity = 0.75, rollingRes = 0.70,
-        staticCoolingRate = 0.044, slipHeatRate = 19.5, workHeatRate = 12.0, wearRate = 0.0006,
+        staticCoolingRate = 0.044, slipHeatRate = 16.6, workHeatRate = 10.2, wearRate = 0.0028,
         treadInertia = 0.441, carcassInertia = 0.714, thermalReactionRate = 1.3, tempPlateau = 14,
         coldWidth = 52, hotWidth = 32, gripFloor = 0.24, coldWearMult = 1.908,
-        hotWearMult = 5.60, grainTempRatio = 0.78, blisterTempRatio = 1.22, waterDrainage = 0.58,
+        hotWearMult = 5.60, grainTempRatio = 0.88, blisterTempRatio = 1.22, waterDrainage = 0.58,
         wetGripScale = 0.995, dryGripScale = 1.04, trackConductivityMult = 0.75, camberSensitivity = 1.1,
-        bottomOutSensitivity = 1, scrubSensitivity = 1.15, skinVelCoolScale = 0.35, workHeatG0 = 0.04
+        bottomOutSensitivity = 1, scrubSensitivity = 1.15, skinVelCoolScale = 0.50, workHeatG0 = 0.04
     } },
     { tread = 0.40, profile = "track_day", mods = {
-        -- Track Day START heat locked. GRIP v1: HS slip matched Plus (~2.1%); aim ~1.0–1.2%.
-        -- long 1.0→1.04; gm/dry 1.00→1.02; loadSens 0.066→0.048. Lat/heat/blister held.
+        -- Track Day LOCKED (Belasco, for now). Between Plus and Hard C2; street purpose.
+        -- HEAT v3: slip 10.9 / work 6.20, opt 76, cooling held. Slight abuse overshoot only.
+        -- GRIP v2: gm/dry 1.04, long 1.08, lat 1.0, loadSens 0.042. Poly 1.15 (~Plus+2%).
+        -- Character + drive soft-cap = Plus→Hard lerp. Recheck later; do not nudge now.
         adhesion = 0.444, airConductionRate = 0.015, airCoolingRate = 0.020, brakeGainRate = 1.32,
         casingCompliance = 0.42, coreCoolRate = 0.036, coreVelCoolRate = 0.0083, skinCoreConductance = 0.090,
-        gripMultiplier = 1.02, longGripMult = 1.04, latGripMult = 1.0, loadSensitivity = 0.048,
+        gripMultiplier = 1.04, longGripMult = 1.08, latGripMult = 1.0, loadSensitivity = 0.042,
         optimalPressure = 31, optimalTemp = 76, pressureSensitivity = 0.71, rollingRes = 0.88,
-        staticCoolingRate = 0.068, slipHeatRate = 10.53, workHeatRate = 6.09, wearRate = 0.00073,
+        staticCoolingRate = 0.068, slipHeatRate = 10.9, workHeatRate = 6.20, wearRate = 0.00073,
         treadInertia = 0.471, carcassInertia = 0.763, thermalReactionRate = 1.22, tempPlateau = 16,
         coldWidth = 64, hotWidth = 52, gripFloor = 0.28, coldWearMult = 1.84,
         hotWearMult = 3.05, grainTempRatio = 0.76, blisterTempRatio = 1.59, waterDrainage = 0.43,
-        wetGripScale = 0.90, dryGripScale = 1.02, trackConductivityMult = 0.90, camberSensitivity = 1.18,
+        wetGripScale = 0.90, dryGripScale = 1.04, trackConductivityMult = 0.90, camberSensitivity = 1.18,
         bottomOutSensitivity = 1.04, scrubSensitivity = 1.28, skinVelCoolScale = 0.80, workHeatG0 = 0.148
     } },
     { tread = 0.50, profile = "sport", mods = {
-        -- v6: medium mechanical μ bump (mirror sport_plus v6→v7 step; Kingsnake continuum ~0.50).
-        -- gm+dry +0.02; lat held 1.0 (felt good); loadSens eased slightly; blend@0.4 still coherent.
-        -- Pass 5: modest slip/work cut (~7%).
-        adhesion = 0.42, airConductionRate = 0.015, airCoolingRate = 0.024, brakeGainRate = 1.2,
+        -- Sport HEAT LOCKED (v7 accepted, Belasco Scintilla native sport, Track 15°C).
+        -- 22 km cruise settle ~53 / 59 / 60 / 61 vs opt 66 (F≪R; FR coldest). Turn 1 ~58–60
+        -- Normal; RL carcass ~opt. HS straight dumps — do not chase 66 on cruise. Grip v6 held.
+        -- Knobs: slip/work 9.40/5.45, velCool 0.72, workHeatG0 0.16, airCool 0.020, static 0.065,
+        -- DRIVE_SOFTCAP_SPORT 0.92/0.95/0.87. Wear not locked. Do not nudge heat.
+        adhesion = 0.42, airConductionRate = 0.015, airCoolingRate = 0.020, brakeGainRate = 1.2,
         casingCompliance = 0.5, coreCoolRate = 0.035, coreVelCoolRate = 0.008, skinCoreConductance = 0.076,
         gripMultiplier = 1.00, longGripMult = 1, latGripMult = 1, loadSensitivity = 0.036,
         optimalPressure = 33, optimalTemp = 66, pressureSensitivity = 0.55, rollingRes = 0.82,
-        staticCoolingRate = 0.073, slipHeatRate = 8.55, workHeatRate = 4.95, wearRate = 0.00045,
+        staticCoolingRate = 0.065, slipHeatRate = 9.40, workHeatRate = 5.45, wearRate = 0.00045,
         treadInertia = 0.483, carcassInertia = 0.782, thermalReactionRate = 1.2, tempPlateau = 18,
         coldWidth = 74, hotWidth = 55, gripFloor = 0.34, coldWearMult = 1.83,
-        hotWearMult = 2.98, grainTempRatio = 0.75, blisterTempRatio = 1.55, waterDrainage = 0.72,
+        hotWearMult = 2.98, grainTempRatio = 0.88, blisterTempRatio = 1.55, waterDrainage = 0.72,
         wetGripScale = 1.03, dryGripScale = 1.02, trackConductivityMult = 1, camberSensitivity = 1,
-        bottomOutSensitivity = 1, scrubSensitivity = 1.1
+        bottomOutSensitivity = 1, scrubSensitivity = 1.1, skinVelCoolScale = 0.72, workHeatG0 = 0.16
     } },
     { tread = 0.60, profile = "standard", mods = {
         -- Mid sport↔standard (common passenger treadCoef ~0.55–0.65).
@@ -1277,11 +1287,12 @@ local VINTAGE_SPECTRUM_POINTS = {
 }
 
 -- Phase 4/5: stamp duty soft-cap magnitudes onto spectra / street-like standalones.
--- sport_plus milder; sport_tour mid; vintage gentler pack; slick OFF; drag/drift/rally keep DEFAULT 1.0
--- (specialty / purpose-gated — Phase 5 enable pack skips circuit/drag/drift/tarmac_rally/gravel).
+-- Street continuum: Sport HEAT LOCKED (own pack) → Plus → Track Day (Plus→Hard lerp). Hard C2 / slicks OFF.
+-- Vintage gentler pack; drag/drift/rally keep DEFAULT 1.0 (purpose skips the enable path).
 stampSpectrumDriveSoftcap(PROFILE_POINTS, function(name)
     if name == "sport_plus" then return DRIVE_SOFTCAP_SPORT_PLUS end
-    if name == "track_day" or name == "sport_tour" then return DRIVE_SOFTCAP_SPORT_MID end
+    if name == "track_day" then return DRIVE_SOFTCAP_TRACK_DAY end
+    if name == "sport" then return DRIVE_SOFTCAP_SPORT end
     return DRIVE_SOFTCAP_STREET
 end)
 stampSpectrumDriveSoftcap(SLICK_SPECTRUM_POINTS, DRIVE_SOFTCAP_OFF)
@@ -1311,8 +1322,8 @@ end
 -- sport/slick climb blister/stint/hot cliff; winter/rain stay NEUTRAL (wet behavior intact).
 stampSpectrumCharacter(PROFILE_POINTS, function(name)
     if name == "sport_plus" then return CHARACTER_SPORT_PLUS end
-    if name == "track_day" or name == "sport_tour" then return CHARACTER_TRACK_DAY end
-    if name == "sport" then return CHARACTER_SPORT_MID end
+    if name == "track_day" then return CHARACTER_TRACK_DAY end
+    if name == "sport" then return CHARACTER_SPORT end
     return CHARACTER_NEUTRAL
 end)
 stampSpectrumCharacter(SLICK_SPECTRUM_POINTS, function(name, pt)
@@ -1354,7 +1365,7 @@ local stintDistanceM = 0 -- mod trip meter (m); resets on initTyreData / vehicle
 local telem = {
     csvEnabled = false,    -- Optional CSV dump (user can enable)
     interval = 1.0,        -- Seconds between samples when enabled
-    armMarker = "mods/unpacked/Tire-Wear-and-Thermals-ReSpin-main/tools/TELEMETRY_CSV_ARMED",
+    armMarker = "mods/unpacked/Tire-Wear-and-Thermals-ReSpin-dev/tools/TELEMETRY_CSV_ARMED",
     timer = 0,
     path = nil,
     csvBuffer = {},
@@ -2439,6 +2450,15 @@ F.remapSlickSoftness = function(softnessCoef)
     return 0.80 + ((s - 0.875) / 0.115) * 0.075
 end
 
+-- Named street sport compounds must not fall through the utility radius band (20" passenger
+-- tires like 275/40R20 sit ~0.36–0.37 m and were misrouted to highway_utility_utility).
+local function isNamedStreetSportCompound(nameLower)
+    if string.find(nameLower, "sport_plus", 1, true) then return true end
+    if string.find(nameLower, "track_day", 1, true) or string.find(nameLower, "sport_tour", 1, true) then return true end
+    if string.find(nameLower, "supersport", 1, true) then return false end
+    return string.find(nameLower, "sport", 1, true) ~= nil
+end
+
 -- Hybrid Profile Resolving Engine (With Dynamic Dimensional Scaling & All Continuous Spectrums)
 F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTable, radius, width, hubRadius)
     treadCoef, softnessCoef = treadCoef or 0.5, softnessCoef or 0.5
@@ -2453,7 +2473,12 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
     local vehType = F.getVehicleType()
     local isHeavyCommercialName = string.find(nameLower, "22.5") or string.find(nameLower, "19.5") or string.find(nameLower, "24.5") or string.find(nameLower, "steer") or string.find(nameLower, "drive") or string.find(nameLower, "semi")
     local isCommercialTire = (vehType == "semi_truck" or vehType == "medium_duty") or (radius and radius >= 0.44 and width and width >= 0.22) or (isHeavyCommercialName and radius and radius >= 0.40)
-    local isUtilityTire = not isCommercialTire and ((vehType == "light_truck") or (radius and radius >= 0.36 and radius < 0.44))
+    local isUtilityTire = not isCommercialTire and not isNamedStreetSportCompound(nameLower)
+        and ((vehType == "light_truck")
+            -- 20" passenger radius band (~0.36–0.44 m) was too aggressive:
+            -- if `tireName` lookup fails, we still don't want Sport/Track Day (tread~0.40)
+            -- to get misrouted into highway_utility_utility.
+            or ((radius and radius >= 0.36 and radius < 0.44) and (treadCoef and treadCoef <= 0.37)))
     local isUTVTire = not isCommercialTire and not isUtilityTire and (vehType == "utv" or string.find(nameLower, "utv") or string.find(nameLower, "atv") or string.find(nameLower, "aurata") or string.find(nameLower, "sxs"))
     local isVintageTire = not isCommercialTire and not isUtilityTire and not isUTVTire and (string.find(nameLower, "vintage") or string.find(nameLower, "biasply") or string.find(nameLower, "bias_ply") or string.find(nameLower, "whitewall") or string.find(nameLower, "classic_radial"))
 
@@ -2531,7 +2556,8 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
     elseif string.find(nameLower, "drift") then
         rawProfile1, rawProfile2, interpFactor = "drift", "drift", 0; F.copyMods(STANDALONE_MODIFIERS.drift, mods)
         purpose, classifyReason = "drift", "standalone_drift"
-    elseif string.find(nameLower, "track_day", 1, true) then
+    elseif string.find(nameLower, "track_day", 1, true) or string.find(nameLower, "sport_tour", 1, true) then
+        -- sport_tour is the old Track Day name; do not keep a fourth sport profile.
         rawProfile1, rawProfile2, interpFactor = "track_day", "track_day", 0
         F.copyMods(F.getProfilePointMods("track_day"), mods)
         purpose, classifyReason = "street", "track_day_name"
@@ -2546,6 +2572,11 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
         local sc = F.remapSlickSoftness(softnessCoef)
         rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(SLICK_SPECTRUM_POINTS, "softness", sc, mods)
         purpose, classifyReason = "circuit", "slick_spectrum"
+    elseif isNamedStreetSportCompound(nameLower) then
+        -- Bare *_sport JBeam (not plus/track_day/tour); tread may differ from 0.50 anchor.
+        rawProfile1, rawProfile2, interpFactor = "sport", "sport", 0
+        F.copyMods(F.getProfilePointMods("sport"), mods)
+        purpose, classifyReason = "street", "sport_name"
     elseif isCommercialTire then
         rawProfile1, rawProfile2, interpFactor = F.interpolateSpectrum(COMMERCIAL_SPECTRUM_POINTS, "tread", max(0.50, min(0.90, treadCoef)), mods)
         purpose, classifyReason = "commercial", "commercial_spectrum"
@@ -2673,6 +2704,7 @@ F.getInterpolatedProfile = function(treadCoef, softnessCoef, tireName, targetTab
     -- (JBeam tread 0.18 sits in the ≤0.20 Slick band) or Sport Plus onto circuit.
     if classifyReason == "sport_plus_name" then descriptor = "Sport Plus" end
     if classifyReason == "track_day_name" then descriptor = "Track Day" end
+    if classifyReason == "sport_name" then descriptor = "Sport" end
 
     -- Unnamed low-tread street-spectrum path still shows Slick but stays circuit purpose
     if descriptor == "Slick" and purpose == "street" then
@@ -3150,7 +3182,7 @@ F.ctwIntegrateThermals = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     local slickCarcassScale = 1.0
     local p1Lower = data.profile1Lower or ""
     local p2Lower = data.profile2Lower or ""
-    -- Milder soft-cap duty id for sport_plus only (Track Day uses MID stamp).
+    -- Milder soft-cap duty id for sport_plus only (Track Day uses its own Plus→Hard stamp).
     local isSportPlusProf = not not (string.find(p1Lower, "sport_plus", 1, true) or string.find(p2Lower, "sport_plus", 1, true))
     if string.find(p1Lower, "slick", 1, true) or string.find(p2Lower, "slick", 1, true) then
         slickDriveScale = topo.drivePropSlickScale or 1.0
@@ -4053,11 +4085,12 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
     data.clog = max(0, min(1.0, clog))
 
     -- Graining: cold compound + lateral scrub on hard surfaces (not total slip alone).
-    -- Threshold matches scaled native slip (~0.10), not the old 0.40 gate that rarely fired.
+    -- GRAIN #1: thresh 0.10→0.045 (live Pitwall corner slip); decay 0.012→0.0035;
+    -- rolling polish cap 0.008→0.003. Sport/Plus grainTempRatio 0.88 + rate ×2.
     local grain = data.graining or 0
     local grainColdLimit = current_working_temp * grainTempRatio
     local latGrainWork = max(sideSlipEnergy, slipEnergy * 0.55)
-    local grainSlipThresh = 0.10
+    local grainSlipThresh = 0.045
     local coldSeverity = 0
     if avgWeightedTemp < grainColdLimit then
         coldSeverity = min(1.6, (grainColdLimit - avgWeightedTemp) / max(10.0, grainColdLimit * 0.28))
@@ -4068,10 +4101,10 @@ F.ctwIntegrateWear = function(wheelID, dt, localEnvTemp, wd, w, data, mods)
         local grainDecay = 0
         local warmFloor = current_working_temp * max(0.82, grainTempRatio + 0.06)
         if avgWeightedTemp >= warmFloor and avgWeightedTemp <= (current_working_temp * 1.15) and latGrainWork < (grainSlipThresh * 0.85) then
-            grainDecay = 0.012 -- slow polish in the working window (old 0.04 erased grains too fast)
+            grainDecay = 0.0035 -- polish in window; was 0.012 (erased out-lap grain)
         end
-        if not isAirborne and abs(angularVel) > 3.0 and latGrainWork < 0.08 then
-            grainDecay = grainDecay + min(0.008, 0.00035 * abs(angularVel))
+        if not isAirborne and abs(angularVel) > 3.0 and latGrainWork < (grainSlipThresh * 1.8) then
+            grainDecay = grainDecay + min(0.003, 0.00035 * abs(angularVel))
         end
         grain = grain - grainDecay * dt
     end

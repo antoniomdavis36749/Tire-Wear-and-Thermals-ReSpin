@@ -2,7 +2,7 @@ param(
     # Leave empty to automatically convert all matching tires found in common.zip
     [string[]]$Entries = @(), 
     [string]$BeamNGRoot = 'C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive',
-    [string]$ModRoot = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-main',
+    [string]$ModRoot = 'C:\Users\anton\AppData\Local\BeamNG\BeamNG.drive\current\mods\unpacked\Tire-Wear-and-Thermals-ReSpin-dev',
     
     # Toggle to true to filter base files down to race, slick, and sport templates
     [bool]$OnlyHighPerformance = $true
